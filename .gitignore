@@ -1,0 +1,27 @@
+# Python-generated files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Project virtual environments
+.venv/
+venv/
+
+# Environment variables and secrets
+.env
+
+# Django-generated files
+db.sqlite3
+staticfiles/
+media/
+
+# Test and coverage files
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editor settings
+.vscode/
+
+# Operating-system files
+.DS_Store
