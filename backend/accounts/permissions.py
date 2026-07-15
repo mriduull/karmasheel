@@ -27,3 +27,5 @@ class IsEmployer(BasePermission):
             and request.user.is_authenticated
             and request.user.role == User.Role.EMPLOYER
         )
+
+      
