@@ -22,6 +22,21 @@ class RegisterSerializer(serializers.ModelSerializer):
         required=True,
     )
 
+class CurrentUserSerializer(serializers.ModelSerializer):
+    """Return safe information about the authenticated user."""
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+            "email",
+            "phone_number",
+            "role",
+            "is_contact_verified",
+        )
+        read_only_fields = fields
+
     class Meta:
         model = User
 
