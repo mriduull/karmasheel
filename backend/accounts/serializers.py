@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from rest_framework import serializers
 
@@ -8,22 +9,8 @@ from profiles.models import EmployerProfile, WorkerProfile
 User = get_user_model()
 
 
-class RegisterSerializer(serializers.ModelSerializer):
-    """Validate registration data and create the correct role profile."""
-
-    password = serializers.CharField(
-        write_only=True,
-        min_length=8,
-        style={"input_type": "password"},
-    )
-
-    role = serializers.ChoiceField(
-        choices=User.Role.choices,
-        required=True,
-    )
-
 class CurrentUserSerializer(serializers.ModelSerializer):
-    """Return safe information about the authenticated user."""
+    """Safe account information returned by the /me/ endpoint."""
 
     class Meta:
         model = User
@@ -37,9 +24,21 @@ class CurrentUserSerializer(serializers.ModelSerializer):
         )
         read_only_fields = fields
 
+
+class RegisterSerializer(serializers.ModelSerializer):
+    """Register a worker or employer account."""
+
+    password = serializers.CharField(
+        write_only=True,
+        validators=[validate_password],
+    )
+
+    role = serializers.ChoiceField(
+        choices=User.Role.choices,
+    )
+
     class Meta:
         model = User
-
         fields = (
             "id",
             "username",
@@ -47,20 +46,8 @@ class CurrentUserSerializer(serializers.ModelSerializer):
             "phone_number",
             "password",
             "role",
-            "is_contact_verified",
         )
-
-        read_only_fields = (
-            "id",
-            "is_contact_verified",
-        )
-
-        extra_kwargs = {
-            "email": {
-                "required": False,
-                "allow_blank": True,
-            },
-        }
+        read_only_fields = ("id",)
 
     @transaction.atomic
     def create(self, validated_data):
