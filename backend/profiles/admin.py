@@ -7,13 +7,19 @@ from .models import EmployerProfile, WorkerProfile
 class WorkerProfileAdmin(admin.ModelAdmin):
     list_display = (
         "user",
+        "is_available",
+        "experience_years",
+        "expected_wage",
         "created_at",
         "updated_at",
     )
 
+    list_filter = ("is_available",)
+
     search_fields = (
         "user__username",
         "user__phone_number",
+        "address",
     )
 
     filter_horizontal = ("skills",)
@@ -24,6 +30,7 @@ class EmployerProfileAdmin(admin.ModelAdmin):
     list_display = (
         "user",
         "organization_name",
+        "pan_vat_number",
         "verification_status",
         "created_at",
     )
@@ -34,4 +41,5 @@ class EmployerProfileAdmin(admin.ModelAdmin):
         "organization_name",
         "user__username",
         "user__phone_number",
+        "pan_vat_number",
     )

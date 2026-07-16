@@ -1,3 +1,400 @@
-from django.test import TestCase
+from decimal import Decimal
 
-# Create your tests here.
+from django.contrib.auth import get_user_model
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
+
+from taxonomy.models import Category, SkillAlias, SkillTag, Subcategory, UnmatchedSkillTerm
+
+from .models import EmployerProfile, WorkerProfile
+
+
+User = get_user_model()
+
+
+class WorkerProfileAPITests(APITestCase):
+    def setUp(self):
+        self.worker_url = reverse("profiles:worker_me")
+        self.employer_url = reverse("profiles:employer_me")
+
+        self.worker = User.objects.create_user(
+            username="worker1",
+            phone_number="9811111111",
+            password="WorkerPassword123!",
+            role=User.Role.WORKER,
+        )
+        self.worker_profile = WorkerProfile.objects.create(user=self.worker)
+
+        self.employer = User.objects.create_user(
+            username="employer1",
+            phone_number="9822222222",
+            password="EmployerPassword123!",
+            role=User.Role.EMPLOYER,
+        )
+        EmployerProfile.objects.create(user=self.employer)
+
+        category = Category.objects.create(name="Construction & Repair")
+        subcategory = Subcategory.objects.create(category=category, name="Electrical")
+        self.skill = SkillTag.objects.create(subcategory=subcategory, name="House Wiring")
+        SkillAlias.objects.create(
+            skill=self.skill,
+            phrase="ghar wiring",
+            language=SkillAlias.Language.NE_ROMANIZED,
+        )
+
+    def authenticate_as(self, user, password):
+        login_response = self.client.post(
+            reverse("accounts:login"),
+            {"username": user.username, "password": password},
+            format="json",
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+
+    def test_unauthenticated_cannot_access(self):
+        response = self.client.get(self.worker_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_employer_cannot_access_worker_profile_endpoint(self):
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.get(self.worker_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_worker_can_retrieve_own_profile(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.get(self.worker_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], self.worker_profile.id)
+        self.assertEqual(response.data["skills"], [])
+
+    def test_missing_worker_profile_returns_404_not_500(self):
+        self.worker_profile.delete()
+
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.get(self.worker_url)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_worker_can_create_profile_when_missing(self):
+        self.worker_profile.delete()
+
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.post(
+            self.worker_url,
+            {"address": "Kathmandu", "is_available": True},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(WorkerProfile.objects.filter(user=self.worker).exists())
+
+    def test_worker_cannot_create_duplicate_profile(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.post(self.worker_url, {}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_worker_can_update_scalar_fields(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {
+                "address": "Pokhara",
+                "latitude": "28.209700",
+                "longitude": "83.985600",
+                "experience_years": 5,
+                "is_available": False,
+                "expected_wage": "1500.00",
+                "preferred_travel_radius_km": 15,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.worker_profile.refresh_from_db()
+        self.assertEqual(self.worker_profile.address, "Pokhara")
+        self.assertEqual(self.worker_profile.experience_years, 5)
+        self.assertFalse(self.worker_profile.is_available)
+        self.assertEqual(self.worker_profile.expected_wage, Decimal("1500.00"))
+        self.assertEqual(self.worker_profile.preferred_travel_radius_km, 15)
+
+    def test_worker_can_set_skills_via_skill_input_exact_match(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {"skill_input": ["House Wiring"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["unmatched_terms"], [])
+
+        self.worker_profile.refresh_from_db()
+        self.assertIn(self.skill, self.worker_profile.skills.all())
+
+    def test_worker_can_set_skills_via_romanized_nepali_alias(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {"skill_input": ["ghar wiring"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.worker_profile.refresh_from_db()
+        self.assertIn(self.skill, self.worker_profile.skills.all())
+
+    def test_unmatched_skill_input_is_reported_and_recorded(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {"skill_input": ["completely made up nonexistent skill"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data["unmatched_terms"],
+            ["completely made up nonexistent skill"],
+        )
+        self.assertTrue(
+            UnmatchedSkillTerm.objects.filter(
+                normalized_term="completely made up nonexistent skill"
+            ).exists()
+        )
+
+    def test_worker_latitude_out_of_range_is_rejected(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(self.worker_url, {"latitude": "91"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("latitude", response.data)
+
+    def test_worker_longitude_out_of_range_is_rejected(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(self.worker_url, {"longitude": "-181"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("longitude", response.data)
+
+    def test_negative_experience_years_is_rejected(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(self.worker_url, {"experience_years": -1}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("experience_years", response.data)
+
+    def test_negative_expected_wage_is_rejected(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(self.worker_url, {"expected_wage": "-100.00"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("expected_wage", response.data)
+
+    def test_negative_preferred_travel_radius_is_rejected(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url, {"preferred_travel_radius_km": -5}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("preferred_travel_radius_km", response.data)
+
+    def test_zero_values_are_accepted_for_non_negative_fields(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {
+                "experience_years": 0,
+                "expected_wage": "0.00",
+                "preferred_travel_radius_km": 0,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_worker_cannot_edit_another_workers_profile(self):
+        other_worker = User.objects.create_user(
+            username="worker2",
+            phone_number="9833333333",
+            password="WorkerPassword123!",
+            role=User.Role.WORKER,
+        )
+        other_profile = WorkerProfile.objects.create(user=other_worker, address="Untouched")
+
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(self.worker_url, {"address": "Hijacked"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        other_profile.refresh_from_db()
+        self.assertEqual(other_profile.address, "Untouched")
+
+
+class EmployerProfileAPITests(APITestCase):
+    def setUp(self):
+        self.employer_url = reverse("profiles:employer_me")
+        self.worker_url = reverse("profiles:worker_me")
+
+        self.employer = User.objects.create_user(
+            username="employer1",
+            phone_number="9822222222",
+            password="EmployerPassword123!",
+            role=User.Role.EMPLOYER,
+        )
+        self.employer_profile = EmployerProfile.objects.create(user=self.employer)
+
+        self.worker = User.objects.create_user(
+            username="worker1",
+            phone_number="9811111111",
+            password="WorkerPassword123!",
+            role=User.Role.WORKER,
+        )
+        WorkerProfile.objects.create(user=self.worker)
+
+    def authenticate_as(self, user, password):
+        login_response = self.client.post(
+            reverse("accounts:login"),
+            {"username": user.username, "password": password},
+            format="json",
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+
+    def test_worker_cannot_access_employer_profile_endpoint(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.get(self.employer_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_missing_employer_profile_returns_404_not_500(self):
+        self.employer_profile.delete()
+
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.get(self.employer_url)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_employer_can_update_organization_and_pan_vat_number(self):
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.patch(
+            self.employer_url,
+            {
+                "organization_name": "Himalayan Builders",
+                "address": "Lalitpur",
+                "pan_vat_number": "123456789",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.employer_profile.refresh_from_db()
+        self.assertEqual(self.employer_profile.organization_name, "Himalayan Builders")
+        self.assertEqual(self.employer_profile.pan_vat_number, "123456789")
+
+    def test_invalid_pan_vat_number_format_is_rejected(self):
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.patch(
+            self.employer_url,
+            {"pan_vat_number": "abc"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("pan_vat_number", response.data)
+
+    def test_duplicate_pan_vat_number_is_rejected(self):
+        other_employer = User.objects.create_user(
+            username="employer2",
+            phone_number="9844444444",
+            password="EmployerPassword123!",
+            role=User.Role.EMPLOYER,
+        )
+        EmployerProfile.objects.create(user=other_employer, pan_vat_number="111222333")
+
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.patch(
+            self.employer_url,
+            {"pan_vat_number": "111222333"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("pan_vat_number", response.data)
+
+    def test_blank_pan_vat_number_does_not_trigger_uniqueness_conflict(self):
+        User.objects.create_user(
+            username="employer3",
+            phone_number="9855555555",
+            password="EmployerPassword123!",
+            role=User.Role.EMPLOYER,
+        )
+        # Two employers with no PAN/VAT set (blank) must coexist without error.
+        second_employer = User.objects.create_user(
+            username="employer4",
+            phone_number="9866666666",
+            password="EmployerPassword123!",
+            role=User.Role.EMPLOYER,
+        )
+        EmployerProfile.objects.create(user=second_employer, pan_vat_number="")
+
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.patch(self.employer_url, {"organization_name": "Test"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_verification_status_is_read_only(self):
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.patch(
+            self.employer_url,
+            {"verification_status": EmployerProfile.VerificationStatus.VERIFIED},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.employer_profile.refresh_from_db()
+        self.assertEqual(
+            self.employer_profile.verification_status,
+            EmployerProfile.VerificationStatus.UNVERIFIED,
+        )
+
+    def test_latitude_above_90_is_rejected(self):
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.patch(self.employer_url, {"latitude": "90.5"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("latitude", response.data)
+
+    def test_latitude_below_negative_90_is_rejected(self):
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.patch(self.employer_url, {"latitude": "-90.5"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("latitude", response.data)
+
+    def test_longitude_above_180_is_rejected(self):
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.patch(self.employer_url, {"longitude": "180.5"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("longitude", response.data)
+
+    def test_longitude_below_negative_180_is_rejected(self):
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.patch(self.employer_url, {"longitude": "-180.5"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("longitude", response.data)
+
+    def test_latitude_and_longitude_within_range_are_accepted(self):
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.patch(
+            self.employer_url,
+            {"latitude": "27.700000", "longitude": "85.300000"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

@@ -25,4 +25,9 @@ urlpatterns = [
         "api/auth/",
         include("accounts.urls"),
     ),
+
+    path(
+        "api/profiles/",
+        include("profiles.urls"),
+    ),
 ]

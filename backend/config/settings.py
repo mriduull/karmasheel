@@ -143,3 +143,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+
+# Skill-normalization service (Week 2)
+# Minimum RapidFuzz confidence score (0-100) for a fuzzy skill match to be
+# accepted automatically. Phrases scoring below this are stored in
+# UnmatchedSkillTerm for admin review instead of being auto-matched.
+SKILL_MATCH_THRESHOLD = float(os.getenv("SKILL_MATCH_THRESHOLD", "85"))
