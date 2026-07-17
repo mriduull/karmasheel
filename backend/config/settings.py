@@ -186,4 +186,10 @@ RECOMMENDATION_SETTINGS = {
     # Safe result-list limits for both recommendation endpoints.
     "DEFAULT_RESULT_LIMIT": 20,
     "MAX_RESULT_LIMIT": 50,
+
+    # Week 5 opportunity advisory: a job is a "near miss" for a worker
+    # when their final_match_score falls in this inclusive range - close
+    # enough to be reachable, not so close it's already a good match.
+    "NEAR_MISS_MIN_SCORE": float(os.getenv("RECOMMENDATION_NEAR_MISS_MIN_SCORE", "40")),
+    "NEAR_MISS_MAX_SCORE": float(os.getenv("RECOMMENDATION_NEAR_MISS_MAX_SCORE", "75")),
 }

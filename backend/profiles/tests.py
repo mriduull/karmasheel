@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -8,6 +9,7 @@ from rest_framework.test import APITestCase
 from taxonomy.models import Category, SkillAlias, SkillTag, Subcategory, UnmatchedSkillTerm
 
 from .models import EmployerProfile, WorkerProfile
+from .services import generate_worker_summary
 
 
 User = get_user_model()
@@ -398,3 +400,166 @@ class EmployerProfileAPITests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------
+# Week 5 - automatic worker CV generation
+# ---------------------------------------------------------------------
+
+class WorkerSummaryServiceTests(TestCase):
+    """Unit tests for the deterministic, template-based summary sentence."""
+
+    def setUp(self):
+        self.worker_user = User.objects.create_user(
+            username="cvworker",
+            phone_number="9800000030",
+            password="WorkerPassword123!",
+            role=User.Role.WORKER,
+        )
+        category = Category.objects.create(name="Construction & Repair")
+        self.subcategory = Subcategory.objects.create(category=category, name="Electrical")
+        self.wiring_skill = SkillTag.objects.create(subcategory=self.subcategory, name="House Wiring")
+        self.fan_skill = SkillTag.objects.create(subcategory=self.subcategory, name="Fan Installation")
+
+    def test_no_experience_and_no_skills_omits_those_clauses(self):
+        profile = WorkerProfile.objects.create(user=self.worker_user, is_available=True)
+        summary = generate_worker_summary(profile)
+        self.assertEqual(summary, "Worker, currently available for work.")
+
+    def test_experience_without_skills_has_no_subcategory_phrase(self):
+        profile = WorkerProfile.objects.create(
+            user=self.worker_user, experience_years=4, is_available=True
+        )
+        summary = generate_worker_summary(profile)
+        self.assertEqual(summary, "Worker with 4 years of experience, currently available for work.")
+
+    def test_single_year_uses_singular_word(self):
+        profile = WorkerProfile.objects.create(
+            user=self.worker_user, experience_years=1, is_available=True
+        )
+        summary = generate_worker_summary(profile)
+        self.assertIn("1 year of experience", summary)
+        self.assertNotIn("1 years", summary)
+
+    def test_experience_and_skills_include_subcategory_and_skill_list(self):
+        profile = WorkerProfile.objects.create(
+            user=self.worker_user, experience_years=4, is_available=True
+        )
+        profile.skills.set([self.wiring_skill, self.fan_skill])
+
+        summary = generate_worker_summary(profile)
+
+        self.assertEqual(
+            summary,
+            "Worker with 4 years of experience in electrical work, "
+            "skilled in Fan Installation and House Wiring, currently available for work.",
+        )
+
+    def test_unavailable_worker_uses_not_available_phrasing(self):
+        profile = WorkerProfile.objects.create(user=self.worker_user, is_available=False)
+        summary = generate_worker_summary(profile)
+        self.assertEqual(summary, "Worker, currently not available for new work.")
+
+    def test_skill_list_is_truncated_to_max_summary_skills(self):
+        profile = WorkerProfile.objects.create(user=self.worker_user, is_available=True)
+        skills = [
+            SkillTag.objects.create(subcategory=self.subcategory, name=f"Skill {i}") for i in range(8)
+        ]
+        profile.skills.set(skills)
+
+        summary = generate_worker_summary(profile)
+
+        for skill in skills[:6]:
+            self.assertIn(skill.name, summary)
+
+        for skill in skills[6:]:
+            self.assertNotIn(skill.name, summary)
+
+
+class WorkerCVAPITests(APITestCase):
+    def setUp(self):
+        self.preview_url = reverse("profiles:worker_cv_preview")
+        self.pdf_url = reverse("profiles:worker_cv_pdf")
+
+        self.worker = User.objects.create_user(
+            username="cvworker2",
+            phone_number="9800000031",
+            password="WorkerPassword123!",
+            role=User.Role.WORKER,
+        )
+        self.worker_profile = WorkerProfile.objects.create(
+            user=self.worker, experience_years=2, is_available=True
+        )
+
+        self.employer = User.objects.create_user(
+            username="cvemployer",
+            phone_number="9800000032",
+            password="EmployerPassword123!",
+            role=User.Role.EMPLOYER,
+        )
+        EmployerProfile.objects.create(user=self.employer)
+
+    def authenticate_as(self, user, password):
+        login_response = self.client.post(
+            reverse("accounts:login"),
+            {"username": user.username, "password": password},
+            format="json",
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+
+    def test_unauthenticated_cannot_access_preview(self):
+        response = self.client.get(self.preview_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_unauthenticated_cannot_access_pdf(self):
+        response = self.client.get(self.pdf_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_employer_cannot_access_worker_cv_preview(self):
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.get(self.preview_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_employer_cannot_access_worker_cv_pdf(self):
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.get(self.pdf_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_missing_worker_profile_returns_404_for_preview(self):
+        self.worker_profile.delete()
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.get(self.preview_url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_missing_worker_profile_returns_404_for_pdf(self):
+        self.worker_profile.delete()
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.get(self.pdf_url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_worker_can_preview_own_cv_as_html(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.get(self.preview_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("text/html", response["Content-Type"])
+        content = response.content.decode()
+        self.assertIn(self.worker.username, content)
+        self.assertIn("Worker with 2 years of experience", content)
+
+    def test_worker_can_download_own_cv_as_pdf(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.get(self.pdf_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn("attachment", response["Content-Disposition"])
+        self.assertIn(f"cv-{self.worker.username}.pdf", response["Content-Disposition"])
+        self.assertTrue(response.content.startswith(b"%PDF"))
+
+    def test_cv_never_exposes_employer_only_data(self):
+        # PAN/VAT is an employer-only field and must never leak through a
+        # worker's own CV, even indirectly.
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.get(self.preview_url)
+        self.assertNotIn("pan_vat", response.content.decode().lower())

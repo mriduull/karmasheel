@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from jobs.models import JobPost
 
-from .models import Application
+from .models import Application, Rating
 
 
 class ApplicationSerializer(serializers.ModelSerializer):
@@ -66,3 +66,40 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
 
 class ApplicationStatusUpdateSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Application.Status.choices)
+
+
+class RatingSerializer(serializers.ModelSerializer):
+    """Read representation of a submitted rating."""
+
+    reviewer_username = serializers.CharField(source="reviewer.username", read_only=True)
+    reviewed_username = serializers.CharField(source="reviewed_user.username", read_only=True)
+
+    class Meta:
+        model = Rating
+        fields = (
+            "id",
+            "application",
+            "direction",
+            "reviewer_username",
+            "reviewed_username",
+            "score",
+            "review_text",
+            "created_at",
+        )
+        read_only_fields = fields
+
+
+class RatingCreateSerializer(serializers.Serializer):
+    """Input for submitting a rating. `reviewer`, `reviewed_user`, and
+    `direction` are derived server-side by
+    `applications.services.submit_rating` - never taken from client
+    input - so a participant can only rate the other side of their own
+    application."""
+
+    score = serializers.IntegerField(min_value=1, max_value=5)
+    review_text = serializers.CharField(max_length=1000, required=False, allow_blank=True)
+
+
+class RatingSummarySerializer(serializers.Serializer):
+    average_rating = serializers.FloatField(allow_null=True)
+    rating_count = serializers.IntegerField()

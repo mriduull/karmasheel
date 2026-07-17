@@ -8,13 +8,16 @@ from accounts.permissions import IsEmployer, IsWorker
 from jobs.models import JobPost
 from profiles.models import WorkerProfile
 
-from .models import Application
+from .models import Application, Rating
 from .serializers import (
     ApplicationCreateSerializer,
     ApplicationSerializer,
     ApplicationStatusUpdateSerializer,
+    RatingCreateSerializer,
+    RatingSerializer,
+    RatingSummarySerializer,
 )
-from .services import transition_application_status
+from .services import get_rating_summary, submit_rating, transition_application_status
 
 
 class ApplicationListCreateView(APIView):
@@ -119,3 +122,83 @@ class JobApplicationsView(APIView):
         applications = Application.objects.filter(job=job).select_related("worker__user")
         serializer = ApplicationSerializer(applications, many=True)
         return Response(serializer.data)
+
+
+class ApplicationRatingView(APIView):
+    """Week 5 ratings for one application. Both directions -
+    worker-rates-employer and employer-rates-worker - live at this same
+    endpoint; which one a POST creates depends on which side of the
+    application the requester is on."""
+
+    permission_classes = [IsAuthenticated]
+
+    def _get_application_for_participant(self, request, pk):
+        """Returns (application, error_response). Scoped to participants
+        only, exactly like `ApplicationStatusUpdateView`."""
+
+        application = Application.objects.filter(pk=pk).select_related(
+            "worker__user", "job__employer__user"
+        ).first()
+
+        if application is None:
+            return None, Response({"detail": "Application not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        is_worker_party = application.worker.user_id == request.user.id
+        is_employer_party = application.job.employer.user_id == request.user.id
+
+        if not (is_worker_party or is_employer_party):
+            return None, Response(
+                {"detail": "You are not a participant in this application."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        return application, None
+
+    def get(self, request, pk):
+        application, error_response = self._get_application_for_participant(request, pk)
+
+        if error_response is not None:
+            return error_response
+
+        ratings = Rating.objects.filter(application=application).select_related("reviewer", "reviewed_user")
+        return Response(RatingSerializer(ratings, many=True).data)
+
+    def post(self, request, pk):
+        application, error_response = self._get_application_for_participant(request, pk)
+
+        if error_response is not None:
+            return error_response
+
+        serializer = RatingCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            rating = submit_rating(
+                application,
+                reviewer=request.user,
+                score=serializer.validated_data["score"],
+                review_text=serializer.validated_data.get("review_text", ""),
+            )
+        except DjangoValidationError as exc:
+            message = exc.messages[0] if hasattr(exc, "messages") else str(exc)
+            return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(RatingSerializer(rating).data, status=status.HTTP_201_CREATED)
+
+
+class MyRatingSummaryView(APIView):
+    """GET /api/applications/ratings/summary/
+
+    The authenticated user's own aggregate rating - works for both
+    workers and employers, since `Rating.reviewed_user` is a plain user
+    FK regardless of role."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        average_rating, rating_count = get_rating_summary(request.user)
+        return Response(
+            RatingSummarySerializer(
+                {"average_rating": average_rating, "rating_count": rating_count}
+            ).data
+        )

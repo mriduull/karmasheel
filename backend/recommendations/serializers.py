@@ -79,3 +79,25 @@ class WorkerRecommendationSerializer(_BaseRecommendationSerializer):
     """One ranked worker candidate recommendation for an employer's job."""
 
     worker = RecommendedWorkerSerializer()
+
+
+class NearMissJobSerializer(_BaseRecommendationSerializer):
+    """One near-miss job recommendation, as returned by the Week 5
+    opportunity-advisory endpoint."""
+
+    job = RecommendedJobSerializer()
+
+
+class MissingSkillAdvisorySerializer(serializers.Serializer):
+    """One ranked missing-skill suggestion, with how many near-miss jobs
+    it would help unlock."""
+
+    skill = SkillTagSummarySerializer()
+    missing_frequency = serializers.IntegerField()
+    required_frequency = serializers.IntegerField()
+    job_ids = serializers.ListField(child=serializers.IntegerField())
+
+
+class OpportunityAdvisorySerializer(serializers.Serializer):
+    near_miss_jobs = NearMissJobSerializer(many=True)
+    missing_skills = MissingSkillAdvisorySerializer(many=True)

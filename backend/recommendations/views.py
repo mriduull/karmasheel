@@ -10,7 +10,12 @@ from jobs.permissions import IsVerifiedEmployer
 from jobs.services import filter_candidate_workers_for_job
 from profiles.models import WorkerProfile
 
-from .serializers import JobRecommendationSerializer, WorkerRecommendationSerializer
+from .advisory import build_opportunity_advisory
+from .serializers import (
+    JobRecommendationSerializer,
+    OpportunityAdvisorySerializer,
+    WorkerRecommendationSerializer,
+)
 from .services import evaluate_match, filter_candidate_jobs_for_worker
 
 
@@ -112,4 +117,30 @@ class JobWorkerRecommendationsView(APIView):
         results = results[:limit]
 
         serializer = WorkerRecommendationSerializer(results, many=True)
+        return Response(serializer.data)
+
+
+class OpportunityAdvisoryView(APIView):
+    """GET /api/recommendations/opportunities/
+
+    Week 5 opportunity advisory for the authenticated worker's own
+    profile: jobs that are a "near miss" (final_match_score in the
+    configurable inclusive range), and the required skills missing
+    across those jobs, ranked by how many opportunities learning each
+    one would unlock.
+    """
+
+    permission_classes = [IsAuthenticated, IsWorker]
+
+    def get(self, request):
+        worker_profile = WorkerProfile.objects.filter(user=request.user).select_related("user").first()
+
+        if worker_profile is None:
+            return Response(
+                {"detail": "Worker profile not found. Create your worker profile first."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        advisory = build_opportunity_advisory(worker_profile)
+        serializer = OpportunityAdvisorySerializer(advisory)
         return Response(serializer.data)

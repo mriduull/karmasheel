@@ -1,4 +1,5 @@
 from decimal import Decimal
+from types import SimpleNamespace
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -11,7 +12,7 @@ from jobs.models import JobPost
 from profiles.models import EmployerProfile, WorkerProfile
 from taxonomy.models import Category, SkillTag, Subcategory
 
-from . import services
+from . import advisory, services
 
 User = get_user_model()
 
@@ -665,3 +666,190 @@ class JobWorkerRecommendationEndpointTests(RecommendationEndpointTestsBase):
             reverse("recommendations:job_worker_recommendations", kwargs={"job_id": 999999})
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+# ---------------------------------------------------------------------
+# Week 5 - opportunity advisory
+# ---------------------------------------------------------------------
+
+class NearMissScoreTests(TestCase):
+    """Boundary tests for the configurable inclusive near-miss range."""
+
+    def test_score_below_min_is_excluded(self):
+        self.assertFalse(advisory.is_near_miss_score(39.99))
+
+    def test_score_at_min_is_included(self):
+        self.assertTrue(advisory.is_near_miss_score(40.0))
+
+    def test_score_at_max_is_included(self):
+        self.assertTrue(advisory.is_near_miss_score(75.0))
+
+    def test_score_above_max_is_excluded(self):
+        self.assertFalse(advisory.is_near_miss_score(75.01))
+
+    def test_midpoint_is_included(self):
+        self.assertTrue(advisory.is_near_miss_score(57.5))
+
+    @override_settings(
+        RECOMMENDATION_SETTINGS={
+            **settings.RECOMMENDATION_SETTINGS,
+            "NEAR_MISS_MIN_SCORE": 50.0,
+            "NEAR_MISS_MAX_SCORE": 60.0,
+        }
+    )
+    def test_range_is_configurable(self):
+        self.assertFalse(advisory.is_near_miss_score(45.0))
+        self.assertTrue(advisory.is_near_miss_score(50.0))
+        self.assertTrue(advisory.is_near_miss_score(60.0))
+        self.assertFalse(advisory.is_near_miss_score(65.0))
+
+
+class MissingSkillRankingTests(TestCase):
+    def setUp(self):
+        category = Category.objects.create(name="Construction & Repair")
+        subcategory = Subcategory.objects.create(category=category, name="Electrical")
+        self.skill_a = SkillTag.objects.create(subcategory=subcategory, name="Skill A")
+        self.skill_b = SkillTag.objects.create(subcategory=subcategory, name="Skill B")
+        self.skill_c = SkillTag.objects.create(subcategory=subcategory, name="Skill C")
+
+    def _result(self, job_id, *, matched=(), missing=()):
+        skill_result = SimpleNamespace(
+            matched_required_skills=list(matched), missing_required_skills=list(missing)
+        )
+        job = SimpleNamespace(id=job_id)
+        return SimpleNamespace(job=job, skill=skill_result)
+
+    def test_no_near_miss_jobs_yields_no_missing_skills(self):
+        self.assertEqual(advisory.rank_missing_skills([]), [])
+
+    def test_skill_never_missing_is_excluded(self):
+        results = [self._result(1, matched=[self.skill_c], missing=[])]
+        self.assertEqual(advisory.rank_missing_skills(results), [])
+
+    def test_ranks_by_missing_frequency_first(self):
+        # skill_a missing from 2 jobs, skill_c missing from 1 job.
+        results = [
+            self._result(1, missing=[self.skill_a]),
+            self._result(2, missing=[self.skill_a]),
+            self._result(3, missing=[self.skill_c]),
+        ]
+        ranked = advisory.rank_missing_skills(results)
+        self.assertEqual([entry.skill for entry in ranked], [self.skill_a, self.skill_c])
+        self.assertEqual(ranked[0].missing_frequency, 2)
+        self.assertEqual(ranked[1].missing_frequency, 1)
+
+    def test_required_frequency_breaks_ties_on_missing_frequency(self):
+        # skill_a and skill_b are both missing from exactly 2 jobs, but
+        # skill_b is additionally *required* (and already matched) in a
+        # third job, so it represents broader demand and should rank first.
+        results = [
+            self._result(1, missing=[self.skill_a, self.skill_b]),
+            self._result(2, missing=[self.skill_a]),
+            self._result(3, missing=[self.skill_b]),
+            self._result(4, matched=[self.skill_b]),
+        ]
+        ranked = advisory.rank_missing_skills(results)
+        self.assertEqual(ranked[0].skill, self.skill_b)
+        self.assertEqual(ranked[0].missing_frequency, 2)
+        self.assertEqual(ranked[0].required_frequency, 3)
+        self.assertEqual(ranked[1].skill, self.skill_a)
+        self.assertEqual(ranked[1].missing_frequency, 2)
+        self.assertEqual(ranked[1].required_frequency, 2)
+
+    def test_full_tie_breaks_deterministically_by_skill_id(self):
+        results = [
+            self._result(1, missing=[self.skill_b]),
+            self._result(2, missing=[self.skill_a]),
+        ]
+        ranked = advisory.rank_missing_skills(results)
+        expected_order = sorted([self.skill_a, self.skill_b], key=lambda skill: skill.id)
+        self.assertEqual([entry.skill for entry in ranked], expected_order)
+
+    def test_job_ids_are_tracked_per_skill(self):
+        results = [
+            self._result(1, missing=[self.skill_a]),
+            self._result(2, missing=[self.skill_a]),
+        ]
+        ranked = advisory.rank_missing_skills(results)
+        self.assertEqual(ranked[0].job_ids, [1, 2])
+
+
+class OpportunityAdvisoryEndpointTests(RecommendationEndpointTestsBase):
+    def test_unauthenticated_request_is_rejected(self):
+        response = self.client.get(reverse("recommendations:opportunity_advisory"))
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_employer_cannot_access_endpoint(self):
+        self.authenticate_as(self.employer_user, "EmployerPassword123!")
+        response = self.client.get(reverse("recommendations:opportunity_advisory"))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_missing_worker_profile_returns_404(self):
+        profileless_user = User.objects.create_user(
+            username="noprofileworker3",
+            phone_number="9800000007",
+            password="WorkerPassword123!",
+            role=User.Role.WORKER,
+        )
+        self.authenticate_as(profileless_user, "WorkerPassword123!")
+        response = self.client.get(reverse("recommendations:opportunity_advisory"))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_near_miss_job_and_its_missing_skill_are_surfaced(self):
+        # Add a second required skill the worker lacks, so self.job is no
+        # longer a full match. The near-miss window is pinned exactly to
+        # this job's real, formula-computed score so the test exercises
+        # actual boundary inclusion rather than a guessed range.
+        advanced_skill = SkillTag.objects.create(subcategory=self.subcategory, name="Advanced Panel Work")
+        self.job.required_skills.add(advanced_skill)
+
+        score = services.evaluate_match(self.worker, self.job, direction="worker_to_job").final_score
+
+        with override_settings(
+            RECOMMENDATION_SETTINGS={
+                **settings.RECOMMENDATION_SETTINGS,
+                "NEAR_MISS_MIN_SCORE": score,
+                "NEAR_MISS_MAX_SCORE": score,
+            }
+        ):
+            self.authenticate_as(self.worker_user, "WorkerPassword123!")
+            response = self.client.get(reverse("recommendations:opportunity_advisory"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        job_ids = [entry["job"]["id"] for entry in response.data["near_miss_jobs"]]
+        self.assertIn(self.job.id, job_ids)
+
+        missing_skill_ids = [entry["skill"]["id"] for entry in response.data["missing_skills"]]
+        self.assertIn(advanced_skill.id, missing_skill_ids)
+
+    def test_job_scoring_just_below_the_window_is_excluded(self):
+        advanced_skill = SkillTag.objects.create(subcategory=self.subcategory, name="Advanced Panel Work")
+        self.job.required_skills.add(advanced_skill)
+
+        score = services.evaluate_match(self.worker, self.job, direction="worker_to_job").final_score
+
+        with override_settings(
+            RECOMMENDATION_SETTINGS={
+                **settings.RECOMMENDATION_SETTINGS,
+                "NEAR_MISS_MIN_SCORE": score + 0.01,
+                "NEAR_MISS_MAX_SCORE": 100.0,
+            }
+        ):
+            self.authenticate_as(self.worker_user, "WorkerPassword123!")
+            response = self.client.get(reverse("recommendations:opportunity_advisory"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["near_miss_jobs"], [])
+        self.assertEqual(response.data["missing_skills"], [])
+
+    def test_full_match_job_with_default_thresholds_is_not_a_near_miss(self):
+        # self.job's only required skill (wiring_skill) is already on the
+        # worker, so with the default 40-75 window it should score above
+        # the near-miss range and not appear as a near miss.
+        self.authenticate_as(self.worker_user, "WorkerPassword123!")
+        response = self.client.get(reverse("recommendations:opportunity_advisory"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        job_ids = [entry["job"]["id"] for entry in response.data["near_miss_jobs"]]
+        self.assertNotIn(self.job.id, job_ids)

@@ -1,3 +1,5 @@
+from django.http import HttpResponse
+from django.utils.text import slugify
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -7,6 +9,7 @@ from accounts.permissions import IsEmployer, IsWorker
 
 from .models import EmployerProfile, WorkerProfile
 from .serializers import EmployerProfileSerializer, WorkerProfileSerializer
+from .services import render_worker_cv_html, render_worker_cv_pdf
 
 
 class WorkerProfileView(APIView):
@@ -70,6 +73,60 @@ class WorkerProfileView(APIView):
 
     def patch(self, request):
         return self._update(request, partial=True)
+
+
+class WorkerCVPreviewView(APIView):
+    """HTML preview of the authenticated worker's own auto-generated CV.
+
+    Scoped entirely to `request.user`, exactly like `WorkerProfileView` -
+    there is no way to preview another worker's CV through this endpoint.
+    """
+
+    permission_classes = [IsAuthenticated, IsWorker]
+
+    def get(self, request):
+        profile = (
+            WorkerProfile.objects.filter(user=request.user)
+            .select_related("user")
+            .prefetch_related("skills__subcategory")
+            .first()
+        )
+
+        if profile is None:
+            return Response(
+                {"detail": "Worker profile not found. Create your worker profile first."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        html = render_worker_cv_html(profile)
+        return HttpResponse(html, content_type="text/html")
+
+
+class WorkerCVPdfView(APIView):
+    """PDF download of the authenticated worker's own auto-generated CV."""
+
+    permission_classes = [IsAuthenticated, IsWorker]
+
+    def get(self, request):
+        profile = (
+            WorkerProfile.objects.filter(user=request.user)
+            .select_related("user")
+            .prefetch_related("skills__subcategory")
+            .first()
+        )
+
+        if profile is None:
+            return Response(
+                {"detail": "Worker profile not found. Create your worker profile first."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        pdf_bytes = render_worker_cv_pdf(profile)
+        filename = f"cv-{slugify(profile.user.username) or profile.user.id}.pdf"
+
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
 
 class EmployerProfileView(APIView):
