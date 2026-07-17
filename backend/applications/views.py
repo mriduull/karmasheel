@@ -1,3 +1,121 @@
-from django.shortcuts import render
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-# Create your views here.
+from accounts.permissions import IsEmployer, IsWorker
+from jobs.models import JobPost
+from profiles.models import WorkerProfile
+
+from .models import Application
+from .serializers import (
+    ApplicationCreateSerializer,
+    ApplicationSerializer,
+    ApplicationStatusUpdateSerializer,
+)
+from .services import transition_application_status
+
+
+class ApplicationListCreateView(APIView):
+    """A worker's own application history, and the endpoint used to apply
+    to a job."""
+
+    permission_classes = [IsAuthenticated, IsWorker]
+
+    def get(self, request):
+        worker_profile = WorkerProfile.objects.filter(user=request.user).first()
+
+        if worker_profile is None:
+            return Response(
+                {"detail": "Worker profile not found. Create your worker profile first."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        applications = Application.objects.filter(worker=worker_profile).select_related("job")
+        serializer = ApplicationSerializer(applications, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        worker_profile = WorkerProfile.objects.filter(user=request.user).first()
+
+        if worker_profile is None:
+            return Response(
+                {"detail": "Worker profile not found. Create your worker profile first."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = ApplicationCreateSerializer(
+            data=request.data, context={"worker_profile": worker_profile}
+        )
+        serializer.is_valid(raise_exception=True)
+        application = serializer.save()
+        return Response(ApplicationSerializer(application).data, status=status.HTTP_201_CREATED)
+
+
+class ApplicationStatusUpdateView(APIView):
+    """Controlled application-status updates. The applying worker may
+    withdraw their own application; the job-owning employer may
+    shortlist, contact, hire, reject, or complete it. All other users are
+    forbidden. Legality of the requested transition itself is enforced by
+    the Week 3 state-machine service, not this view."""
+
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        application = Application.objects.filter(pk=pk).select_related(
+            "worker__user", "job__employer__user"
+        ).first()
+
+        if application is None:
+            return Response({"detail": "Application not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        is_worker_party = application.worker.user_id == request.user.id
+        is_employer_party = application.job.employer.user_id == request.user.id
+
+        if not (is_worker_party or is_employer_party):
+            return Response(
+                {"detail": "You are not a participant in this application."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = ApplicationStatusUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        new_status = serializer.validated_data["status"]
+
+        try:
+            transition_application_status(application, new_status, actor=request.user)
+        except DjangoValidationError as exc:
+            message = exc.messages[0] if hasattr(exc, "messages") else str(exc)
+            return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
+
+        note_field = "worker_note" if is_worker_party else "employer_note"
+        note = request.data.get(note_field)
+
+        if note:
+            setattr(application, note_field, note)
+            application.save(update_fields=[note_field])
+
+        return Response(ApplicationSerializer(application).data)
+
+
+class JobApplicationsView(APIView):
+    """Employer review of applications for one of their own job posts."""
+
+    permission_classes = [IsAuthenticated, IsEmployer]
+
+    def get(self, request, job_id):
+        job = JobPost.objects.filter(pk=job_id).select_related("employer").first()
+
+        if job is None:
+            return Response({"detail": "Job not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if job.employer.user_id != request.user.id:
+            return Response(
+                {"detail": "Only the owning employer can view applications for this job."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        applications = Application.objects.filter(job=job).select_related("worker__user")
+        serializer = ApplicationSerializer(applications, many=True)
+        return Response(serializer.data)
