@@ -40,4 +40,9 @@ urlpatterns = [
         "api/applications/",
         include("applications.urls"),
     ),
+
+    path(
+        "api/recommendations/",
+        include("recommendations.urls"),
+    ),
 ]

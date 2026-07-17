@@ -150,3 +150,40 @@ STATIC_URL = 'static/'
 # accepted automatically. Phrases scoring below this are stored in
 # UnmatchedSkillTerm for admin review instead of being auto-matched.
 SKILL_MATCH_THRESHOLD = float(os.getenv("SKILL_MATCH_THRESHOLD", "85"))
+
+# Explainable hybrid recommendation engine (Week 4)
+# All component weights live here rather than as magic numbers in
+# recommendations/services.py or views. FINAL_WEIGHT_* must sum to 1.0 -
+# this is validated at startup, see recommendations.apps.RecommendationsConfig.
+RECOMMENDATION_SETTINGS = {
+    # Distance score falloff: 100 at 0 km, linearly down to 0 at this
+    # distance (and beyond).
+    "MAX_DISTANCE_KM": float(os.getenv("RECOMMENDATION_MAX_DISTANCE_KM", "20")),
+
+    # Used in place of a component that cannot be computed (e.g. distance
+    # when coordinates are missing) - neither rewards nor penalizes.
+    "NEUTRAL_SCORE_WHEN_UNKNOWN": 50.0,
+
+    # skill_score = SKILL_WEIGHT_REQUIRED_COVERAGE * required_skill_coverage
+    #             + SKILL_WEIGHT_COSINE_SIMILARITY * cosine_similarity_score
+    "SKILL_WEIGHT_REQUIRED_COVERAGE": 0.70,
+    "SKILL_WEIGHT_COSINE_SIMILARITY": 0.30,
+
+    # reciprocal_preference_score is a separate, explanatory "mutual fit"
+    # metric returned alongside the final score. It is NOT an input to
+    # final_match_score, to avoid double-counting the same underlying
+    # component scores - see recommendations/services.py for details.
+    "RECIPROCAL_WEIGHT_EMPLOYER_SIDE": 0.60,
+    "RECIPROCAL_WEIGHT_WORKER_SIDE": 0.40,
+
+    # final_match_score weights. Must sum to 1.0.
+    "FINAL_WEIGHT_SKILL": 0.40,
+    "FINAL_WEIGHT_DISTANCE": 0.20,
+    "FINAL_WEIGHT_EXPERIENCE": 0.15,
+    "FINAL_WEIGHT_AVAILABILITY": 0.15,
+    "FINAL_WEIGHT_RELIABILITY": 0.10,
+
+    # Safe result-list limits for both recommendation endpoints.
+    "DEFAULT_RESULT_LIMIT": 20,
+    "MAX_RESULT_LIMIT": 50,
+}

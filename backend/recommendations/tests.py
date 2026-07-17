@@ -1,3 +1,667 @@
-from django.test import TestCase
+from decimal import Decimal
 
-# Create your tests here.
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.test import TestCase, override_settings
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
+
+from jobs.models import JobPost
+from profiles.models import EmployerProfile, WorkerProfile
+from taxonomy.models import Category, SkillTag, Subcategory
+
+from . import services
+
+User = get_user_model()
+
+
+def make_job(employer, category, subcategory, **overrides):
+    defaults = dict(
+        title="House wiring for new build",
+        description="Wire a two-storey residential building.",
+        address="Baneshwor, Kathmandu",
+        latitude=Decimal("27.700000"),
+        longitude=Decimal("85.330000"),
+        required_experience_years=0,
+        wage_amount=Decimal("1500.00"),
+        status=JobPost.Status.ACTIVE,
+    )
+    defaults.update(overrides)
+    return JobPost.objects.create(employer=employer, category=category, subcategory=subcategory, **defaults)
+
+
+# ---------------------------------------------------------------------
+# Pure scoring-function unit tests
+# ---------------------------------------------------------------------
+
+class RequiredSkillCoverageTests(TestCase):
+    def test_full_coverage(self):
+        self.assertEqual(services.required_skill_coverage({1, 2, 3}, {1, 2, 3}), 100.0)
+
+    def test_partial_coverage(self):
+        self.assertEqual(services.required_skill_coverage({1, 2}, {1, 2, 3, 4}), 50.0)
+
+    def test_no_required_skills_is_full_coverage_not_division_by_zero(self):
+        self.assertEqual(services.required_skill_coverage({1, 2}, set()), 100.0)
+
+    def test_no_matching_skills(self):
+        self.assertEqual(services.required_skill_coverage({9, 10}, {1, 2}), 0.0)
+
+
+class CosineSimilarityTests(TestCase):
+    def test_identical_skill_sets_score_100(self):
+        score = services.cosine_similarity_score({1, 2, 3}, {1, 2, 3}, set())
+        self.assertEqual(score, 100.0)
+
+    def test_partial_overlap_scores_between_0_and_100(self):
+        score = services.cosine_similarity_score({1, 2}, {2, 3}, set())
+        self.assertGreater(score, 0.0)
+        self.assertLess(score, 100.0)
+
+    def test_disjoint_sets_score_0(self):
+        score = services.cosine_similarity_score({1, 2}, {3, 4}, set())
+        self.assertEqual(score, 0.0)
+
+    def test_empty_vectors_do_not_crash(self):
+        self.assertEqual(services.cosine_similarity_score(set(), set(), set()), 0.0)
+
+    def test_worker_has_no_skills_scores_0(self):
+        score = services.cosine_similarity_score(set(), {1, 2}, {3})
+        self.assertEqual(score, 0.0)
+
+    def test_considers_preferred_skills_too(self):
+        score = services.cosine_similarity_score({1}, set(), {1})
+        self.assertEqual(score, 100.0)
+
+
+class DistanceScoreTests(TestCase):
+    def test_zero_km_scores_100(self):
+        self.assertEqual(services.calculate_distance_score(0), 100.0)
+
+    def test_intermediate_distance_falls_off_linearly(self):
+        # Default MAX_DISTANCE_KM is 20 -> 10km is the midpoint.
+        self.assertEqual(services.calculate_distance_score(10), 50.0)
+
+    def test_distance_at_max_scores_0(self):
+        self.assertEqual(services.calculate_distance_score(20), 0.0)
+
+    def test_distance_beyond_max_scores_0(self):
+        self.assertEqual(services.calculate_distance_score(35), 0.0)
+
+    def test_none_distance_returns_none(self):
+        self.assertIsNone(services.calculate_distance_score(None))
+
+    @override_settings(RECOMMENDATION_SETTINGS={**settings.RECOMMENDATION_SETTINGS, "MAX_DISTANCE_KM": 10.0})
+    def test_max_distance_is_configurable(self):
+        self.assertEqual(services.calculate_distance_score(5), 50.0)
+
+
+class ExperienceScoreTests(TestCase):
+    def test_no_experience_required_scores_100(self):
+        self.assertEqual(services.calculate_experience_score(0, 0), 100.0)
+
+    def test_worker_meets_requirement_scores_100(self):
+        self.assertEqual(services.calculate_experience_score(5, 5), 100.0)
+
+    def test_worker_exceeds_requirement_scores_100(self):
+        self.assertEqual(services.calculate_experience_score(10, 5), 100.0)
+
+    def test_worker_below_requirement_scores_proportionally(self):
+        self.assertEqual(services.calculate_experience_score(2, 4), 50.0)
+
+    def test_zero_worker_experience_below_requirement_scores_0(self):
+        self.assertEqual(services.calculate_experience_score(0, 5), 0.0)
+
+
+class ClampScoreTests(TestCase):
+    def test_clamps_above_100(self):
+        self.assertEqual(services.clamp_score(150), 100.0)
+
+    def test_clamps_below_0(self):
+        self.assertEqual(services.clamp_score(-20), 0.0)
+
+    def test_leaves_in_range_value_untouched(self):
+        self.assertEqual(services.clamp_score(42), 42)
+
+
+class RecommendationWeightValidationTests(TestCase):
+    def test_default_weights_are_valid(self):
+        services.validate_recommendation_weights()
+
+    @override_settings(RECOMMENDATION_SETTINGS={**settings.RECOMMENDATION_SETTINGS, "FINAL_WEIGHT_SKILL": 0.9})
+    def test_raises_when_final_weights_do_not_sum_to_one(self):
+        with self.assertRaises(AssertionError):
+            services.validate_recommendation_weights()
+
+    @override_settings(
+        RECOMMENDATION_SETTINGS={**settings.RECOMMENDATION_SETTINGS, "SKILL_WEIGHT_REQUIRED_COVERAGE": 0.9}
+    )
+    def test_raises_when_skill_weights_do_not_sum_to_one(self):
+        with self.assertRaises(AssertionError):
+            services.validate_recommendation_weights()
+
+
+# ---------------------------------------------------------------------
+# Tests needing model instances (skill/job/profile scoring, explanations)
+# ---------------------------------------------------------------------
+
+class RecommendationServiceTestsBase(TestCase):
+    def setUp(self):
+        self.category = Category.objects.create(name="Construction & Repair")
+        self.subcategory = Subcategory.objects.create(category=self.category, name="Electrical")
+        self.other_subcategory = Subcategory.objects.create(category=self.category, name="Plumbing")
+
+        self.wiring_skill = SkillTag.objects.create(subcategory=self.subcategory, name="House Wiring")
+        self.breaker_skill = SkillTag.objects.create(subcategory=self.subcategory, name="Circuit Breaker Installation")
+        self.panel_skill = SkillTag.objects.create(subcategory=self.subcategory, name="Panel Upgrades")
+
+        self.employer_user = User.objects.create_user(
+            username="employer1",
+            phone_number="9800000001",
+            password="EmployerPassword123!",
+            role=User.Role.EMPLOYER,
+        )
+        self.employer = EmployerProfile.objects.create(
+            user=self.employer_user,
+            organization_name="Kathmandu Electrical Co",
+            verification_status=EmployerProfile.VerificationStatus.VERIFIED,
+        )
+
+        self.worker_user = User.objects.create_user(
+            username="worker1",
+            phone_number="9800000002",
+            password="WorkerPassword123!",
+            role=User.Role.WORKER,
+            is_contact_verified=True,
+        )
+        self.worker = WorkerProfile.objects.create(
+            user=self.worker_user,
+            address="Baneshwor, Kathmandu",
+            latitude=Decimal("27.700000"),
+            longitude=Decimal("85.330000"),
+            experience_years=3,
+            is_available=True,
+            expected_wage=Decimal("1000.00"),
+            preferred_travel_radius_km=15,
+        )
+        self.worker.skills.set([self.wiring_skill, self.breaker_skill])
+
+        self.job = make_job(
+            self.employer,
+            self.category,
+            self.subcategory,
+            required_experience_years=2,
+            wage_amount=Decimal("1500.00"),
+            latitude=Decimal("27.710000"),
+            longitude=Decimal("85.340000"),
+        )
+        self.job.required_skills.set([self.wiring_skill])
+        self.job.preferred_skills.set([self.breaker_skill])
+
+
+class SkillScoreCalculationTests(RecommendationServiceTestsBase):
+    def test_worker_with_all_required_and_preferred_skills(self):
+        result = services.calculate_skill_score(
+            self.worker.skills.all(), self.job.required_skills.all(), self.job.preferred_skills.all()
+        )
+        self.assertEqual(result.required_skill_coverage, 100.0)
+        self.assertEqual(result.matched_required_skills, [self.wiring_skill])
+        self.assertEqual(result.missing_required_skills, [])
+        self.assertEqual(result.matched_preferred_skills, [self.breaker_skill])
+        self.assertEqual(result.skill_score, round(0.70 * 100 + 0.30 * result.cosine_similarity_score, 2))
+
+    def test_worker_missing_required_skill(self):
+        self.worker.skills.set([self.breaker_skill])
+        result = services.calculate_skill_score(
+            self.worker.skills.all(), self.job.required_skills.all(), self.job.preferred_skills.all()
+        )
+        self.assertEqual(result.required_skill_coverage, 0.0)
+        self.assertEqual(result.missing_required_skills, [self.wiring_skill])
+
+    def test_job_with_no_required_skills_treats_worker_as_fully_covered(self):
+        self.job.required_skills.clear()
+        result = services.calculate_skill_score(
+            self.worker.skills.all(), self.job.required_skills.all(), self.job.preferred_skills.all()
+        )
+        self.assertEqual(result.required_skill_coverage, 100.0)
+
+
+class DistanceCalculationTests(RecommendationServiceTestsBase):
+    def test_known_coordinates_produce_distance_and_score(self):
+        distance_km, distance_score = services.calculate_distance(self.worker, self.job)
+        self.assertIsNotNone(distance_km)
+        self.assertGreater(distance_km, 0)
+        self.assertIsNotNone(distance_score)
+
+    def test_missing_worker_coordinates_returns_none_without_crashing(self):
+        self.worker.latitude = None
+        self.worker.longitude = None
+        distance_km, distance_score = services.calculate_distance(self.worker, self.job)
+        self.assertIsNone(distance_km)
+        self.assertIsNone(distance_score)
+
+
+class AvailabilityPreferenceScoreTests(RecommendationServiceTestsBase):
+    def test_wage_meets_expectation_and_within_radius_scores_high(self):
+        score, sub_scores = services.calculate_availability_preference_score(self.worker, self.job, 5.0)
+        self.assertEqual(sub_scores["wage_compatibility_score"], 100.0)
+        self.assertEqual(sub_scores["travel_radius_compatibility_score"], 100.0)
+        self.assertEqual(score, 100.0)
+
+    def test_wage_below_expectation_lowers_score(self):
+        self.job.wage_amount = Decimal("500.00")
+        score, sub_scores = services.calculate_availability_preference_score(self.worker, self.job, 5.0)
+        self.assertLess(sub_scores["wage_compatibility_score"], 100.0)
+
+    def test_outside_travel_radius_lowers_score(self):
+        score, sub_scores = services.calculate_availability_preference_score(self.worker, self.job, 30.0)
+        self.assertLess(sub_scores["travel_radius_compatibility_score"], 100.0)
+
+    def test_missing_wage_expectation_is_neutral_not_penalized(self):
+        self.worker.expected_wage = None
+        score, sub_scores = services.calculate_availability_preference_score(self.worker, self.job, 5.0)
+        self.assertEqual(sub_scores["wage_compatibility_score"], 100.0)
+
+    def test_missing_distance_or_radius_falls_back_to_neutral(self):
+        score, sub_scores = services.calculate_availability_preference_score(self.worker, self.job, None)
+        self.assertEqual(
+            sub_scores["travel_radius_compatibility_score"], settings.RECOMMENDATION_SETTINGS["NEUTRAL_SCORE_WHEN_UNKNOWN"]
+        )
+
+
+class ReliabilityScoreTests(RecommendationServiceTestsBase):
+    def test_verified_contact_scores_higher_than_unverified(self):
+        verified_score, _ = services.calculate_worker_reliability_score(self.worker)
+
+        self.worker_user.is_contact_verified = False
+        self.worker_user.save()
+        unverified_score, _ = services.calculate_worker_reliability_score(self.worker)
+
+        self.assertGreater(verified_score, unverified_score)
+
+    def test_incomplete_worker_profile_scores_lower(self):
+        complete_score, _ = services.calculate_worker_reliability_score(self.worker)
+
+        sparse_worker = WorkerProfile.objects.create(
+            user=User.objects.create_user(
+                username="sparseworker",
+                phone_number="9800000099",
+                password="WorkerPassword123!",
+                role=User.Role.WORKER,
+            )
+        )
+        sparse_score, _ = services.calculate_worker_reliability_score(sparse_worker)
+
+        self.assertGreater(complete_score, sparse_score)
+
+    def test_verified_employer_scores_higher_than_unverified(self):
+        verified_score, _ = services.calculate_employer_reliability_score(self.employer)
+
+        self.employer.verification_status = EmployerProfile.VerificationStatus.UNVERIFIED
+        unverified_score, _ = services.calculate_employer_reliability_score(self.employer)
+
+        self.assertGreater(verified_score, unverified_score)
+
+
+class FinalMatchScoreTests(TestCase):
+    def test_final_score_is_weighted_combination(self):
+        score = services.calculate_final_match_score(
+            skill_score=100, distance_score=100, experience_score=100, availability_score=100, reliability_score=100
+        )
+        self.assertEqual(score, 100.0)
+
+    def test_final_score_of_all_zero_components_is_zero(self):
+        score = services.calculate_final_match_score(
+            skill_score=0, distance_score=0, experience_score=0, availability_score=0, reliability_score=0
+        )
+        self.assertEqual(score, 0.0)
+
+    def test_missing_distance_uses_neutral_component(self):
+        score = services.calculate_final_match_score(
+            skill_score=0, distance_score=None, experience_score=0, availability_score=0, reliability_score=0
+        )
+        weights = settings.RECOMMENDATION_SETTINGS
+        expected = weights["FINAL_WEIGHT_DISTANCE"] * weights["NEUTRAL_SCORE_WHEN_UNKNOWN"]
+        self.assertEqual(score, round(expected, 2))
+
+
+class EvaluateMatchExplanationTests(RecommendationServiceTestsBase):
+    def test_worker_to_job_reports_matched_and_missing_skills_and_reasons(self):
+        result = services.evaluate_match(self.worker, self.job, direction="worker_to_job")
+
+        self.assertIn("Matches 1 of 1 required skills.", result.reasons)
+        self.assertIn("Also matches 1 preferred skills.", result.reasons)
+        self.assertIn("Meets the required experience.", result.reasons)
+        self.assertIn("Available for work.", result.reasons)
+        self.assertIn("Job wage meets the worker's expected wage.", result.reasons)
+        self.assertIn("Employer profile is verified.", result.reasons)
+        self.assertEqual(result.warnings, [])
+
+    def test_missing_required_skill_produces_warning(self):
+        self.worker.skills.set([self.breaker_skill])
+        result = services.evaluate_match(self.worker, self.job, direction="worker_to_job")
+        self.assertTrue(any("Missing required skill" in warning for warning in result.warnings))
+
+    def test_insufficient_experience_produces_warning(self):
+        self.worker.experience_years = 0
+        result = services.evaluate_match(self.worker, self.job, direction="worker_to_job")
+        self.assertTrue(any("less experience" in warning for warning in result.warnings))
+
+    def test_missing_worker_location_produces_warning_not_crash(self):
+        self.worker.latitude = None
+        self.worker.longitude = None
+        result = services.evaluate_match(self.worker, self.job, direction="worker_to_job")
+        self.assertIsNone(result.distance_km)
+        self.assertIn("Worker location is unavailable; distance could not be calculated.", result.warnings)
+
+    def test_wage_below_expectation_produces_warning(self):
+        self.job.wage_amount = Decimal("500.00")
+        result = services.evaluate_match(self.worker, self.job, direction="worker_to_job")
+        self.assertIn("Offered wage is below the worker's expected wage.", result.warnings)
+
+    def test_outside_travel_radius_produces_warning(self):
+        self.job.latitude = Decimal("28.500000")
+        self.job.longitude = Decimal("86.500000")
+        result = services.evaluate_match(self.worker, self.job, direction="worker_to_job")
+        self.assertIn("Worker is outside the preferred travel radius.", result.warnings)
+
+    def test_job_to_worker_uses_worker_verification_reason(self):
+        result = services.evaluate_match(self.worker, self.job, direction="job_to_worker")
+        self.assertIn("Worker's contact is verified.", result.reasons)
+
+    def test_reciprocal_score_does_not_equal_final_score_in_general(self):
+        result = services.evaluate_match(self.worker, self.job, direction="worker_to_job")
+        # Not a hard mathematical law, but for this deliberately mixed
+        # fixture the two formulas should diverge, proving reciprocal
+        # isn't silently just a re-derivation of the final score.
+        self.job.wage_amount = Decimal("400.00")
+        divergent_result = services.evaluate_match(self.worker, self.job, direction="worker_to_job")
+        self.assertNotEqual(divergent_result.final_score, divergent_result.reciprocal_preference_score)
+
+
+# ---------------------------------------------------------------------
+# Ranking-behavior tests
+# ---------------------------------------------------------------------
+
+class RankingBehaviorTests(RecommendationServiceTestsBase):
+    def setUp(self):
+        super().setUp()
+        self.weak_worker_user = User.objects.create_user(
+            username="weakworker",
+            phone_number="9800000003",
+            password="WorkerPassword123!",
+            role=User.Role.WORKER,
+        )
+        self.weak_worker = WorkerProfile.objects.create(
+            user=self.weak_worker_user,
+            latitude=self.worker.latitude,
+            longitude=self.worker.longitude,
+            experience_years=0,
+        )
+
+    def test_stronger_skill_match_ranks_higher_when_other_factors_equal(self):
+        strong = services.evaluate_match(self.worker, self.job, direction="worker_to_job")
+        weak = services.evaluate_match(self.weak_worker, self.job, direction="worker_to_job")
+        self.assertGreater(strong.skill.skill_score, weak.skill.skill_score)
+        self.assertGreater(strong.final_score, weak.final_score)
+
+    def test_closer_worker_ranks_higher_when_skills_equal(self):
+        self.weak_worker.skills.set([self.wiring_skill, self.breaker_skill])
+        self.weak_worker.experience_years = self.worker.experience_years
+        self.weak_worker.expected_wage = self.worker.expected_wage
+        self.weak_worker.preferred_travel_radius_km = self.worker.preferred_travel_radius_km
+
+        far_worker = self.weak_worker
+        far_worker.latitude = Decimal("28.500000")
+        far_worker.longitude = Decimal("86.500000")
+        far_worker.save()
+
+        near_result = services.evaluate_match(self.worker, self.job, direction="worker_to_job")
+        far_result = services.evaluate_match(far_worker, self.job, direction="worker_to_job")
+
+        self.assertLess(near_result.distance_km, far_result.distance_km)
+        self.assertGreater(near_result.final_score, far_result.final_score)
+
+    def test_sufficient_experience_improves_ranking(self):
+        under_experienced = services.evaluate_match(self.weak_worker, self.job, direction="worker_to_job")
+
+        self.weak_worker.experience_years = self.job.required_experience_years
+        sufficiently_experienced = services.evaluate_match(self.weak_worker, self.job, direction="worker_to_job")
+
+        self.assertGreater(sufficiently_experienced.experience_score, under_experienced.experience_score)
+        self.assertGreaterEqual(sufficiently_experienced.final_score, under_experienced.final_score)
+
+    def test_deterministic_secondary_ordering_for_tied_scores(self):
+        results = [
+            services.evaluate_match(self.worker, self.job, direction="worker_to_job"),
+            services.evaluate_match(self.weak_worker, self.job, direction="worker_to_job"),
+        ]
+        # Force a tie to exercise the sort's secondary key.
+        for result in results:
+            result.final_score = 50.0
+
+        results.sort(key=lambda result: (-result.final_score, result.worker.id))
+        self.assertEqual([r.worker.id for r in results], sorted(r.worker.id for r in results))
+
+    def test_closed_jobs_are_excluded_from_worker_recommendations(self):
+        self.job.status = JobPost.Status.CLOSED
+        self.job.save()
+        jobs = services.filter_candidate_jobs_for_worker(self.worker)
+        self.assertNotIn(self.job, jobs)
+
+    def test_expired_jobs_are_excluded_from_worker_recommendations(self):
+        from django.utils import timezone
+
+        self.job.application_deadline = timezone.now() - timezone.timedelta(days=1)
+        self.job.save()
+        jobs = services.filter_candidate_jobs_for_worker(self.worker)
+        self.assertNotIn(self.job, jobs)
+
+    def test_unavailable_worker_gets_no_job_recommendations(self):
+        self.worker.is_available = False
+        self.worker.save()
+        jobs = services.filter_candidate_jobs_for_worker(self.worker)
+        self.assertEqual(jobs, [])
+
+    def test_unavailable_worker_excluded_from_job_candidates(self):
+        from jobs.services import filter_candidate_workers_for_job
+
+        self.worker.is_available = False
+        self.worker.save()
+        candidates = filter_candidate_workers_for_job(self.job)
+        self.assertNotIn(self.worker, candidates)
+
+
+# ---------------------------------------------------------------------
+# Endpoint and permission tests
+# ---------------------------------------------------------------------
+
+class RecommendationEndpointTestsBase(APITestCase):
+    def setUp(self):
+        self.category = Category.objects.create(name="Construction & Repair")
+        self.subcategory = Subcategory.objects.create(category=self.category, name="Electrical")
+
+        self.wiring_skill = SkillTag.objects.create(subcategory=self.subcategory, name="House Wiring")
+        self.breaker_skill = SkillTag.objects.create(subcategory=self.subcategory, name="Circuit Breaker Installation")
+
+        self.employer_user = User.objects.create_user(
+            username="employer1",
+            phone_number="9800000001",
+            password="EmployerPassword123!",
+            role=User.Role.EMPLOYER,
+        )
+        self.employer = EmployerProfile.objects.create(
+            user=self.employer_user,
+            organization_name="Kathmandu Electrical Co",
+            verification_status=EmployerProfile.VerificationStatus.VERIFIED,
+        )
+
+        self.other_employer_user = User.objects.create_user(
+            username="employer2",
+            phone_number="9800000004",
+            password="EmployerPassword123!",
+            role=User.Role.EMPLOYER,
+        )
+        self.other_employer = EmployerProfile.objects.create(
+            user=self.other_employer_user,
+            verification_status=EmployerProfile.VerificationStatus.VERIFIED,
+        )
+
+        self.worker_user = User.objects.create_user(
+            username="worker1",
+            phone_number="9800000002",
+            password="WorkerPassword123!",
+            role=User.Role.WORKER,
+            is_contact_verified=True,
+        )
+        self.worker = WorkerProfile.objects.create(
+            user=self.worker_user,
+            latitude=Decimal("27.700000"),
+            longitude=Decimal("85.330000"),
+            experience_years=3,
+            expected_wage=Decimal("1000.00"),
+            preferred_travel_radius_km=15,
+        )
+        self.worker.skills.set([self.wiring_skill])
+
+        self.job = make_job(
+            self.employer,
+            self.category,
+            self.subcategory,
+            latitude=Decimal("27.710000"),
+            longitude=Decimal("85.340000"),
+        )
+        self.job.required_skills.set([self.wiring_skill])
+        self.job.preferred_skills.set([self.breaker_skill])
+
+    def authenticate_as(self, user, password):
+        login_response = self.client.post(
+            reverse("accounts:login"),
+            {"username": user.username, "password": password},
+            format="json",
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+
+
+class WorkerJobRecommendationEndpointTests(RecommendationEndpointTestsBase):
+    def test_worker_receives_ranked_jobs_with_explanation(self):
+        self.authenticate_as(self.worker_user, "WorkerPassword123!")
+        response = self.client.get(reverse("recommendations:worker_job_recommendations"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+        item = response.data[0]
+        self.assertIn("final_score", item)
+        self.assertIn("skill", item)
+        self.assertIn("reasons", item)
+        self.assertIn("warnings", item)
+        self.assertEqual(item["job"]["id"], self.job.id)
+
+    def test_unauthenticated_request_is_rejected(self):
+        response = self.client.get(reverse("recommendations:worker_job_recommendations"))
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_employer_cannot_access_worker_recommendation_endpoint(self):
+        self.authenticate_as(self.employer_user, "EmployerPassword123!")
+        response = self.client.get(reverse("recommendations:worker_job_recommendations"))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_missing_worker_profile_is_handled_safely(self):
+        profileless_user = User.objects.create_user(
+            username="noprofileworker",
+            phone_number="9800000005",
+            password="WorkerPassword123!",
+            role=User.Role.WORKER,
+        )
+        self.authenticate_as(profileless_user, "WorkerPassword123!")
+        response = self.client.get(reverse("recommendations:worker_job_recommendations"))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_closed_job_is_excluded(self):
+        self.job.status = JobPost.Status.CLOSED
+        self.job.save()
+        self.authenticate_as(self.worker_user, "WorkerPassword123!")
+        response = self.client.get(reverse("recommendations:worker_job_recommendations"))
+        self.assertEqual(response.data, [])
+
+    def test_limit_parameter_restricts_result_count(self):
+        make_job(
+            self.employer, self.category, self.subcategory, title="Second job",
+            latitude=Decimal("27.710000"), longitude=Decimal("85.340000"),
+        )
+        self.authenticate_as(self.worker_user, "WorkerPassword123!")
+        response = self.client.get(reverse("recommendations:worker_job_recommendations"), {"limit": 1})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+    def test_invalid_limit_is_rejected(self):
+        self.authenticate_as(self.worker_user, "WorkerPassword123!")
+        response = self.client.get(reverse("recommendations:worker_job_recommendations"), {"limit": "abc"})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class JobWorkerRecommendationEndpointTests(RecommendationEndpointTestsBase):
+    def test_verified_job_owner_receives_ranked_workers(self):
+        self.authenticate_as(self.employer_user, "EmployerPassword123!")
+        response = self.client.get(
+            reverse("recommendations:job_worker_recommendations", kwargs={"job_id": self.job.id})
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+        item = response.data[0]
+        self.assertEqual(item["worker"]["id"], self.worker.id)
+        self.assertIn("final_score", item)
+        self.assertIn("reasons", item)
+
+    def test_sensitive_worker_information_is_not_exposed(self):
+        self.authenticate_as(self.employer_user, "EmployerPassword123!")
+        response = self.client.get(
+            reverse("recommendations:job_worker_recommendations", kwargs={"job_id": self.job.id})
+        )
+        worker_payload = response.data[0]["worker"]
+        self.assertNotIn("phone_number", worker_payload)
+
+    def test_unauthenticated_request_is_rejected(self):
+        response = self.client.get(
+            reverse("recommendations:job_worker_recommendations", kwargs={"job_id": self.job.id})
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_worker_cannot_access_job_worker_recommendation_endpoint(self):
+        self.authenticate_as(self.worker_user, "WorkerPassword123!")
+        response = self.client.get(
+            reverse("recommendations:job_worker_recommendations", kwargs={"job_id": self.job.id})
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_employer_cannot_access_another_employers_job_recommendations(self):
+        self.authenticate_as(self.other_employer_user, "EmployerPassword123!")
+        response = self.client.get(
+            reverse("recommendations:job_worker_recommendations", kwargs={"job_id": self.job.id})
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unverified_employer_is_rejected(self):
+        unverified_user = User.objects.create_user(
+            username="unverifiedemployer",
+            phone_number="9800000006",
+            password="EmployerPassword123!",
+            role=User.Role.EMPLOYER,
+        )
+        EmployerProfile.objects.create(user=unverified_user)
+        self.authenticate_as(unverified_user, "EmployerPassword123!")
+        response = self.client.get(
+            reverse("recommendations:job_worker_recommendations", kwargs={"job_id": self.job.id})
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_missing_job_returns_404(self):
+        self.authenticate_as(self.employer_user, "EmployerPassword123!")
+        response = self.client.get(
+            reverse("recommendations:job_worker_recommendations", kwargs={"job_id": 999999})
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
