@@ -1,9 +1,13 @@
+import json
 from importlib import import_module
 
 from django.apps import apps as global_apps
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase, override_settings
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
 
 from .models import Category, SkillAlias, SkillTag, Subcategory, UnmatchedSkillTerm
 from .services import normalize_skill_phrase, normalize_skill_phrases, preprocess_skill_phrase
@@ -303,3 +307,228 @@ class ConsolidateDuplicateSkillTagsMigrationTests(TestCase):
 
         self.assertTrue(SkillTag.objects.filter(id=skill.id).exists())
         self.assertEqual(SkillTag.objects.filter(name__iexact="house wiring").count(), 1)
+
+
+class TaxonomyPublicAPITests(APITestCase):
+    """Week 6 read-only taxonomy API: /api/taxonomy/categories|subcategories|skills|tree/."""
+
+    def setUp(self):
+        # Created out of alphabetical order deliberately, to prove
+        # ordering is enforced by the API rather than accidental.
+        self.cat_domestic = Category.objects.create(name="Domestic & Local Services")
+        self.cat_construction = Category.objects.create(name="Construction & Repair")
+
+        self.sub_plumbing = Subcategory.objects.create(
+            category=self.cat_construction, name="Plumbing"
+        )
+        self.sub_electrical = Subcategory.objects.create(
+            category=self.cat_construction, name="Electrical"
+        )
+        self.sub_cleaning = Subcategory.objects.create(
+            category=self.cat_domestic, name="Cleaning"
+        )
+
+        self.skill_wiring_repair = SkillTag.objects.create(
+            subcategory=self.sub_electrical, name="Wiring Repair"
+        )
+        self.skill_house_wiring = SkillTag.objects.create(
+            subcategory=self.sub_electrical, name="House Wiring"
+        )
+        self.skill_inactive = SkillTag.objects.create(
+            subcategory=self.sub_electrical, name="Deprecated Skill", is_active=False
+        )
+        self.skill_house_cleaning = SkillTag.objects.create(
+            subcategory=self.sub_cleaning, name="House Cleaning"
+        )
+
+        SkillAlias.objects.create(skill=self.skill_house_wiring, phrase="ghar wiring")
+        UnmatchedSkillTerm.objects.create(
+            raw_term="totally weird term",
+            normalized_term="totally weird term",
+            best_candidate=self.skill_house_wiring,
+        )
+
+    # --- categories/ ---
+
+    def test_category_list_is_public(self):
+        response = self.client.get(reverse("taxonomy:categories"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_category_list_alphabetical_order(self):
+        response = self.client.get(reverse("taxonomy:categories"))
+
+        names = [item["name"] for item in response.data]
+        self.assertEqual(
+            names, ["Construction & Repair", "Domestic & Local Services"]
+        )
+
+    def test_category_fields_are_minimal(self):
+        response = self.client.get(reverse("taxonomy:categories"))
+
+        self.assertEqual(set(response.data[0].keys()), {"id", "name"})
+
+    # --- subcategories/ ---
+
+    def test_subcategory_list_is_public_and_alphabetical(self):
+        response = self.client.get(reverse("taxonomy:subcategories"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [item["name"] for item in response.data]
+        self.assertEqual(names, sorted(names))
+
+    def test_subcategory_filter_by_category(self):
+        response = self.client.get(
+            reverse("taxonomy:subcategories"), {"category": self.cat_construction.id}
+        )
+
+        names = [item["name"] for item in response.data]
+        self.assertEqual(names, ["Electrical", "Plumbing"])
+
+    def test_subcategory_filter_by_unknown_category_returns_empty_list(self):
+        response = self.client.get(
+            reverse("taxonomy:subcategories"), {"category": 999999}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    def test_subcategory_filter_by_non_integer_category_is_bad_request(self):
+        response = self.client.get(
+            reverse("taxonomy:subcategories"), {"category": "not-a-number"}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    # --- skills/ ---
+
+    def test_skill_list_is_public_alphabetical_and_active_only(self):
+        response = self.client.get(reverse("taxonomy:skills"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [item["name"] for item in response.data]
+        self.assertEqual(names, sorted(names))
+        self.assertNotIn("Deprecated Skill", names)
+
+    def test_skill_filter_by_subcategory(self):
+        response = self.client.get(
+            reverse("taxonomy:skills"), {"subcategory": self.sub_electrical.id}
+        )
+
+        names = [item["name"] for item in response.data]
+        self.assertEqual(names, ["House Wiring", "Wiring Repair"])
+
+    def test_skill_filter_by_subcategory_excludes_inactive(self):
+        response = self.client.get(
+            reverse("taxonomy:skills"), {"subcategory": self.sub_electrical.id}
+        )
+
+        names = [item["name"] for item in response.data]
+        self.assertNotIn("Deprecated Skill", names)
+
+    def test_skill_search_matches_partial_case_insensitive(self):
+        response = self.client.get(reverse("taxonomy:skills"), {"search": "wiring"})
+
+        names = {item["name"] for item in response.data}
+        self.assertEqual(names, {"House Wiring", "Wiring Repair"})
+
+        response = self.client.get(reverse("taxonomy:skills"), {"search": "HOUSE"})
+        names = {item["name"] for item in response.data}
+        self.assertEqual(names, {"House Wiring", "House Cleaning"})
+
+    def test_skill_search_combined_with_subcategory_filter(self):
+        response = self.client.get(
+            reverse("taxonomy:skills"),
+            {"search": "house", "subcategory": self.sub_cleaning.id},
+        )
+
+        names = [item["name"] for item in response.data]
+        self.assertEqual(names, ["House Cleaning"])
+
+    def test_skill_filter_by_non_integer_subcategory_is_bad_request(self):
+        response = self.client.get(reverse("taxonomy:skills"), {"subcategory": "abc"})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    # --- tree/ ---
+
+    def test_tree_is_public(self):
+        response = self.client.get(reverse("taxonomy:tree"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_tree_structure_is_nested_and_alphabetical_at_every_level(self):
+        response = self.client.get(reverse("taxonomy:tree"))
+        data = response.data
+
+        category_names = [c["name"] for c in data]
+        self.assertEqual(
+            category_names, ["Construction & Repair", "Domestic & Local Services"]
+        )
+
+        construction = next(c for c in data if c["name"] == "Construction & Repair")
+        subcategory_names = [s["name"] for s in construction["subcategories"]]
+        self.assertEqual(subcategory_names, ["Electrical", "Plumbing"])
+
+        electrical = next(
+            s for s in construction["subcategories"] if s["name"] == "Electrical"
+        )
+        skill_names = [sk["name"] for sk in electrical["skills"]]
+        self.assertEqual(skill_names, ["House Wiring", "Wiring Repair"])
+
+    def test_tree_excludes_inactive_skills(self):
+        response = self.client.get(reverse("taxonomy:tree"))
+
+        all_skill_names = [
+            sk["name"]
+            for c in response.data
+            for s in c["subcategories"]
+            for sk in s["skills"]
+        ]
+        self.assertNotIn("Deprecated Skill", all_skill_names)
+
+    def test_tree_uses_a_bounded_number_of_queries(self):
+        # One query for categories, one for subcategories (prefetched),
+        # one for skills (nested prefetch) - independent of tree size.
+        with self.assertNumQueries(3):
+            self.client.get(reverse("taxonomy:tree"))
+
+    def test_no_admin_or_review_fields_leak_into_any_public_response(self):
+        forbidden_keys = {
+            "is_active",
+            "created_at",
+            "occurrence_count",
+            "best_candidate",
+            "best_candidate_score",
+            "submitted_by",
+            "status",
+            "resolved_skill",
+            "resolved_by",
+            "normalized_term",
+            "raw_term",
+        }
+
+        for url_name in (
+            "taxonomy:categories",
+            "taxonomy:subcategories",
+            "taxonomy:skills",
+            "taxonomy:tree",
+        ):
+            response = self.client.get(reverse(url_name))
+            body = json.dumps(response.data)
+            for forbidden in forbidden_keys:
+                self.assertNotIn(
+                    f'"{forbidden}"',
+                    body,
+                    msg=f"{forbidden!r} leaked into {url_name} response",
+                )
+
+    def test_unmatched_term_text_never_appears_in_public_responses(self):
+        for url_name in (
+            "taxonomy:categories",
+            "taxonomy:subcategories",
+            "taxonomy:skills",
+            "taxonomy:tree",
+        ):
+            response = self.client.get(reverse(url_name))
+            self.assertNotIn("totally weird term", json.dumps(response.data))

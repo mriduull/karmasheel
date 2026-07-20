@@ -28,6 +28,18 @@ SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
 ALLOWED_HOSTS = []
 
+# CORS (django-cors-headers)
+# Comma-separated list of origins allowed to make cross-origin requests
+# to this API, read from the environment - e.g.
+# CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+# Deliberately does NOT use CORS_ALLOW_ALL_ORIGINS: only origins
+# explicitly listed in the environment are permitted.
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
 
 # Application definition
 
@@ -43,6 +55,7 @@ INSTALLED_APPS = [
     # Third-party applications
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
+    "corsheaders",
 
     # Project applications
     "accounts",
@@ -66,6 +79,10 @@ REST_FRAMEWORK = {
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # CorsMiddleware must sit above middleware that can generate
+    # responses (e.g. CommonMiddleware) so CORS headers are attached
+    # to every response, including error responses.
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',

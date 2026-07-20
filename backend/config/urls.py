@@ -32,6 +32,11 @@ urlpatterns = [
     ),
 
     path(
+        "api/taxonomy/",
+        include("taxonomy.urls"),
+    ),
+
+    path(
         "api/jobs/",
         include("jobs.urls"),
     ),
