@@ -532,3 +532,123 @@ class TaxonomyPublicAPITests(APITestCase):
         ):
             response = self.client.get(reverse(url_name))
             self.assertNotIn("totally weird term", json.dumps(response.data))
+
+
+class TaxonomyAdminTests(TestCase):
+    """Week 6 admin usability tests for the taxonomy app. Does not modify
+    the existing resolve/reject UnmatchedSkillTerm behaviour - only
+    verifies it still works as-is."""
+
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username="taxonomyadmin",
+            phone_number="9800000201",
+            password="AdminPassword123!",
+        )
+
+        self.category = Category.objects.create(name="Construction & Repair")
+        self.subcategory = Subcategory.objects.create(category=self.category, name="Electrical")
+        self.skill = SkillTag.objects.create(subcategory=self.subcategory, name="House Wiring")
+        self.alias = SkillAlias.objects.create(
+            skill=self.skill,
+            phrase="ghar wiring",
+            language=SkillAlias.Language.NE_ROMANIZED,
+        )
+
+        self.other_skill = SkillTag.objects.create(subcategory=self.subcategory, name="Fan Installation")
+        self.unmatched_term = UnmatchedSkillTerm.objects.create(
+            raw_term="fan lagaune",
+            normalized_term="fan lagaune",
+            best_candidate=self.other_skill,
+            best_candidate_score=92.0,
+        )
+
+    def _get(self, url_name, params=None):
+        self.client.force_login(self.superuser)
+        return self.client.get(reverse(url_name), params or {})
+
+    def test_every_taxonomy_changelist_is_accessible_to_superuser(self):
+        for url_name in (
+            "admin:taxonomy_category_changelist",
+            "admin:taxonomy_subcategory_changelist",
+            "admin:taxonomy_skilltag_changelist",
+            "admin:taxonomy_skillalias_changelist",
+            "admin:taxonomy_unmatchedskillterm_changelist",
+        ):
+            with self.subTest(url_name=url_name):
+                response = self._get(url_name)
+                self.assertEqual(response.status_code, 200)
+
+    def test_skill_tag_search_by_name(self):
+        response = self._get("admin:taxonomy_skilltag_changelist", {"q": "House Wiring"})
+        self.assertContains(response, "House Wiring")
+
+    def test_skill_alias_search_by_phrase(self):
+        response = self._get("admin:taxonomy_skillalias_changelist", {"q": "ghar wiring"})
+        self.assertContains(response, "ghar wiring")
+
+    def test_skill_tag_subcategory_filter_loads(self):
+        response = self._get(
+            "admin:taxonomy_skilltag_changelist",
+            {"subcategory__id__exact": self.subcategory.pk},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "House Wiring")
+
+    def test_unmatched_term_status_filter_loads(self):
+        response = self._get(
+            "admin:taxonomy_unmatchedskillterm_changelist",
+            {"status": UnmatchedSkillTerm.Status.PENDING},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "fan lagaune")
+
+    def test_resolve_using_best_candidate_action_still_creates_alias_and_resolves_term(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.post(
+            reverse("admin:taxonomy_unmatchedskillterm_changelist"),
+            {
+                "action": "resolve_using_best_candidate",
+                "_selected_action": [str(self.unmatched_term.pk)],
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.unmatched_term.refresh_from_db()
+        self.assertEqual(self.unmatched_term.status, UnmatchedSkillTerm.Status.RESOLVED)
+        self.assertEqual(self.unmatched_term.resolved_skill, self.other_skill)
+        self.assertTrue(
+            SkillAlias.objects.filter(phrase="fan lagaune", skill=self.other_skill).exists()
+        )
+
+    def test_reject_unmatched_terms_action_only_uses_an_existing_status_value(self):
+        self.client.force_login(self.superuser)
+
+        self.client.post(
+            reverse("admin:taxonomy_unmatchedskillterm_changelist"),
+            {
+                "action": "reject_unmatched_terms",
+                "_selected_action": [str(self.unmatched_term.pk)],
+            },
+            follow=True,
+        )
+
+        self.unmatched_term.refresh_from_db()
+        self.assertIn(self.unmatched_term.status, UnmatchedSkillTerm.Status.values)
+        self.assertEqual(self.unmatched_term.status, UnmatchedSkillTerm.Status.REJECTED)
+
+    def test_non_staff_user_cannot_access_taxonomy_admin(self):
+        worker = User.objects.create_user(
+            username="taxonomynonstaff",
+            phone_number="9800000202",
+            password="WorkerPassword123!",
+        )
+        self.client.force_login(worker)
+
+        response = self.client.get(reverse("admin:taxonomy_category_changelist"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login/", response.url)

@@ -624,3 +624,208 @@ class RatingSummaryEndpointTests(APITestCase):
 
         self.assertEqual(response.data["average_rating"], 5.0)
         self.assertEqual(response.data["rating_count"], 1)
+
+
+class ApplicationAdminTests(TestCase):
+    """Week 6 admin usability and safety tests for
+    applications.Application. The critical property under test is that
+    editing an existing application through the admin cannot change
+    `status` directly - that would bypass `transition_application_status`,
+    which has no participant `actor` to check in an admin context."""
+
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username="applicationsadmin",
+            phone_number="9800000401",
+            password="AdminPassword123!",
+        )
+
+        category = Category.objects.create(name="Construction & Repair")
+        subcategory = Subcategory.objects.create(category=category, name="Electrical")
+
+        self.employer_user = User.objects.create_user(
+            username="appsadminemployer",
+            phone_number="9800000402",
+            password="EmployerPassword123!",
+            role=User.Role.EMPLOYER,
+        )
+        self.employer = EmployerProfile.objects.create(user=self.employer_user)
+
+        self.worker_user = User.objects.create_user(
+            username="appsadminworker",
+            phone_number="9800000403",
+            password="WorkerPassword123!",
+            role=User.Role.WORKER,
+        )
+        self.worker = WorkerProfile.objects.create(user=self.worker_user)
+
+        self.job = make_job(self.employer, category, subcategory)
+        self.application = Application.objects.create(worker=self.worker, job=self.job)
+
+    def test_superuser_can_access_application_changelist(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(reverse("admin:applications_application_changelist"))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_application_search_by_job_title(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(
+            reverse("admin:applications_application_changelist"),
+            {"q": self.job.title},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.job.title)
+
+    def test_application_status_filter_loads(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(
+            reverse("admin:applications_application_changelist"),
+            {"status": Application.Status.APPLIED},
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_application_status_field_is_not_rendered_as_editable_on_existing_record(self):
+        self.client.force_login(self.superuser)
+
+        change_url = reverse("admin:applications_application_change", args=[self.application.pk])
+        response = self.client.get(change_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'name="status"')
+        self.assertNotContains(response, 'name="worker"')
+        self.assertNotContains(response, 'name="job"')
+
+    def test_posting_a_changed_status_does_not_bypass_the_state_machine(self):
+        self.client.force_login(self.superuser)
+
+        change_url = reverse("admin:applications_application_change", args=[self.application.pk])
+
+        self.client.post(
+            change_url,
+            {
+                "worker": self.worker.pk,
+                "job": self.job.pk,
+                "status": Application.Status.HIRED,
+                "worker_note": "",
+                "employer_note": "",
+            },
+            follow=True,
+        )
+
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status, Application.Status.APPLIED)
+
+    def test_non_staff_user_cannot_access_application_admin(self):
+        self.client.force_login(self.worker_user)
+
+        response = self.client.get(reverse("admin:applications_application_changelist"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login/", response.url)
+
+
+class RatingAdminTests(TestCase):
+    """Week 6 admin usability and safety tests for applications.Rating.
+    Ratings are only ever created through `submit_rating`, so the admin
+    disables add and locks every field - it is inspect/moderate only."""
+
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username="ratingsadmin",
+            phone_number="9800000501",
+            password="AdminPassword123!",
+        )
+
+        category = Category.objects.create(name="Construction & Repair")
+        subcategory = Subcategory.objects.create(category=category, name="Electrical")
+
+        self.employer_user = User.objects.create_user(
+            username="ratingsadminemployer",
+            phone_number="9800000502",
+            password="EmployerPassword123!",
+            role=User.Role.EMPLOYER,
+        )
+        self.employer = EmployerProfile.objects.create(user=self.employer_user)
+
+        self.worker_user = User.objects.create_user(
+            username="ratingsadminworker",
+            phone_number="9800000503",
+            password="WorkerPassword123!",
+            role=User.Role.WORKER,
+        )
+        self.worker = WorkerProfile.objects.create(user=self.worker_user)
+
+        self.job = make_job(self.employer, category, subcategory)
+        self.application = Application.objects.create(
+            worker=self.worker, job=self.job, status=Application.Status.COMPLETED
+        )
+
+        self.rating = submit_rating(
+            self.application,
+            reviewer=self.employer_user,
+            score=5,
+            review_text="Great work.",
+        )
+
+    def test_superuser_can_access_rating_changelist(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(reverse("admin:applications_rating_changelist"))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_rating_score_filter_loads(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(
+            reverse("admin:applications_rating_changelist"),
+            {"score": "5"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_rating_cannot_be_added_through_admin(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(reverse("admin:applications_rating_add"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_rating_fields_are_not_rendered_as_editable_on_existing_record(self):
+        self.client.force_login(self.superuser)
+
+        change_url = reverse("admin:applications_rating_change", args=[self.rating.pk])
+        response = self.client.get(change_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'name="score"')
+        self.assertNotContains(response, 'name="review_text"')
+
+    def test_posting_a_changed_score_does_not_alter_the_stored_rating(self):
+        self.client.force_login(self.superuser)
+
+        change_url = reverse("admin:applications_rating_change", args=[self.rating.pk])
+
+        self.client.post(
+            change_url,
+            {"score": 1, "review_text": "tampered"},
+            follow=True,
+        )
+
+        self.rating.refresh_from_db()
+        self.assertEqual(self.rating.score, 5)
+        self.assertEqual(self.rating.review_text, "Great work.")
+
+    def test_non_staff_user_cannot_access_rating_admin(self):
+        self.client.force_login(self.worker_user)
+
+        response = self.client.get(reverse("admin:applications_rating_changelist"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login/", response.url)

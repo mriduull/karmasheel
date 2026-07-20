@@ -7,6 +7,8 @@ from .models import Category, SkillAlias, SkillTag, Subcategory, UnmatchedSkillT
 class CategoryAdmin(admin.ModelAdmin):
     list_display = ("name", "created_at")
     search_fields = ("name",)
+    ordering = ("name",)
+    readonly_fields = ("created_at",)
 
 
 @admin.register(Subcategory)
@@ -14,6 +16,20 @@ class SubcategoryAdmin(admin.ModelAdmin):
     list_display = ("name", "category", "created_at")
     list_filter = ("category",)
     search_fields = ("name", "category__name")
+    ordering = ("category__name", "name")
+    list_select_related = ("category",)
+    autocomplete_fields = ("category",)
+    readonly_fields = ("created_at",)
+
+
+class SkillAliasInline(admin.TabularInline):
+    """Lets an admin inspect and add aliases while viewing a skill,
+    without duplicating SkillAlias's own standalone admin page (which
+    stays useful for searching/filtering aliases across all skills)."""
+
+    model = SkillAlias
+    extra = 0
+    fields = ("phrase", "language")
 
 
 @admin.register(SkillTag)
@@ -37,12 +53,26 @@ class SkillTagAdmin(admin.ModelAdmin):
         "subcategory__category__name",
     )
 
+    ordering = ("subcategory__name", "name")
+
+    list_select_related = ("subcategory", "subcategory__category")
+
+    autocomplete_fields = ("subcategory",)
+
+    readonly_fields = ("created_at",)
+
+    inlines = [SkillAliasInline]
+
 
 @admin.register(SkillAlias)
 class SkillAliasAdmin(admin.ModelAdmin):
     list_display = ("phrase", "skill", "language", "created_at")
     list_filter = ("language",)
     search_fields = ("phrase", "skill__name")
+    ordering = ("phrase",)
+    list_select_related = ("skill",)
+    autocomplete_fields = ("skill",)
+    readonly_fields = ("created_at",)
 
 
 @admin.action(description="Resolve using best candidate and create alias")
@@ -84,6 +114,10 @@ class UnmatchedSkillTermAdmin(admin.ModelAdmin):
     list_filter = ("status",)
 
     search_fields = ("raw_term", "normalized_term")
+
+    date_hierarchy = "updated_at"
+
+    list_select_related = ("best_candidate", "resolved_skill", "submitted_by", "resolved_by")
 
     autocomplete_fields = ("best_candidate", "resolved_skill")
 

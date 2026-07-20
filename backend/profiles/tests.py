@@ -563,3 +563,125 @@ class WorkerCVAPITests(APITestCase):
         self.authenticate_as(self.worker, "WorkerPassword123!")
         response = self.client.get(self.preview_url)
         self.assertNotIn("pan_vat", response.content.decode().lower())
+
+
+class ProfileAdminTests(TestCase):
+    """Week 6 admin usability and safety tests for WorkerProfile and
+    EmployerProfile."""
+
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username="profilesadmin",
+            phone_number="9800000101",
+            password="AdminPassword123!",
+        )
+
+        self.worker_user = User.objects.create_user(
+            username="adminworker",
+            phone_number="9800000102",
+            password="WorkerPassword123!",
+            role=User.Role.WORKER,
+        )
+        self.worker_profile = WorkerProfile.objects.create(
+            user=self.worker_user,
+            address="Baneshwor, Kathmandu",
+        )
+
+        self.employer_user = User.objects.create_user(
+            username="adminemployer",
+            phone_number="9800000103",
+            password="EmployerPassword123!",
+            role=User.Role.EMPLOYER,
+        )
+        self.employer_profile = EmployerProfile.objects.create(
+            user=self.employer_user,
+            organization_name="Everest Builders",
+            verification_status=EmployerProfile.VerificationStatus.PENDING,
+        )
+
+    def test_superuser_can_access_worker_profile_changelist(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(reverse("admin:profiles_workerprofile_changelist"))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_superuser_can_access_employer_profile_changelist(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(reverse("admin:profiles_employerprofile_changelist"))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_worker_profile_search_by_address(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(
+            reverse("admin:profiles_workerprofile_changelist"),
+            {"q": "Baneshwor"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "adminworker")
+
+    def test_employer_profile_verification_status_filter_loads(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(
+            reverse("admin:profiles_employerprofile_changelist"),
+            {"verification_status": EmployerProfile.VerificationStatus.PENDING},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Everest Builders")
+
+    def test_mark_verified_action_sets_valid_status_and_reports_count(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.post(
+            reverse("admin:profiles_employerprofile_changelist"),
+            {
+                "action": "mark_verified",
+                "_selected_action": [str(self.employer_profile.pk)],
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Marked 1 employer(s) as verified.")
+
+        self.employer_profile.refresh_from_db()
+        self.assertEqual(
+            self.employer_profile.verification_status,
+            EmployerProfile.VerificationStatus.VERIFIED,
+        )
+
+    def test_mark_rejected_action_uses_only_an_existing_status_value(self):
+        self.client.force_login(self.superuser)
+
+        self.client.post(
+            reverse("admin:profiles_employerprofile_changelist"),
+            {
+                "action": "mark_rejected",
+                "_selected_action": [str(self.employer_profile.pk)],
+            },
+            follow=True,
+        )
+
+        self.employer_profile.refresh_from_db()
+        self.assertIn(
+            self.employer_profile.verification_status,
+            EmployerProfile.VerificationStatus.values,
+        )
+        self.assertEqual(
+            self.employer_profile.verification_status,
+            EmployerProfile.VerificationStatus.REJECTED,
+        )
+
+    def test_non_staff_user_cannot_access_profile_admin(self):
+        self.client.force_login(self.worker_user)
+
+        response = self.client.get(reverse("admin:profiles_workerprofile_changelist"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login/", response.url)

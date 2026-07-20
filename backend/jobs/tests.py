@@ -594,3 +594,78 @@ class PublicJobAccessTests(JobPostAPITestsBase):
         job_ids = {job["id"] for job in response.data}
         self.assertIn(self.active_job.id, job_ids)
         self.assertNotIn(far_job.id, job_ids)
+
+
+class JobPostAdminTests(TestCase):
+    """Week 6 admin usability tests for jobs.JobPost."""
+
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username="jobsadmin",
+            phone_number="9800000301",
+            password="AdminPassword123!",
+        )
+
+        self.category = Category.objects.create(name="Construction & Repair")
+        self.subcategory = Subcategory.objects.create(category=self.category, name="Electrical")
+
+        self.employer_user = User.objects.create_user(
+            username="jobsadminemployer",
+            phone_number="9800000302",
+            password="EmployerPassword123!",
+            role=User.Role.EMPLOYER,
+        )
+        self.employer = EmployerProfile.objects.create(
+            user=self.employer_user,
+            organization_name="Sagarmatha Electricals",
+        )
+
+        self.job = JobPost.objects.create(
+            employer=self.employer,
+            title="House wiring for new build",
+            category=self.category,
+            subcategory=self.subcategory,
+            description="Wire a two-storey residential building.",
+            address="Baneshwor, Kathmandu",
+            latitude=Decimal("27.700000"),
+            longitude=Decimal("85.330000"),
+            wage_amount=Decimal("1500.00"),
+            status=JobPost.Status.ACTIVE,
+        )
+
+    def test_superuser_can_access_job_post_changelist(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(reverse("admin:jobs_jobpost_changelist"))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_job_post_search_by_title(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(
+            reverse("admin:jobs_jobpost_changelist"),
+            {"q": "House wiring"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "House wiring for new build")
+
+    def test_job_post_status_filter_loads(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(
+            reverse("admin:jobs_jobpost_changelist"),
+            {"status": JobPost.Status.ACTIVE},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "House wiring for new build")
+
+    def test_non_staff_user_cannot_access_job_admin(self):
+        self.client.force_login(self.employer_user)
+
+        response = self.client.get(reverse("admin:jobs_jobpost_changelist"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login/", response.url)

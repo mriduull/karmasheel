@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -405,3 +406,121 @@ class AuthenticationAPITests(APITestCase):
             response.status_code,
             status.HTTP_403_FORBIDDEN,
         )
+
+
+class UserAdminTests(TestCase):
+    """Week 6 admin usability and safety tests for accounts.User."""
+
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username="siteadmin",
+            phone_number="9800000001",
+            password="AdminPassword123!",
+            email="siteadmin@example.com",
+        )
+
+        self.worker = User.objects.create_user(
+            username="adminviewworker",
+            phone_number="9800000002",
+            password="WorkerPassword123!",
+            role=User.Role.WORKER,
+            email="adminviewworker@example.com",
+        )
+
+    def test_superuser_can_access_user_changelist(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(reverse("admin:accounts_user_changelist"))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_changelist_search_by_username_finds_user(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(
+            reverse("admin:accounts_user_changelist"),
+            {"q": "adminviewworker"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "adminviewworker")
+
+    def test_changelist_role_filter_loads(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(
+            reverse("admin:accounts_user_changelist"),
+            {"role": User.Role.WORKER},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "adminviewworker")
+
+    def test_mark_contact_verified_action_verifies_selected_user(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.post(
+            reverse("admin:accounts_user_changelist"),
+            {
+                "action": "mark_contact_verified",
+                "_selected_action": [str(self.worker.pk)],
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.worker.refresh_from_db()
+        self.assertTrue(self.worker.is_contact_verified)
+
+    def test_mark_contact_verified_action_does_not_touch_staff_role_or_password(self):
+        original_password_hash = self.worker.password
+
+        self.client.force_login(self.superuser)
+
+        self.client.post(
+            reverse("admin:accounts_user_changelist"),
+            {
+                "action": "mark_contact_verified",
+                "_selected_action": [str(self.worker.pk)],
+            },
+            follow=True,
+        )
+
+        self.worker.refresh_from_db()
+        self.assertFalse(self.worker.is_staff)
+        self.assertFalse(self.worker.is_superuser)
+        self.assertEqual(self.worker.role, User.Role.WORKER)
+        self.assertEqual(self.worker.password, original_password_hash)
+
+    def test_mark_contact_unverified_action_reverses_verification(self):
+        self.worker.is_contact_verified = True
+        self.worker.save(update_fields=["is_contact_verified"])
+
+        self.client.force_login(self.superuser)
+
+        self.client.post(
+            reverse("admin:accounts_user_changelist"),
+            {
+                "action": "mark_contact_unverified",
+                "_selected_action": [str(self.worker.pk)],
+            },
+            follow=True,
+        )
+
+        self.worker.refresh_from_db()
+        self.assertFalse(self.worker.is_contact_verified)
+
+    def test_non_staff_user_cannot_access_admin(self):
+        self.client.force_login(self.worker)
+
+        response = self.client.get(reverse("admin:accounts_user_changelist"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login/", response.url)
+
+    def test_anonymous_user_cannot_access_admin(self):
+        response = self.client.get(reverse("admin:accounts_user_changelist"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login/", response.url)

@@ -18,6 +18,11 @@ from django.contrib import admin
 from django.urls import include, path
 
 
+admin.site.site_header = "Karmasheel Administration"
+admin.site.site_title = "Karmasheel Administration"
+admin.site.index_title = "Karmasheel Administration"
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
 
