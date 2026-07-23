@@ -5,9 +5,17 @@ import { z } from 'zod'
  * Phase F1 (no business schemas are defined in F0 itself).
  */
 
-/** Exactly `length` digits, no separators — matches how the backend
- * validates `phone_number` (10, accounts/models.py) and `pan_vat_number`
- * (9, `profiles/models.py:pan_vat_number_validator`). */
+/**
+ * Exactly `length` digits, no separators. Matches
+ * `profiles/models.py:pan_vat_number_validator` (`^\d{9}$`) exactly.
+ *
+ * Does NOT apply to `phone_number` — despite the "10-digit phone number"
+ * framing in product copy, `accounts/models.py:User.phone_number` is a
+ * plain `CharField(max_length=10, unique=True)` with no format validator
+ * at all. A client-side digits-only/exactly-10 rule would reject input
+ * the backend would actually accept — see `validation/auth.ts` for the
+ * real constraint used on registration (required, max 10 characters).
+ */
 export const digitsOfLength = (length: number) =>
   z
     .string()

@@ -1,16 +1,30 @@
 /**
- * Auth endpoint functions needed by the F0 foundation itself (current-user
- * fetch, logout cleanup, the refresh call lives in ../client.ts since the
- * client owns the retry loop). `register`/`login` are intentionally not
- * defined here yet — those belong to the Login/Register forms built in
- * Phase F1.
+ * Auth endpoint functions. `register`/`login` are plain request functions
+ * only — the Login/Register pages (Phase F1) own all state/redirect logic
+ * around them.
  */
 import { apiFetch } from '@/api/client'
 import { tokenStorage } from '@/api/tokenStorage'
-import type { CurrentUser } from '@/types/user'
+import type { CurrentUser, LoginPayload, RegisterPayload, RegisteredAccount, TokenPair } from '@/types/user'
 
 export function fetchCurrentUser(): Promise<CurrentUser> {
   return apiFetch<CurrentUser>('/auth/me/', { method: 'GET' })
+}
+
+/** POST /api/auth/login/ (SimpleJWT TokenObtainPairView) — public, no
+ * access token to attach yet. */
+export function login(payload: LoginPayload): Promise<TokenPair> {
+  return apiFetch<TokenPair>('/auth/login/', { method: 'POST', body: payload, isPublic: true })
+}
+
+/** POST /api/auth/register/ — public. Never returns a token pair; the
+ * caller must not treat a successful registration as a login. */
+export function register(payload: RegisterPayload): Promise<RegisteredAccount> {
+  return apiFetch<RegisteredAccount>('/auth/register/', {
+    method: 'POST',
+    body: payload,
+    isPublic: true,
+  })
 }
 
 /**
@@ -25,6 +39,6 @@ export async function logoutRequest(): Promise<void> {
   try {
     await apiFetch<void>('/auth/logout/', { method: 'POST', body: { refresh } })
   } catch {
-    // Local state is cleared by the caller regardless — see NavShell.
+    // Local state is cleared by the caller regardless — see state/authStore.ts:logout.
   }
 }

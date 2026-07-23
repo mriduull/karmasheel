@@ -41,9 +41,13 @@ export function NavShell({ items, brandHref, children }: NavShellProps) {
   const mobileItems = items.slice(0, MOBILE_TAB_ITEMS)
 
   const handleLogout = async () => {
+    // Best-effort server-side blacklist — logoutRequest() never throws
+    // (see its own try/catch), so an already-expired session is handled
+    // safely here too: local state is cleared and the redirect happens
+    // regardless of whether the API call succeeded.
     await logoutRequest()
     useAuthStore.getState().logout()
-    navigate('/login')
+    navigate('/')
   }
 
   return (

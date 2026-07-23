@@ -97,13 +97,17 @@ export function toBannerMessage(error: ApiError): string {
   }
 }
 
-/** Flattens `fieldErrors` to one message per field, for `setError` in a form. */
+/** Flattens `fieldErrors` to one message per field, for `setError` in a
+ * form. Django's `validate_password` (used by registration) commonly
+ * raises several messages at once (e.g. "too short" AND "too common") —
+ * all of them are joined, not just the first, so nothing is silently
+ * dropped. */
 export function toFieldErrors(error: ApiError): Record<string, string> | null {
   if (!error.fieldErrors) return null
 
   const flat: Record<string, string> = {}
   for (const [field, messages] of Object.entries(error.fieldErrors)) {
-    if (messages[0]) flat[field] = messages[0]
+    if (messages.length > 0) flat[field] = messages.join(' ')
   }
   return flat
 }

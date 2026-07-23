@@ -1,8 +1,11 @@
 import '@/i18n'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { http, HttpResponse } from 'msw'
 import { render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
+import { server } from '@/test/msw/server'
+import { API_ROOT } from '@/test/msw/handlers'
 import { routeConfig } from './router'
 import { createTestQueryClient, resetAuthStore, setAuthenticatedUser } from '@/test/utils'
 
@@ -16,11 +19,20 @@ function renderAt(path: string) {
 }
 
 describe('router', () => {
-  beforeEach(() => resetAuthStore())
+  beforeEach(() => {
+    resetAuthStore()
+    server.use(
+      http.get(`${API_ROOT}/taxonomy/tree/`, () => HttpResponse.json([])),
+      http.get(`${API_ROOT}/jobs/browse/`, () => HttpResponse.json([])),
+    )
+  })
 
   it('renders the public landing page at /', () => {
     renderAt('/')
-    expect(screen.getByRole('heading', { name: 'Workforce Match' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Workforce Match' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 1, name: /find honest local work/i }),
+    ).toBeInTheDocument()
   })
 
   it('renders the 404 page for an unknown path', () => {
@@ -44,6 +56,18 @@ describe('router', () => {
     })
     renderAt('/worker')
     expect(screen.getByRole('heading', { name: 'Worker Dashboard' })).toBeInTheDocument()
+  })
+
+  it('renders public Job Browse and Job Detail routes added in Phase F1', () => {
+    renderAt('/jobs')
+    expect(screen.getByRole('heading', { name: 'Browse Jobs' })).toBeInTheDocument()
+
+    server.use(
+      http.get(`${API_ROOT}/jobs/5/`, () =>
+        HttpResponse.json({ detail: 'Job not found.' }, { status: 404 }),
+      ),
+    )
+    renderAt('/jobs/5')
   })
 
   it('does not include any route for an unsupported feature (password reset, chat, etc.)', () => {

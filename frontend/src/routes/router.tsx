@@ -7,6 +7,7 @@ import { Landing } from '@/pages/public/Landing'
 import { Login } from '@/pages/public/Login'
 import { Register } from '@/pages/public/Register'
 import { JobBrowse } from '@/pages/shared/JobBrowse'
+import { JobDetail } from '@/pages/shared/JobDetail'
 import { NotFound } from '@/pages/shared/NotFound'
 import { Unauthorized } from '@/pages/shared/Unauthorized'
 import { WorkerDashboard } from '@/pages/worker/Dashboard'
@@ -37,6 +38,7 @@ export const routeConfig = [
     children: [
       { path: '/', element: <Landing /> },
       { path: '/jobs', element: <JobBrowse /> },
+      { path: '/jobs/:id', element: <JobDetail /> },
       {
         path: '/login',
         element: (
