@@ -24,6 +24,23 @@ export const digitsOfLength = (length: number) =>
 
 export const nonEmptyString = (label: string) => z.string().trim().min(1, `${label} is required.`)
 
-/** Matches `PositiveSmallIntegerField`/`PositiveIntegerField` fields
- * (experience_years, preferred_travel_radius_km, etc.). */
-export const nonNegativeInt = z.coerce.number().int().min(0)
+/**
+ * A number input kept as a form-level `string` (not coerced) so an empty
+ * value is distinguishable from `0` — the caller maps `''` to `null` at
+ * submit time to explicitly clear a nullable field (e.g. `expected_wage`,
+ * `preferred_travel_radius_km`), rather than silently coercing blank to
+ * zero. `integer: true` matches `PositiveIntegerField`-backed fields;
+ * omitted for `DecimalField`-backed ones (`expected_wage`).
+ */
+export const optionalNonNegativeNumberString = (label: string, { integer = false } = {}) =>
+  z.string().trim().refine(
+    (value) => {
+      if (value === '') return true
+      const numeric = Number(value)
+      if (Number.isNaN(numeric) || numeric < 0) return false
+      return integer ? Number.isInteger(numeric) : true
+    },
+    {
+      message: integer ? `${label} must be a whole number, zero or more.` : `${label} must be zero or more.`,
+    },
+  )

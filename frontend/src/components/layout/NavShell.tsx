@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -33,7 +33,6 @@ const MOBILE_TAB_ITEMS = 5
 export function NavShell({ items, brandHref, children }: NavShellProps) {
   const { t } = useTranslation()
   const user = useAuthStore((state) => state.user)
-  const navigate = useNavigate()
   const [isMoreOpen, setMoreOpen] = useState(false)
 
   const tabletPrimaryItems = items.slice(0, TABLET_VISIBLE_ITEMS)
@@ -47,7 +46,18 @@ export function NavShell({ items, brandHref, children }: NavShellProps) {
     // regardless of whether the API call succeeded.
     await logoutRequest()
     useAuthStore.getState().logout()
-    navigate('/')
+    // A full page load, not client-side navigate(), and deliberately so:
+    // the current route is very likely still a Worker/Employer-guarded
+    // one, whose guard (RequireAuth/RequireRole) is reactively watching
+    // `user` and would redirect to /login the instant it goes null,
+    // regardless of call order — React Router's data-router navigation
+    // resolves via a concurrent transition that neither synchronous
+    // reordering nor flushSync can force to commit ahead of that reactive
+    // redirect (verified empirically, not assumed). A hard navigation
+    // sidesteps the race entirely and, as a bonus, guarantees every
+    // in-memory value (not just the query cache) is wiped, not just
+    // whatever this SPA's state management happens to track.
+    window.location.assign('/')
   }
 
   return (

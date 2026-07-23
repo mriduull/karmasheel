@@ -1,17 +1,11 @@
 import type { EmployerVerificationStatus } from '@/hooks/useEmployerVerificationStatus'
+import type { SkillTagSummary } from './skill'
 
 export type JobStatus = 'ACTIVE' | 'CLOSED'
 export type WorkType = 'FULL_TIME' | 'PART_TIME' | 'CONTRACT' | 'ONE_TIME'
 export type WageType = 'HOURLY' | 'DAILY' | 'MONTHLY' | 'FIXED'
 
-/** profiles/serializers.py:SkillTagSummarySerializer — note `subcategory`
- * is a plain string here (StringRelatedField), unlike the taxonomy app's
- * own SkillTag shape where `subcategory` is a numeric id. */
-export interface SkillTagSummary {
-  id: number
-  name: string
-  subcategory: string
-}
+export type { SkillTagSummary }
 
 /**
  * jobs/serializers.py:PublicJobPostSerializer — the read-only, public-safe

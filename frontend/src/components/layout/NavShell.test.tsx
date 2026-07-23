@@ -4,11 +4,11 @@ import { http, HttpResponse } from 'msw'
 import { Home } from 'lucide-react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { server } from '@/test/msw/server'
 import { API_ROOT } from '@/test/msw/handlers'
-import { createTestQueryClient, setAuthenticatedUser } from '@/test/utils'
+import { createTestQueryClient, mockWindowLocationAssign, setAuthenticatedUser } from '@/test/utils'
 import { useAuthStore } from '@/state/authStore'
 import { tokenStorage } from '@/api/tokenStorage'
 import { queryClient as appQueryClient } from '@/lib/queryClient'
@@ -56,7 +56,7 @@ describe('NavShell — current-user display and logout', () => {
     expect(screen.getByText(/Worker/)).toBeInTheDocument()
   })
 
-  it('logs out: calls the backend logout endpoint, clears local auth state and cached data, and redirects to the public landing page', async () => {
+  it('logs out: calls the backend logout endpoint, clears local auth state and cached data, and requests the public landing page', async () => {
     setAuthenticatedUser(WORKER_USER)
     appQueryClient.setQueryData(['me'], WORKER_USER)
 
@@ -69,17 +69,26 @@ describe('NavShell — current-user display and logout', () => {
       }),
     )
 
+    // A hard navigation (`window.location.assign`), not client-side
+    // navigate() — see NavShell.tsx's handleLogout for why (a verified
+    // race against the currently-mounted route guard's own reactive
+    // redirect to /login). jsdom doesn't implement real navigation, so
+    // this is asserted via a spy rather than by checking rendered content.
+    const { assignSpy, restore } = mockWindowLocationAssign()
+
     const user = userEvent.setup()
     renderNavShell()
 
     await user.click(screen.getByRole('button', { name: /log out/i }))
 
-    expect(await screen.findByText('public-landing-page')).toBeInTheDocument()
+    await waitFor(() => expect(assignSpy).toHaveBeenCalledWith('/'))
     expect(loggedOutRefreshToken).toBe('a-refresh-token')
     expect(useAuthStore.getState().accessToken).toBeNull()
     expect(useAuthStore.getState().user).toBeNull()
     expect(tokenStorage.getRefreshToken()).toBeNull()
     expect(appQueryClient.getQueryData(['me'])).toBeUndefined()
+
+    restore()
   })
 
   it('handles an already-expired session safely (logout endpoint itself fails)', async () => {
@@ -91,13 +100,17 @@ describe('NavShell — current-user display and logout', () => {
       ),
     )
 
+    const { assignSpy, restore } = mockWindowLocationAssign()
+
     const user = userEvent.setup()
     renderNavShell()
 
     await user.click(screen.getByRole('button', { name: /log out/i }))
 
-    expect(await screen.findByText('public-landing-page')).toBeInTheDocument()
+    await waitFor(() => expect(assignSpy).toHaveBeenCalledWith('/'))
     expect(useAuthStore.getState().accessToken).toBeNull()
     expect(useAuthStore.getState().user).toBeNull()
+
+    restore()
   })
 })

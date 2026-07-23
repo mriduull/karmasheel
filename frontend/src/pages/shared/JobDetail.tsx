@@ -4,7 +4,6 @@ import { ArrowLeft } from 'lucide-react'
 import { fetchJobDetail } from '@/api/endpoints/jobs'
 import { ApiError, toBannerMessage } from '@/api/errors'
 import { formatDateTime, formatWage, formatWorkType } from '@/lib/formatters'
-import { useAuthStore } from '@/state/authStore'
 import { PageContainer } from '@/components/primitives/PageContainer'
 import { SkeletonBlock } from '@/components/primitives/SkeletonBlock'
 import { ErrorBanner } from '@/components/primitives/ErrorBanner'
@@ -12,10 +11,10 @@ import { EmptyState } from '@/components/primitives/EmptyState'
 import { StatusBadge } from '@/components/primitives/StatusBadge'
 import { EmployerVerificationBadge } from '@/components/shared/EmployerVerificationBadge'
 import { SkillChipList } from '@/components/shared/SkillChipList'
+import { ApplyPanel } from '@/components/shared/ApplyPanel'
 
 export function JobDetail() {
   const { id } = useParams<{ id: string }>()
-  const user = useAuthStore((state) => state.user)
 
   const jobQuery = useQuery({
     queryKey: ['job', id],
@@ -144,18 +143,7 @@ export function JobDetail() {
             <h2 className="mb-2 text-lg font-semibold text-text-primary">{job.employer_name}</h2>
             <EmployerVerificationBadge status={job.employer_verification_status} />
 
-            {/* Applying is Phase F2 — an unauthenticated visitor is
-                nudged toward logging in; an already-authenticated worker
-                (or employer) sees no button here at all, rather than one
-                that would do nothing. */}
-            {!user && (
-              <p className="mt-4 text-sm text-text-secondary">
-                <Link to="/login" className="font-semibold text-brand-primary hover:underline">
-                  Log in as a worker
-                </Link>{' '}
-                to apply.
-              </p>
-            )}
+            <ApplyPanel job={job} />
           </div>
         </aside>
       </div>

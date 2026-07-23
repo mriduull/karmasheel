@@ -1,5 +1,7 @@
 import type { Category, CategoryTree, Subcategory } from '@/types/taxonomy'
 import type { PublicJobPost } from '@/types/job'
+import type { WorkerProfile } from '@/types/profile'
+import type { Application } from '@/types/application'
 
 export const CATEGORY_FIXTURES: Category[] = [
   { id: 1, name: 'Construction & Repair' },
@@ -53,6 +55,39 @@ export function buildJobFixture(overrides: Partial<PublicJobPost> = {}): PublicJ
     number_of_workers_required: 2,
     application_deadline: '2026-08-21T12:00:00Z',
     status: 'ACTIVE',
+    created_at: '2026-07-22T12:00:00Z',
+    updated_at: '2026-07-22T12:00:00Z',
+    ...overrides,
+  }
+}
+
+export function buildWorkerProfileFixture(overrides: Partial<WorkerProfile> = {}): WorkerProfile {
+  return {
+    id: 3,
+    address: 'Koteshwor, Kathmandu',
+    latitude: '27.677800',
+    longitude: '85.348800',
+    experience_years: 6,
+    is_available: true,
+    expected_wage: '1200.00',
+    preferred_travel_radius_km: 15,
+    skills: [{ id: 2, name: 'House Wiring', subcategory: 'Electrical' }],
+    unmatched_terms: [],
+    created_at: '2026-07-22T12:00:00Z',
+    updated_at: '2026-07-22T12:00:00Z',
+    ...overrides,
+  }
+}
+
+export function buildApplicationFixture(overrides: Partial<Application> = {}): Application {
+  return {
+    id: 8,
+    job: 5,
+    job_title: 'House Wiring for New Apartment Block',
+    worker_username: 'demo_worker_ramesh',
+    status: 'APPLIED',
+    worker_note: '',
+    employer_note: '',
     created_at: '2026-07-22T12:00:00Z',
     updated_at: '2026-07-22T12:00:00Z',
     ...overrides,
