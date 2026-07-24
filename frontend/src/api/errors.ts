@@ -21,8 +21,24 @@ export class ApiError extends Error implements ApiErrorShape {
   }
 }
 
+/**
+ * Thrown whenever `fetch()` itself rejects — no HTTP response was ever
+ * received. This covers two genuinely different situations that a raw
+ * `TypeError: Failed to fetch` cannot distinguish on its own:
+ *   - the browser has no network connectivity at all (`navigator.onLine
+ *     === false`) — kind 'network', "you're offline";
+ *   - the browser IS online but the request couldn't be completed —
+ *     connection refused (backend not running), DNS failure, timeout, or
+ *     a CORS-blocked response (e.g. the frontend's origin isn't in the
+ *     backend's `CORS_ALLOWED_ORIGINS`) — kind 'unreachable', "can't
+ *     reach the server". Telling a fully-online user they're "offline"
+ *     when the real problem is a stopped/misconfigured backend is
+ *     actively misleading, so these must never share one message.
+ */
 export function networkError(): ApiError {
-  return new ApiError({ kind: 'network', status: null, detail: null, fieldErrors: null })
+  const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false
+  const kind: ApiErrorKind = isOffline ? 'network' : 'unreachable'
+  return new ApiError({ kind, status: null, detail: null, fieldErrors: null })
 }
 
 function splitErrorBody(body: unknown): {
@@ -85,6 +101,8 @@ export function toBannerMessage(error: ApiError): string {
   switch (error.kind) {
     case 'network':
       return "You appear to be offline — some actions won't work until you're back online."
+    case 'unreachable':
+      return "Cannot reach the server. It may be down, or this address may be blocked — please try again in a moment."
     case 'unauthorized':
       return error.detail ?? 'Your session ended — please log in again.'
     case 'forbidden':

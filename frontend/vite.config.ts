@@ -10,6 +10,17 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    // Fixed at Django's documented CORS-allowed dev origin
+    // (backend .env's CORS_ALLOWED_ORIGINS, see .env.example). strictPort
+    // makes `npm run dev` fail with a clear error when 5173 is already in
+    // use, instead of Vite silently switching to another port (e.g. 5174)
+    // and producing a confusing CORS failure that looks like the backend
+    // is unreachable. See docs/DEVELOPMENT_SETUP.md for how to free the
+    // port, or to deliberately opt into a different one.
+    port: 5173,
+    strictPort: true,
+  },
   test: {
     environment: 'jsdom',
     globals: true,

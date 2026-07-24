@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { server } from '@/test/msw/server'
 import { API_ROOT } from '@/test/msw/handlers'
@@ -11,6 +11,10 @@ describe('apiFetch', () => {
   beforeEach(() => {
     resetAuthStore()
     localStorage.clear()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('attaches the access token to authenticated requests', async () => {
@@ -169,7 +173,19 @@ describe('apiFetch', () => {
     expect(useAuthStore.getState().accessToken).toBeNull()
   })
 
-  it('classifies a network failure distinctly from any HTTP status', async () => {
+  it('classifies a fetch failure while the browser reports being online as "unreachable" — never claims the user is offline for a stopped/unreachable server', async () => {
+    // jsdom's default navigator.onLine is true, matching the real-world
+    // common case: the backend is down or CORS-blocked while the user's
+    // own network connection is fine.
+    server.use(http.get(`${API_ROOT}/taxonomy/categories/`, () => HttpResponse.error()))
+
+    await expect(apiFetch('/taxonomy/categories/', { isPublic: true })).rejects.toMatchObject({
+      kind: 'unreachable',
+    })
+  })
+
+  it('classifies a fetch failure as "network" (offline) only when the browser itself reports no connectivity', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
     server.use(http.get(`${API_ROOT}/taxonomy/categories/`, () => HttpResponse.error()))
 
     await expect(apiFetch('/taxonomy/categories/', { isPublic: true })).rejects.toMatchObject({

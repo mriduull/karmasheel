@@ -7,6 +7,14 @@ preferences, and reliability indicators. Recommendations are transparent and
 explainable - every match score comes with a plain-language breakdown, never
 a black-box model.
 
+## Local Development
+
+For the full, copyable, fresh-clone setup sequence (backend **and**
+frontend, PostgreSQL, seeding, and troubleshooting) see
+**[`docs/DEVELOPMENT_SETUP.md`](docs/DEVELOPMENT_SETUP.md)**. The
+condensed backend-only version below still works, but the full guide is
+kept up to date first.
+
 ## Implemented features
 
 - **Accounts** - custom `User` model (username + unique phone number),
@@ -76,7 +84,7 @@ karmasheel/
 │   ├── DEFERRED_SCOPE.md       # What's implemented vs. deferred (Phase 4)
 │   ├── DEMO_SCRIPT.md          # Step-by-step demonstration walkthrough
 │   └── postman/                # Postman collection, environment, walkthrough
-├── frontend/                 # Reserved for a minimal HTML frontend (not yet built - see DEFERRED_SCOPE.md)
+├── frontend/                 # React + TypeScript + Vite client (see docs/DEVELOPMENT_SETUP.md)
 ├── .env.example
 └── requirements.txt
 ```
@@ -231,9 +239,10 @@ of implemented, partially-implemented, and intentionally-deferred features
 (complaints, trusted-worker rehiring, notifications, advanced analytics,
 file uploads, embeddings/NLP, production deployment, and more).
 
-The `frontend/` directory is currently empty - only the API is implemented
-and demonstrated (via Postman/curl and the Django admin). A minimal HTML
-frontend was listed as optional Week 6 scope but has not been built.
+The `frontend/` directory contains a working React + TypeScript + Vite
+client (see [`docs/DEVELOPMENT_SETUP.md`](docs/DEVELOPMENT_SETUP.md) to run
+it locally); the API itself remains independently usable and demonstrated
+via Postman/curl and the Django admin.
 
 ## Common setup problems and fixes
 

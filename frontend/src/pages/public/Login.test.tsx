@@ -1,6 +1,6 @@
 import '@/i18n'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -35,6 +35,10 @@ describe('Login', () => {
   beforeEach(() => {
     resetAuthStore()
     localStorage.clear()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('logs in and redirects a Worker to /worker, storing tokens via the F0 auth system', async () => {
@@ -118,8 +122,27 @@ describe('Login', () => {
     expect(tokenStorage.getRefreshToken()).toBeNull()
   })
 
-  it('distinguishes a network/offline error from an authentication error', async () => {
+  it('distinguishes an unreachable-server error from an authentication error', async () => {
+    // A fetch failure while the browser reports being online (jsdom's
+    // default) is a stopped/unreachable backend, not the user being
+    // offline — must not show the "you're offline" message here.
     const user = userEvent.setup()
+
+    server.use(http.post(`${API_ROOT}/auth/login/`, () => HttpResponse.error()))
+
+    renderLogin()
+
+    await user.type(screen.getByLabelText('Username'), 'demo_worker_ramesh')
+    await user.type(screen.getByLabelText('Password'), 'DemoPass123!')
+    await user.click(screen.getByRole('button', { name: 'Log In' }))
+
+    expect(await screen.findByText(/cannot reach the server/i)).toBeInTheDocument()
+    expect(screen.queryByText(/you appear to be offline/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the offline message specifically when the browser itself reports no connectivity', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
 
     server.use(http.post(`${API_ROOT}/auth/login/`, () => HttpResponse.error()))
 
