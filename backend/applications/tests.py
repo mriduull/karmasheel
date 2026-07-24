@@ -1,9 +1,11 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -122,6 +124,24 @@ class ApplicationStatusStateMachineTests(TestCase):
         with self.assertRaises(ValidationError):
             transition_application_status(self.application, Application.Status.SHORTLISTED, actor=self.employer_user)
 
+    def test_stale_instance_cannot_overwrite_terminal_transition(self):
+        stale_application = Application.objects.get(pk=self.application.pk)
+        transition_application_status(
+            self.application,
+            Application.Status.REJECTED,
+            actor=self.employer_user,
+        )
+
+        with self.assertRaises(ValidationError):
+            transition_application_status(
+                stale_application,
+                Application.Status.SHORTLISTED,
+                actor=self.employer_user,
+            )
+
+        stale_application.refresh_from_db()
+        self.assertEqual(stale_application.status, Application.Status.REJECTED)
+
     def test_non_participant_cannot_transition_status(self):
         with self.assertRaises(ValidationError):
             transition_application_status(
@@ -216,6 +236,23 @@ class ApplicationAPITests(APITestCase):
         response = self.client.post(self.applications_url, {"job": self.closed_job.id}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Application.objects.count(), 0)
+
+    def test_cannot_apply_after_application_deadline(self):
+        self.active_job.application_deadline = (
+            timezone.now() - timedelta(minutes=1)
+        )
+        self.active_job.save(update_fields=["application_deadline"])
+        self.authenticate_as(self.worker_user, "WorkerPassword123!")
+
+        response = self.client.post(
+            self.applications_url,
+            {"job": self.active_job.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("job", response.data)
         self.assertEqual(Application.objects.count(), 0)
 
     def test_employer_cannot_apply_to_a_job(self):
@@ -501,6 +538,13 @@ class RatingAPITests(APITestCase):
     def rating_url(self, application):
         return reverse("applications:rating", args=[application.id])
 
+    @staticmethod
+    def application_payload(response, application):
+        return next(
+            item for item in response.data
+            if item["id"] == application.id
+        )
+
     def test_unauthenticated_cannot_submit_rating(self):
         response = self.client.post(self.rating_url(self.completed_application), {"score": 5}, format="json")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -565,6 +609,84 @@ class RatingAPITests(APITestCase):
         self.authenticate_as(self.other_employer_user, "EmployerPassword123!")
         response = self.client.get(self.rating_url(self.completed_application))
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_worker_application_history_exposes_and_persists_own_rating_state(self):
+        self.authenticate_as(self.worker_user, "WorkerPassword123!")
+
+        before_response = self.client.get(reverse("applications:list_create"))
+        self.assertEqual(before_response.status_code, status.HTTP_200_OK)
+
+        completed = self.application_payload(
+            before_response,
+            self.completed_application,
+        )
+        applied = self.application_payload(
+            before_response,
+            self.applied_application,
+        )
+        self.assertEqual(
+            completed["requester_rating_direction"],
+            Rating.Direction.WORKER_TO_EMPLOYER,
+        )
+        self.assertTrue(completed["can_rate"])
+        self.assertFalse(completed["has_rated"])
+        self.assertFalse(applied["can_rate"])
+        self.assertFalse(applied["has_rated"])
+
+        rating_response = self.client.post(
+            self.rating_url(self.completed_application),
+            {"score": 5},
+            format="json",
+        )
+        self.assertEqual(rating_response.status_code, status.HTTP_201_CREATED)
+
+        after_response = self.client.get(reverse("applications:list_create"))
+        completed = self.application_payload(
+            after_response,
+            self.completed_application,
+        )
+        self.assertFalse(completed["can_rate"])
+        self.assertTrue(completed["has_rated"])
+
+    def test_employer_rating_state_is_independent_of_worker_direction(self):
+        submit_rating(
+            self.completed_application,
+            reviewer=self.worker_user,
+            score=5,
+        )
+        self.authenticate_as(self.employer_user, "EmployerPassword123!")
+        job_applications_url = reverse(
+            "jobs:job_applications",
+            args=[self.job.id],
+        )
+
+        before_response = self.client.get(job_applications_url)
+        self.assertEqual(before_response.status_code, status.HTTP_200_OK)
+        completed = self.application_payload(
+            before_response,
+            self.completed_application,
+        )
+        self.assertEqual(
+            completed["requester_rating_direction"],
+            Rating.Direction.EMPLOYER_TO_WORKER,
+        )
+        self.assertTrue(completed["can_rate"])
+        self.assertFalse(completed["has_rated"])
+
+        rating_response = self.client.post(
+            self.rating_url(self.completed_application),
+            {"score": 4},
+            format="json",
+        )
+        self.assertEqual(rating_response.status_code, status.HTTP_201_CREATED)
+
+        after_response = self.client.get(job_applications_url)
+        completed = self.application_payload(
+            after_response,
+            self.completed_application,
+        )
+        self.assertFalse(completed["can_rate"])
+        self.assertTrue(completed["has_rated"])
 
 
 class RatingSummaryEndpointTests(APITestCase):

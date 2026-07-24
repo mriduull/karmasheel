@@ -1,9 +1,10 @@
 """Week 4 explainable hybrid recommendation engine.
 
 Everything here is deterministic and formula-based - no machine
-learning, embeddings, or pretrained models. All weights are read from
-``settings.RECOMMENDATION_SETTINGS`` (never hard-coded) so they can be
-tuned without touching this module.
+learning, embeddings, or pretrained models. Hybrid match weights are
+read from ``settings.RECOMMENDATION_SETTINGS`` so they can be tuned
+without touching this module; the small history-confidence calibration
+constants are named alongside the reliability formula below.
 
 Score components
 -----------------
@@ -20,11 +21,10 @@ Each worker/job pair is scored on five 0-100 components:
 - ``availability_preference_score``: wage compatibility and travel-radius
   comfort, from fields that already exist on ``WorkerProfile``.
 - ``reliability_verification_score``: a simplified, cold-start-safe
-  signal from contact verification, employer verification status, and
-  profile completeness. There is no rating or completed-job history yet
-  (that is Week 5) - ``calculate_worker_reliability_score`` and
-  ``calculate_employer_reliability_score`` are kept isolated so Week 5
-  can extend them without touching the rest of this module.
+  signal from contact verification, employer verification status,
+  profile completeness, completed engagements, and ratings received.
+  Workers and employers with no work history retain the original
+  verification/profile score rather than receiving an invented rating.
 
 ``final_match_score`` is the weighted sum of those five components. Which
 party's reliability score is used depends on recommendation direction:
@@ -75,12 +75,19 @@ def filter_candidate_jobs_for_worker(worker_profile):
     subcategories the worker has at least one skill in, when the worker
     has recorded any skills; a worker with no skills yet sees jobs across
     all subcategories, since compatibility can't be judged either way.
+    Jobs already present in this worker's application history are always
+    excluded: the database constraint prevents a second application, so
+    recommending them again would present a dead-end action.
     """
 
     if not worker_profile.is_available:
         return []
 
     jobs = filter_active_jobs_for_worker(worker_profile)
+    applied_job_ids = set(
+        worker_profile.applications.values_list("job_id", flat=True)
+    )
+    jobs = [job for job in jobs if job.id not in applied_job_ids]
 
     worker_subcategory_ids = set(worker_profile.skills.values_list("subcategory_id", flat=True))
 
@@ -288,6 +295,60 @@ EMPLOYER_VERIFICATION_STATUS_SCORES = {
     EmployerProfile.VerificationStatus.REJECTED: 0.0,
 }
 
+# A received rating gradually earns influence as more evidence arrives:
+# one rating uses 6% of the score and five or more use the full 30%.
+# Completed engagements are a separate positive reliability signal,
+# capped so volume cannot overwhelm verification or consistently poor
+# ratings.
+MAX_RATING_HISTORY_WEIGHT = 0.30
+RATINGS_FOR_FULL_CONFIDENCE = 5
+COMPLETED_JOB_BONUS_PER_JOB = 2.0
+MAX_COMPLETED_JOB_BONUS = 10.0
+
+
+def _apply_reliability_history(base_score, *, user, completed_job_count):
+    """Blend received ratings and completed work into ``base_score``.
+
+    Missing history is represented by zero influence, not by a made-up
+    midpoint rating, so the original verification/profile formula stays
+    unchanged for a new user. Rating influence increases gradually to
+    avoid letting a single early review dominate the score.
+    """
+
+    # Local import keeps the recommendation module independent of
+    # application-model initialization order at Django startup.
+    from applications.services import get_rating_summary
+
+    average_rating, rating_count = get_rating_summary(user)
+
+    if average_rating is None:
+        rating_score = None
+        rating_weight = 0.0
+        rating_adjusted_score = base_score
+    else:
+        rating_score = clamp_score(float(average_rating) / 5.0 * 100.0)
+        rating_confidence = min(rating_count / RATINGS_FOR_FULL_CONFIDENCE, 1.0)
+        rating_weight = MAX_RATING_HISTORY_WEIGHT * rating_confidence
+        rating_adjusted_score = (
+            (1.0 - rating_weight) * base_score
+            + rating_weight * rating_score
+        )
+
+    completed_job_bonus = min(
+        completed_job_count * COMPLETED_JOB_BONUS_PER_JOB,
+        MAX_COMPLETED_JOB_BONUS,
+    )
+    score = clamp_score(rating_adjusted_score + completed_job_bonus)
+
+    return round(score, 2), {
+        "average_rating": average_rating,
+        "rating_count": rating_count,
+        "rating_score": round(rating_score, 2) if rating_score is not None else None,
+        "rating_history_weight": round(rating_weight, 4),
+        "completed_job_count": completed_job_count,
+        "completed_job_bonus": round(completed_job_bonus, 2),
+    }
+
 
 def _worker_profile_completeness(worker_profile):
     signals = [
@@ -301,22 +362,36 @@ def _worker_profile_completeness(worker_profile):
 
 
 def calculate_worker_reliability_score(worker_profile):
-    """Simplified, cold-start-safe reliability score: no ratings or
-    completed-job history exist yet (Week 5). Uses only contact
-    verification and profile completeness. Kept isolated so Week 5 can
-    extend it (e.g. blend in ratings) without touching callers."""
+    """Cold-start-safe worker reliability with transparent history.
+
+    Contact verification and profile completeness form the base score.
+    Completed applications add a small capped bonus, while received
+    ratings are confidence-weighted so a single rating cannot dominate.
+    """
+
+    from applications.models import Application
 
     contact_verified = worker_profile.user.is_contact_verified
     completeness = _worker_profile_completeness(worker_profile)
 
-    score = 0.5 * (100.0 if contact_verified else 0.0) + 0.5 * completeness
+    base_score = 0.5 * (100.0 if contact_verified else 0.0) + 0.5 * completeness
+    completed_job_count = worker_profile.applications.filter(
+        status=Application.Status.COMPLETED
+    ).count()
+    score, history_sub_scores = _apply_reliability_history(
+        base_score,
+        user=worker_profile.user,
+        completed_job_count=completed_job_count,
+    )
 
     sub_scores = {
         "contact_verified": contact_verified,
         "profile_completeness": completeness,
+        "base_reliability_score": round(base_score, 2),
+        **history_sub_scores,
     }
 
-    return round(clamp_score(score), 2), sub_scores
+    return score, sub_scores
 
 
 def _employer_profile_completeness(employer_profile):
@@ -330,24 +405,39 @@ def _employer_profile_completeness(employer_profile):
 
 
 def calculate_employer_reliability_score(employer_profile):
-    """Simplified, cold-start-safe reliability score for an employer:
-    manual verification status (Week 1 admin review), contact
-    verification, and profile completeness. Kept isolated so Week 5 can
-    extend it without touching callers."""
+    """Cold-start-safe employer reliability with transparent history.
+
+    Manual verification, contact verification, and completeness form
+    the base. Completed engagements and ratings received from workers
+    then add evidence without inventing a cold-start rating.
+    """
+
+    from applications.models import Application
 
     verification_component = EMPLOYER_VERIFICATION_STATUS_SCORES[employer_profile.verification_status]
     contact_component = 100.0 if employer_profile.user.is_contact_verified else 0.0
     completeness = _employer_profile_completeness(employer_profile)
 
-    score = 0.5 * verification_component + 0.3 * contact_component + 0.2 * completeness
+    base_score = 0.5 * verification_component + 0.3 * contact_component + 0.2 * completeness
+    completed_job_count = Application.objects.filter(
+        job__employer=employer_profile,
+        status=Application.Status.COMPLETED,
+    ).count()
+    score, history_sub_scores = _apply_reliability_history(
+        base_score,
+        user=employer_profile.user,
+        completed_job_count=completed_job_count,
+    )
 
     sub_scores = {
         "verification_status": employer_profile.verification_status,
         "contact_verified": employer_profile.user.is_contact_verified,
         "profile_completeness": completeness,
+        "base_reliability_score": round(base_score, 2),
+        **history_sub_scores,
     }
 
-    return round(clamp_score(score), 2), sub_scores
+    return score, sub_scores
 
 
 # ---------------------------------------------------------------------
@@ -399,38 +489,163 @@ def calculate_final_match_score(
     return round(clamp_score(score), 2)
 
 
-def validate_recommendation_weights():
-    """Raises AssertionError if any configurable weight group does not
-    sum to 1.0. Called at app-startup (recommendations.apps) so a
-    misconfiguration is caught immediately rather than silently skewing
-    every recommendation."""
+def _finite_numeric_setting(settings_dict, key):
+    if key not in settings_dict:
+        raise AssertionError(
+            f"settings.RECOMMENDATION_SETTINGS is missing required key {key}."
+        )
 
-    weights = _settings()
+    value = settings_dict[key]
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise AssertionError(
+            f"settings.RECOMMENDATION_SETTINGS {key} must be a finite number."
+        )
 
-    groups = {
-        "SKILL_WEIGHT_*": weights["SKILL_WEIGHT_REQUIRED_COVERAGE"] + weights["SKILL_WEIGHT_COSINE_SIMILARITY"],
-        "RECIPROCAL_WEIGHT_*": weights["RECIPROCAL_WEIGHT_EMPLOYER_SIDE"] + weights["RECIPROCAL_WEIGHT_WORKER_SIDE"],
+    numeric_value = float(value)
+    if not math.isfinite(numeric_value):
+        raise AssertionError(
+            f"settings.RECOMMENDATION_SETTINGS {key} must be finite, got {value}."
+        )
+
+    return numeric_value
+
+
+def validate_recommendation_settings():
+    """Validate every recommendation tuning value at Django startup.
+
+    This rejects values that would otherwise produce NaN scores, divide
+    by zero, create impossible score bands, or make endpoint limits fail
+    at request time. Individual weights must be within 0..1 as well as
+    summing to one, so offsetting negative/oversized weights cannot pass.
+    The shared skill-normalization threshold is checked here too because
+    it is another environment-provided 0..100 score threshold.
+    """
+
+    recommendation_settings = _settings()
+    if not isinstance(recommendation_settings, dict):
+        raise AssertionError("settings.RECOMMENDATION_SETTINGS must be a dictionary.")
+
+    max_distance = _finite_numeric_setting(
+        recommendation_settings, "MAX_DISTANCE_KM"
+    )
+    if max_distance <= 0:
+        raise AssertionError(
+            "settings.RECOMMENDATION_SETTINGS MAX_DISTANCE_KM must be greater than 0."
+        )
+
+    neutral_score = _finite_numeric_setting(
+        recommendation_settings, "NEUTRAL_SCORE_WHEN_UNKNOWN"
+    )
+    if not 0 <= neutral_score <= 100:
+        raise AssertionError(
+            "settings.RECOMMENDATION_SETTINGS "
+            "NEUTRAL_SCORE_WHEN_UNKNOWN must be between 0 and 100."
+        )
+
+    weight_groups = {
+        "SKILL_WEIGHT_*": (
+            "SKILL_WEIGHT_REQUIRED_COVERAGE",
+            "SKILL_WEIGHT_COSINE_SIMILARITY",
+        ),
+        "RECIPROCAL_WEIGHT_*": (
+            "RECIPROCAL_WEIGHT_EMPLOYER_SIDE",
+            "RECIPROCAL_WEIGHT_WORKER_SIDE",
+        ),
         "FINAL_WEIGHT_*": (
-            weights["FINAL_WEIGHT_SKILL"]
-            + weights["FINAL_WEIGHT_DISTANCE"]
-            + weights["FINAL_WEIGHT_EXPERIENCE"]
-            + weights["FINAL_WEIGHT_AVAILABILITY"]
-            + weights["FINAL_WEIGHT_RELIABILITY"]
+            "FINAL_WEIGHT_SKILL",
+            "FINAL_WEIGHT_DISTANCE",
+            "FINAL_WEIGHT_EXPERIENCE",
+            "FINAL_WEIGHT_AVAILABILITY",
+            "FINAL_WEIGHT_RELIABILITY",
         ),
     }
 
-    for name, total in groups.items():
+    for group_name, keys in weight_groups.items():
+        values = [
+            _finite_numeric_setting(recommendation_settings, key)
+            for key in keys
+        ]
+        for key, value in zip(keys, values):
+            if not 0 <= value <= 1:
+                raise AssertionError(
+                    f"settings.RECOMMENDATION_SETTINGS {key} must be between 0 and 1."
+                )
+
+        total = sum(values)
         if not math.isclose(total, 1.0, abs_tol=1e-6):
             raise AssertionError(
-                f"settings.RECOMMENDATION_SETTINGS {name} weights must sum to 1.0, got {total}."
+                f"settings.RECOMMENDATION_SETTINGS {group_name} weights "
+                f"must sum to 1.0, got {total}."
             )
+
+    for key in ("DEFAULT_RESULT_LIMIT", "MAX_RESULT_LIMIT"):
+        if key not in recommendation_settings:
+            raise AssertionError(
+                f"settings.RECOMMENDATION_SETTINGS is missing required key {key}."
+            )
+        value = recommendation_settings[key]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise AssertionError(
+                f"settings.RECOMMENDATION_SETTINGS {key} must be a positive integer."
+            )
+
+    if (
+        recommendation_settings["DEFAULT_RESULT_LIMIT"]
+        > recommendation_settings["MAX_RESULT_LIMIT"]
+    ):
+        raise AssertionError(
+            "settings.RECOMMENDATION_SETTINGS DEFAULT_RESULT_LIMIT "
+            "cannot exceed MAX_RESULT_LIMIT."
+        )
+
+    near_miss_min = _finite_numeric_setting(
+        recommendation_settings, "NEAR_MISS_MIN_SCORE"
+    )
+    near_miss_max = _finite_numeric_setting(
+        recommendation_settings, "NEAR_MISS_MAX_SCORE"
+    )
+    if not 0 <= near_miss_min <= 100 or not 0 <= near_miss_max <= 100:
+        raise AssertionError(
+            "settings.RECOMMENDATION_SETTINGS near-miss scores "
+            "must be between 0 and 100."
+        )
+    if near_miss_min > near_miss_max:
+        raise AssertionError(
+            "settings.RECOMMENDATION_SETTINGS NEAR_MISS_MIN_SCORE "
+            "cannot exceed NEAR_MISS_MAX_SCORE."
+        )
+
+    skill_threshold = getattr(settings, "SKILL_MATCH_THRESHOLD", None)
+    if (
+        isinstance(skill_threshold, bool)
+        or not isinstance(skill_threshold, (int, float))
+        or not math.isfinite(float(skill_threshold))
+        or not 0 <= float(skill_threshold) <= 100
+    ):
+        raise AssertionError(
+            "settings.SKILL_MATCH_THRESHOLD must be a finite number between 0 and 100."
+        )
+
+
+def validate_recommendation_weights():
+    """Backward-compatible entry point for older callers and tests."""
+
+    validate_recommendation_settings()
 
 
 # ---------------------------------------------------------------------
 # Explanation (Section 9)
 # ---------------------------------------------------------------------
 
-def _build_reasons_and_warnings(*, worker_profile, job, skill_result, distance_km, direction):
+def _build_reasons_and_warnings(
+    *,
+    worker_profile,
+    job,
+    skill_result,
+    distance_km,
+    direction,
+    reliability_sub_scores,
+):
     reasons = []
     warnings = []
 
@@ -481,6 +696,24 @@ def _build_reasons_and_warnings(*, worker_profile, job, skill_result, distance_k
     else:
         if worker_profile.user.is_contact_verified:
             reasons.append("Worker's contact is verified.")
+
+    reliability_party = "Employer" if direction == "worker_to_job" else "Worker"
+    completed_job_count = reliability_sub_scores["completed_job_count"]
+    if completed_job_count:
+        job_word = "job" if completed_job_count == 1 else "jobs"
+        reasons.append(
+            f"{reliability_party} has completed {completed_job_count} {job_word} through Karmasheel."
+        )
+
+    rating_count = reliability_sub_scores["rating_count"]
+    average_rating = reliability_sub_scores["average_rating"]
+    if rating_count and average_rating is not None:
+        rating_word = "rating" if rating_count == 1 else "ratings"
+        formatted_rating = f"{float(average_rating):g}"
+        reasons.append(
+            f"{reliability_party} has an average rating of {formatted_rating}/5 "
+            f"from {rating_count} {rating_word}."
+        )
 
     return reasons, warnings
 
@@ -554,6 +787,7 @@ def evaluate_match(worker_profile, job, *, direction):
         skill_result=skill_result,
         distance_km=distance_km,
         direction=direction,
+        reliability_sub_scores=reliability_sub_scores,
     )
 
     return RecommendationResult(

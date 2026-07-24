@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -93,10 +94,51 @@ class JobPostSerializer(serializers.ModelSerializer):
                 {"subcategory": "This subcategory does not belong to the selected category."}
             )
 
+        skill_input_fields = (
+            ("required_skills_input", "required_skills"),
+            ("preferred_skills_input", "preferred_skills"),
+        )
+        skill_errors = {}
+
+        for input_field, relation_name in skill_input_fields:
+            if input_field in attrs:
+                # Serializer validation must remain free of database side
+                # effects. Unmatched terms are recorded only after every
+                # field has validated and the job is actually being saved.
+                matched, _ = normalize_skill_phrases(
+                    attrs[input_field],
+                    record_unmatched=False,
+                )
+                invalid_skills = [
+                    skill for skill in matched if subcategory and skill.subcategory_id != subcategory.id
+                ]
+
+                if invalid_skills:
+                    invalid_names = ", ".join(sorted({skill.name for skill in invalid_skills}))
+                    skill_errors[input_field] = (
+                        "Every job skill must belong to the selected subcategory. "
+                        f"Invalid skill(s): {invalid_names}."
+                    )
+                    continue
+            elif self.instance is not None and subcategory is not None:
+                # Changing a job's subcategory without replacing its skills
+                # must not leave previously normalized skills attached to the
+                # wrong taxonomy branch.
+                if getattr(self.instance, relation_name).exclude(
+                    subcategory_id=subcategory.id
+                ).exists():
+                    skill_errors[input_field] = (
+                        "Supply a replacement skill list when changing the "
+                        "subcategory because existing skills belong elsewhere."
+                    )
+
+        if skill_errors:
+            raise serializers.ValidationError(skill_errors)
+
         return attrs
 
     def validate_application_deadline(self, value):
-        if self.instance is None and value is not None and value < timezone.now():
+        if value is not None and value <= timezone.now():
             raise serializers.ValidationError("Application deadline cannot be in the past.")
 
         return value
@@ -124,6 +166,7 @@ class JobPostSerializer(serializers.ModelSerializer):
             instance.preferred_skills.set(matched)
             self._unmatched_preferred_terms = unmatched
 
+    @transaction.atomic
     def create(self, validated_data):
         required_input = validated_data.pop("required_skills_input", None)
         preferred_input = validated_data.pop("preferred_skills_input", None)
@@ -131,6 +174,7 @@ class JobPostSerializer(serializers.ModelSerializer):
         self._apply_skill_inputs(instance, required_input, preferred_input)
         return instance
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         required_input = validated_data.pop("required_skills_input", None)
         preferred_input = validated_data.pop("preferred_skills_input", None)
@@ -140,8 +184,12 @@ class JobPostSerializer(serializers.ModelSerializer):
 
 
 class WorkerCandidateSerializer(serializers.ModelSerializer):
-    """Read-only summary of a worker, used when an employer browses
-    candidates filtered for one of their own job posts."""
+    """Privacy-safe worker summary for a verified employer's own job.
+
+    Exact worker address and coordinates are matching inputs, not candidate
+    directory fields. They are deliberately omitted so browsing candidates
+    cannot be used to collect workers' precise locations.
+    """
 
     username = serializers.CharField(source="user.username", read_only=True)
     skills = SkillTagSummarySerializer(many=True, read_only=True)
@@ -151,9 +199,6 @@ class WorkerCandidateSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "username",
-            "address",
-            "latitude",
-            "longitude",
             "experience_years",
             "is_available",
             "expected_wage",

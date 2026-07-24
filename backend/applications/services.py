@@ -7,7 +7,7 @@ employer who owns the job.
 """
 
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Avg, Count
 
 from .models import Application, Rating
@@ -40,6 +40,7 @@ EMPLOYER_ALLOWED_TRANSITIONS = {
 }
 
 
+@transaction.atomic
 def transition_application_status(application, new_status, *, actor):
     """Move `application` to `new_status` on behalf of `actor`.
 
@@ -48,11 +49,27 @@ def transition_application_status(application, new_status, *, actor):
     that participant from the application's current status.
     """
 
-    current_status = application.status
+    if application.pk is None:
+        raise ValidationError("Cannot transition an unsaved application.")
 
-    if actor.id == application.worker.user_id:
+    # Always make the decision from the latest database state and hold a row
+    # lock until the write commits. Without this, two stale requests can both
+    # validate from APPLIED and the later save can overwrite a terminal
+    # transition made by the first request.
+    try:
+        locked_application = (
+            Application.objects.select_for_update()
+            .select_related("worker__user", "job__employer__user")
+            .get(pk=application.pk)
+        )
+    except Application.DoesNotExist:
+        raise ValidationError("Application no longer exists.")
+
+    current_status = locked_application.status
+
+    if actor.id == locked_application.worker.user_id:
         allowed_targets = WORKER_ALLOWED_TRANSITIONS.get(current_status, set())
-    elif actor.id == application.job.employer.user_id:
+    elif actor.id == locked_application.job.employer.user_id:
         allowed_targets = EMPLOYER_ALLOWED_TRANSITIONS.get(current_status, set())
     else:
         raise ValidationError("You are not a participant in this application.")
@@ -62,8 +79,13 @@ def transition_application_status(application, new_status, *, actor):
             f"Cannot transition application from {current_status} to {new_status}."
         )
 
-    application.status = new_status
-    application.save(update_fields=["status", "updated_at"])
+    locked_application.status = new_status
+    locked_application.save(update_fields=["status", "updated_at"])
+
+    # Keep the caller's instance current because API views serialize the
+    # object they passed in after this service returns.
+    application.status = locked_application.status
+    application.updated_at = locked_application.updated_at
     return application
 
 

@@ -1,5 +1,6 @@
 from decimal import Decimal
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -8,6 +9,8 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from applications.models import Application
+from applications.services import submit_rating
 from jobs.models import JobPost
 from profiles.models import EmployerProfile, WorkerProfile
 from taxonomy.models import Category, SkillTag, Subcategory
@@ -128,7 +131,7 @@ class ClampScoreTests(TestCase):
 
 class RecommendationWeightValidationTests(TestCase):
     def test_default_weights_are_valid(self):
-        services.validate_recommendation_weights()
+        services.validate_recommendation_settings()
 
     @override_settings(RECOMMENDATION_SETTINGS={**settings.RECOMMENDATION_SETTINGS, "FINAL_WEIGHT_SKILL": 0.9})
     def test_raises_when_final_weights_do_not_sum_to_one(self):
@@ -141,6 +144,98 @@ class RecommendationWeightValidationTests(TestCase):
     def test_raises_when_skill_weights_do_not_sum_to_one(self):
         with self.assertRaises(AssertionError):
             services.validate_recommendation_weights()
+
+    def test_rejects_offsetting_out_of_range_weights_even_when_sum_is_one(self):
+        invalid_settings = {
+            **settings.RECOMMENDATION_SETTINGS,
+            "FINAL_WEIGHT_SKILL": -0.1,
+            "FINAL_WEIGHT_DISTANCE": 0.7,
+        }
+        with override_settings(RECOMMENDATION_SETTINGS=invalid_settings):
+            with self.assertRaises(AssertionError):
+                services.validate_recommendation_settings()
+
+    def test_rejects_non_finite_weight(self):
+        invalid_settings = {
+            **settings.RECOMMENDATION_SETTINGS,
+            "FINAL_WEIGHT_SKILL": float("nan"),
+        }
+        with override_settings(RECOMMENDATION_SETTINGS=invalid_settings):
+            with self.assertRaises(AssertionError):
+                services.validate_recommendation_settings()
+
+    def test_rejects_non_positive_or_non_finite_max_distance(self):
+        for value in (0, -1, float("nan"), float("inf")):
+            with self.subTest(value=value):
+                invalid_settings = {
+                    **settings.RECOMMENDATION_SETTINGS,
+                    "MAX_DISTANCE_KM": value,
+                }
+                with override_settings(RECOMMENDATION_SETTINGS=invalid_settings):
+                    with self.assertRaises(AssertionError):
+                        services.validate_recommendation_settings()
+
+    def test_rejects_invalid_neutral_score(self):
+        for value in (-0.01, 100.01, float("nan"), float("inf")):
+            with self.subTest(value=value):
+                invalid_settings = {
+                    **settings.RECOMMENDATION_SETTINGS,
+                    "NEUTRAL_SCORE_WHEN_UNKNOWN": value,
+                }
+                with override_settings(RECOMMENDATION_SETTINGS=invalid_settings):
+                    with self.assertRaises(AssertionError):
+                        services.validate_recommendation_settings()
+
+    def test_rejects_inverted_or_out_of_range_near_miss_band(self):
+        invalid_updates = (
+            {"NEAR_MISS_MIN_SCORE": 76.0, "NEAR_MISS_MAX_SCORE": 75.0},
+            {"NEAR_MISS_MIN_SCORE": -0.01},
+            {"NEAR_MISS_MAX_SCORE": 100.01},
+            {"NEAR_MISS_MIN_SCORE": float("nan")},
+            {"NEAR_MISS_MAX_SCORE": float("inf")},
+        )
+        for updates in invalid_updates:
+            with self.subTest(updates=updates):
+                invalid_settings = {
+                    **settings.RECOMMENDATION_SETTINGS,
+                    **updates,
+                }
+                with override_settings(RECOMMENDATION_SETTINGS=invalid_settings):
+                    with self.assertRaises(AssertionError):
+                        services.validate_recommendation_settings()
+
+    def test_equal_near_miss_bounds_are_valid(self):
+        valid_settings = {
+            **settings.RECOMMENDATION_SETTINGS,
+            "NEAR_MISS_MIN_SCORE": 50.0,
+            "NEAR_MISS_MAX_SCORE": 50.0,
+        }
+        with override_settings(RECOMMENDATION_SETTINGS=valid_settings):
+            services.validate_recommendation_settings()
+
+    def test_rejects_invalid_result_limits(self):
+        invalid_updates = (
+            {"DEFAULT_RESULT_LIMIT": 0},
+            {"MAX_RESULT_LIMIT": 0},
+            {"DEFAULT_RESULT_LIMIT": True},
+            {"DEFAULT_RESULT_LIMIT": 51, "MAX_RESULT_LIMIT": 50},
+        )
+        for updates in invalid_updates:
+            with self.subTest(updates=updates):
+                invalid_settings = {
+                    **settings.RECOMMENDATION_SETTINGS,
+                    **updates,
+                }
+                with override_settings(RECOMMENDATION_SETTINGS=invalid_settings):
+                    with self.assertRaises(AssertionError):
+                        services.validate_recommendation_settings()
+
+    def test_rejects_invalid_skill_match_threshold(self):
+        for value in (-0.01, 100.01, float("nan"), float("inf"), True):
+            with self.subTest(value=value):
+                with override_settings(SKILL_MATCH_THRESHOLD=value):
+                    with self.assertRaises(AssertionError):
+                        services.validate_recommendation_settings()
 
 
 # ---------------------------------------------------------------------
@@ -272,6 +367,23 @@ class AvailabilityPreferenceScoreTests(RecommendationServiceTestsBase):
 
 
 class ReliabilityScoreTests(RecommendationServiceTestsBase):
+    def _create_completed_application(self):
+        return Application.objects.create(
+            worker=self.worker,
+            job=self.job,
+            status=Application.Status.COMPLETED,
+        )
+
+    def test_no_history_preserves_cold_start_score(self):
+        worker_score, worker_sub_scores = services.calculate_worker_reliability_score(self.worker)
+        employer_score, employer_sub_scores = services.calculate_employer_reliability_score(self.employer)
+
+        self.assertEqual(worker_score, worker_sub_scores["base_reliability_score"])
+        self.assertEqual(employer_score, employer_sub_scores["base_reliability_score"])
+        self.assertIsNone(worker_sub_scores["average_rating"])
+        self.assertEqual(worker_sub_scores["rating_count"], 0)
+        self.assertEqual(worker_sub_scores["completed_job_count"], 0)
+
     def test_verified_contact_scores_higher_than_unverified(self):
         verified_score, _ = services.calculate_worker_reliability_score(self.worker)
 
@@ -303,6 +415,45 @@ class ReliabilityScoreTests(RecommendationServiceTestsBase):
         unverified_score, _ = services.calculate_employer_reliability_score(self.employer)
 
         self.assertGreater(verified_score, unverified_score)
+
+    def test_completed_job_history_improves_worker_and_employer_reliability(self):
+        self.worker_user.is_contact_verified = False
+        self.worker_user.save(update_fields=["is_contact_verified"])
+
+        worker_before, _ = services.calculate_worker_reliability_score(self.worker)
+        employer_before, _ = services.calculate_employer_reliability_score(self.employer)
+        self._create_completed_application()
+        worker_after, worker_sub_scores = services.calculate_worker_reliability_score(self.worker)
+        employer_after, employer_sub_scores = services.calculate_employer_reliability_score(self.employer)
+
+        self.assertGreater(worker_after, worker_before)
+        self.assertGreater(employer_after, employer_before)
+        self.assertEqual(worker_sub_scores["completed_job_count"], 1)
+        self.assertEqual(employer_sub_scores["completed_job_count"], 1)
+
+    def test_low_worker_rating_lowers_reliability_without_overriding_verification(self):
+        application = self._create_completed_application()
+        score_before, _ = services.calculate_worker_reliability_score(self.worker)
+        submit_rating(application, reviewer=self.employer_user, score=1)
+        score_after, sub_scores = services.calculate_worker_reliability_score(self.worker)
+
+        self.assertLess(score_after, score_before)
+        self.assertGreater(score_after, 0)
+        self.assertEqual(sub_scores["average_rating"], 1.0)
+        self.assertEqual(sub_scores["rating_score"], 20.0)
+        self.assertEqual(sub_scores["rating_count"], 1)
+
+    def test_high_employer_rating_improves_reliability_and_is_explained(self):
+        application = self._create_completed_application()
+        score_before, _ = services.calculate_employer_reliability_score(self.employer)
+        submit_rating(application, reviewer=self.worker_user, score=5)
+        score_after, sub_scores = services.calculate_employer_reliability_score(self.employer)
+        result = services.evaluate_match(self.worker, self.job, direction="worker_to_job")
+
+        self.assertGreater(score_after, score_before)
+        self.assertEqual(sub_scores["average_rating"], 5.0)
+        self.assertIn("Employer has completed 1 job through Karmasheel.", result.reasons)
+        self.assertIn("Employer has an average rating of 5/5 from 1 rating.", result.reasons)
 
 
 class FinalMatchScoreTests(TestCase):
@@ -465,6 +616,21 @@ class RankingBehaviorTests(RecommendationServiceTestsBase):
         jobs = services.filter_candidate_jobs_for_worker(self.worker)
         self.assertEqual(jobs, [])
 
+    def test_job_already_applied_to_is_excluded_from_worker_recommendations(self):
+        Application.objects.create(worker=self.worker, job=self.job)
+
+        jobs = services.filter_candidate_jobs_for_worker(self.worker)
+
+        self.assertNotIn(self.job, jobs)
+
+    def test_applied_job_is_excluded_even_when_worker_has_no_skills(self):
+        self.worker.skills.clear()
+        Application.objects.create(worker=self.worker, job=self.job)
+
+        jobs = services.filter_candidate_jobs_for_worker(self.worker)
+
+        self.assertNotIn(self.job, jobs)
+
     def test_unavailable_worker_excluded_from_job_candidates(self):
         from jobs.services import filter_candidate_workers_for_job
 
@@ -587,6 +753,17 @@ class WorkerJobRecommendationEndpointTests(RecommendationEndpointTestsBase):
         response = self.client.get(reverse("recommendations:worker_job_recommendations"))
         self.assertEqual(response.data, [])
 
+    def test_job_already_applied_to_is_excluded(self):
+        Application.objects.create(worker=self.worker, job=self.job)
+        self.authenticate_as(self.worker_user, "WorkerPassword123!")
+
+        response = self.client.get(
+            reverse("recommendations:worker_job_recommendations")
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
     def test_limit_parameter_restricts_result_count(self):
         make_job(
             self.employer, self.category, self.subcategory, title="Second job",
@@ -619,12 +796,19 @@ class JobWorkerRecommendationEndpointTests(RecommendationEndpointTestsBase):
         self.assertIn("reasons", item)
 
     def test_sensitive_worker_information_is_not_exposed(self):
+        self.worker.address = "Exact private home address"
+        self.worker.save(update_fields=["address"])
         self.authenticate_as(self.employer_user, "EmployerPassword123!")
         response = self.client.get(
             reverse("recommendations:job_worker_recommendations", kwargs={"job_id": self.job.id})
         )
         worker_payload = response.data[0]["worker"]
         self.assertNotIn("phone_number", worker_payload)
+        self.assertNotIn("address", worker_payload)
+        self.assertNotIn("latitude", worker_payload)
+        self.assertNotIn("longitude", worker_payload)
+        self.assertNotIn("Exact private home address", str(worker_payload))
+        self.assertIn("distance_km", response.data[0])
 
     def test_unauthenticated_request_is_rejected(self):
         response = self.client.get(
@@ -773,6 +957,50 @@ class MissingSkillRankingTests(TestCase):
         ranked = advisory.rank_missing_skills(results)
         self.assertEqual(ranked[0].job_ids, [1, 2])
 
+    def test_suggestion_has_deterministic_plain_english_reason(self):
+        ranked = advisory.rank_missing_skills(
+            [
+                self._result(1, missing=[self.skill_a]),
+                self._result(2, missing=[self.skill_a]),
+            ]
+        )
+
+        self.assertEqual(
+            ranked[0].reason,
+            "Learning Skill A could strengthen your match for 2 near-miss jobs that require it.",
+        )
+
+    def test_single_job_suggestion_uses_singular_grammar(self):
+        ranked = advisory.rank_missing_skills(
+            [self._result(1, missing=[self.skill_a])]
+        )
+
+        self.assertEqual(
+            ranked[0].reason,
+            "Learning Skill A could strengthen your match for 1 near-miss job that requires it.",
+        )
+
+    def test_opportunity_advisory_caps_suggestions_at_three(self):
+        skill_d = SkillTag.objects.create(
+            subcategory=self.skill_a.subcategory,
+            name="Skill D",
+        )
+        near_misses = [
+            self._result(1, missing=[self.skill_a]),
+            self._result(2, missing=[self.skill_b]),
+            self._result(3, missing=[self.skill_c]),
+            self._result(4, missing=[skill_d]),
+        ]
+
+        with patch.object(advisory, "find_near_miss_jobs", return_value=near_misses):
+            result = advisory.build_opportunity_advisory(SimpleNamespace())
+
+        self.assertEqual(len(result.missing_skills), advisory.MAX_SUGGESTED_SKILLS)
+        self.assertEqual(
+            [entry.skill for entry in result.missing_skills],
+            [self.skill_a, self.skill_b, self.skill_c],
+        )
+
 
 class OpportunityAdvisoryEndpointTests(RecommendationEndpointTestsBase):
     def test_unauthenticated_request_is_rejected(self):
@@ -822,6 +1050,41 @@ class OpportunityAdvisoryEndpointTests(RecommendationEndpointTestsBase):
 
         missing_skill_ids = [entry["skill"]["id"] for entry in response.data["missing_skills"]]
         self.assertIn(advanced_skill.id, missing_skill_ids)
+        advanced_suggestion = next(
+            entry
+            for entry in response.data["missing_skills"]
+            if entry["skill"]["id"] == advanced_skill.id
+        )
+        self.assertIn("Learning Advanced Panel Work", advanced_suggestion["reason"])
+
+    def test_job_already_applied_to_is_excluded_from_advisory(self):
+        advanced_skill = SkillTag.objects.create(
+            subcategory=self.subcategory,
+            name="Applied Job Skill",
+        )
+        self.job.required_skills.add(advanced_skill)
+        score = services.evaluate_match(
+            self.worker,
+            self.job,
+            direction="worker_to_job",
+        ).final_score
+        Application.objects.create(worker=self.worker, job=self.job)
+
+        with override_settings(
+            RECOMMENDATION_SETTINGS={
+                **settings.RECOMMENDATION_SETTINGS,
+                "NEAR_MISS_MIN_SCORE": score,
+                "NEAR_MISS_MAX_SCORE": score,
+            }
+        ):
+            self.authenticate_as(self.worker_user, "WorkerPassword123!")
+            response = self.client.get(
+                reverse("recommendations:opportunity_advisory")
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["near_miss_jobs"], [])
+        self.assertEqual(response.data["missing_skills"], [])
 
     def test_job_scoring_just_below_the_window_is_excluded(self):
         advanced_skill = SkillTag.objects.create(subcategory=self.subcategory, name="Advanced Panel Work")

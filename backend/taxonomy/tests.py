@@ -535,9 +535,7 @@ class TaxonomyPublicAPITests(APITestCase):
 
 
 class TaxonomyAdminTests(TestCase):
-    """Week 6 admin usability tests for the taxonomy app. Does not modify
-    the existing resolve/reject UnmatchedSkillTerm behaviour - only
-    verifies it still works as-is."""
+    """Admin usability and safe unmatched-term review tests."""
 
     def setUp(self):
         self.superuser = User.objects.create_superuser(
@@ -624,6 +622,36 @@ class TaxonomyAdminTests(TestCase):
             SkillAlias.objects.filter(phrase="fan lagaune", skill=self.other_skill).exists()
         )
 
+    def test_resolve_action_does_not_misreport_conflicting_existing_alias(self):
+        SkillAlias.objects.create(
+            phrase=self.unmatched_term.normalized_term,
+            skill=self.skill,
+        )
+        self.client.force_login(self.superuser)
+
+        response = self.client.post(
+            reverse("admin:taxonomy_unmatchedskillterm_changelist"),
+            {
+                "action": "resolve_using_best_candidate",
+                "_selected_action": [str(self.unmatched_term.pk)],
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Skipped 1 alias conflict")
+        self.unmatched_term.refresh_from_db()
+        self.assertEqual(
+            self.unmatched_term.status, UnmatchedSkillTerm.Status.PENDING
+        )
+        self.assertIsNone(self.unmatched_term.resolved_skill)
+        self.assertEqual(
+            SkillAlias.objects.get(
+                phrase=self.unmatched_term.normalized_term
+            ).skill,
+            self.skill,
+        )
+
     def test_reject_unmatched_terms_action_only_uses_an_existing_status_value(self):
         self.client.force_login(self.superuser)
 
@@ -639,6 +667,29 @@ class TaxonomyAdminTests(TestCase):
         self.unmatched_term.refresh_from_db()
         self.assertIn(self.unmatched_term.status, UnmatchedSkillTerm.Status.values)
         self.assertEqual(self.unmatched_term.status, UnmatchedSkillTerm.Status.REJECTED)
+
+    def test_reject_action_does_not_rewrite_resolved_term(self):
+        self.unmatched_term.status = UnmatchedSkillTerm.Status.RESOLVED
+        self.unmatched_term.resolved_skill = self.other_skill
+        self.unmatched_term.save(
+            update_fields=["status", "resolved_skill", "updated_at"]
+        )
+        self.client.force_login(self.superuser)
+
+        self.client.post(
+            reverse("admin:taxonomy_unmatchedskillterm_changelist"),
+            {
+                "action": "reject_unmatched_terms",
+                "_selected_action": [str(self.unmatched_term.pk)],
+            },
+            follow=True,
+        )
+
+        self.unmatched_term.refresh_from_db()
+        self.assertEqual(
+            self.unmatched_term.status, UnmatchedSkillTerm.Status.RESOLVED
+        )
+        self.assertEqual(self.unmatched_term.resolved_skill, self.other_skill)
 
     def test_non_staff_user_cannot_access_taxonomy_admin(self):
         worker = User.objects.create_user(

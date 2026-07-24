@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.http import HttpResponse
 from django.utils.text import slugify
 from rest_framework import status
@@ -73,6 +74,40 @@ class WorkerProfileView(APIView):
 
     def patch(self, request):
         return self._update(request, partial=True)
+
+    def delete(self, request):
+        # WorkerProfile is the parent of every application the worker has
+        # made. Its model-level CASCADE is useful for database integrity, but
+        # an ordinary profile API request must not erase application and
+        # rating history. Lock the profile so a concurrent application cannot
+        # be inserted between the history check and deletion.
+        with transaction.atomic():
+            profile = (
+                WorkerProfile.objects.select_for_update()
+                .filter(user=request.user)
+                .first()
+            )
+
+            if profile is None:
+                return Response(
+                    {"detail": "Worker profile not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            if profile.applications.exists():
+                return Response(
+                    {
+                        "detail": (
+                            "Worker profile cannot be deleted while application "
+                            "history exists."
+                        )
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            profile.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class WorkerCVPreviewView(APIView):
@@ -185,3 +220,36 @@ class EmployerProfileView(APIView):
 
     def patch(self, request):
         return self._update(request, partial=True)
+
+    def delete(self, request):
+        # JobPost points at EmployerProfile with CASCADE, and applications and
+        # ratings cascade from each job. Permit deleting an unused profile,
+        # but protect all persisted hiring history once the employer has
+        # posted a job.
+        with transaction.atomic():
+            profile = (
+                EmployerProfile.objects.select_for_update()
+                .filter(user=request.user)
+                .first()
+            )
+
+            if profile is None:
+                return Response(
+                    {"detail": "Employer profile not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            if profile.job_posts.exists():
+                return Response(
+                    {
+                        "detail": (
+                            "Employer profile cannot be deleted while job "
+                            "history exists."
+                        )
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            profile.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)

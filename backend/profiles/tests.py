@@ -1,15 +1,19 @@
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from applications.models import Application
+from applications.services import submit_rating
+from jobs.models import JobPost
 from taxonomy.models import Category, SkillAlias, SkillTag, Subcategory, UnmatchedSkillTerm
 
 from .models import EmployerProfile, WorkerProfile
-from .services import generate_worker_summary
+from .services import generate_worker_summary, render_worker_cv_pdf
 
 
 User = get_user_model()
@@ -62,6 +66,13 @@ class WorkerProfileAPITests(APITestCase):
         response = self.client.get(self.worker_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_employer_cannot_delete_worker_profile(self):
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.delete(self.worker_url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(WorkerProfile.objects.filter(pk=self.worker_profile.pk).exists())
+
     def test_worker_can_retrieve_own_profile(self):
         self.authenticate_as(self.worker, "WorkerPassword123!")
         response = self.client.get(self.worker_url)
@@ -90,6 +101,52 @@ class WorkerProfileAPITests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(WorkerProfile.objects.filter(user=self.worker).exists())
+
+    def test_worker_can_delete_own_profile(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.delete(self.worker_url)
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(WorkerProfile.objects.filter(pk=self.worker_profile.pk).exists())
+        self.assertTrue(User.objects.filter(pk=self.worker.pk).exists())
+
+    def test_worker_profile_delete_preserves_application_and_rating_history(self):
+        job = JobPost.objects.create(
+            employer=self.employer.employer_profile,
+            title="Historical electrical job",
+            category=self.skill.subcategory.category,
+            subcategory=self.skill.subcategory,
+            description="Completed work that must remain auditable.",
+            address="Kathmandu",
+            latitude=Decimal("27.700000"),
+            longitude=Decimal("85.330000"),
+            wage_amount=Decimal("1500.00"),
+        )
+        application = Application.objects.create(
+            worker=self.worker_profile,
+            job=job,
+            status=Application.Status.COMPLETED,
+        )
+        rating = submit_rating(application, reviewer=self.employer, score=5)
+
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.delete(self.worker_url)
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn("application history", response.data["detail"])
+        self.assertTrue(
+            WorkerProfile.objects.filter(pk=self.worker_profile.pk).exists()
+        )
+        self.assertTrue(Application.objects.filter(pk=application.pk).exists())
+        self.assertTrue(type(rating).objects.filter(pk=rating.pk).exists())
+
+    def test_delete_missing_worker_profile_returns_404(self):
+        self.worker_profile.delete()
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+
+        response = self.client.delete(self.worker_url)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_worker_cannot_create_duplicate_profile(self):
         self.authenticate_as(self.worker, "WorkerPassword123!")
@@ -270,6 +327,15 @@ class EmployerProfileAPITests(APITestCase):
         response = self.client.get(self.employer_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_worker_cannot_delete_employer_profile(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.delete(self.employer_url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(
+            EmployerProfile.objects.filter(pk=self.employer_profile.pk).exists()
+        )
+
     def test_missing_employer_profile_returns_404_not_500(self):
         self.employer_profile.delete()
 
@@ -295,6 +361,60 @@ class EmployerProfileAPITests(APITestCase):
         self.employer_profile.refresh_from_db()
         self.assertEqual(self.employer_profile.organization_name, "Himalayan Builders")
         self.assertEqual(self.employer_profile.pan_vat_number, "123456789")
+
+    def test_employer_can_delete_own_profile(self):
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.delete(self.employer_url)
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(
+            EmployerProfile.objects.filter(pk=self.employer_profile.pk).exists()
+        )
+        self.assertTrue(User.objects.filter(pk=self.employer.pk).exists())
+
+    def test_employer_profile_delete_preserves_job_application_and_rating_history(self):
+        category = Category.objects.create(name="Construction & Repair")
+        subcategory = Subcategory.objects.create(
+            category=category,
+            name="Electrical",
+        )
+        job = JobPost.objects.create(
+            employer=self.employer_profile,
+            title="Historical electrical job",
+            category=category,
+            subcategory=subcategory,
+            description="Completed work that must remain auditable.",
+            address="Kathmandu",
+            latitude=Decimal("27.700000"),
+            longitude=Decimal("85.330000"),
+            wage_amount=Decimal("1500.00"),
+        )
+        application = Application.objects.create(
+            worker=self.worker.worker_profile,
+            job=job,
+            status=Application.Status.COMPLETED,
+        )
+        rating = submit_rating(application, reviewer=self.worker, score=5)
+
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.delete(self.employer_url)
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn("job history", response.data["detail"])
+        self.assertTrue(
+            EmployerProfile.objects.filter(pk=self.employer_profile.pk).exists()
+        )
+        self.assertTrue(JobPost.objects.filter(pk=job.pk).exists())
+        self.assertTrue(Application.objects.filter(pk=application.pk).exists())
+        self.assertTrue(type(rating).objects.filter(pk=rating.pk).exists())
+
+    def test_delete_missing_employer_profile_returns_404(self):
+        self.employer_profile.delete()
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+
+        response = self.client.delete(self.employer_url)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_invalid_pan_vat_number_format_is_rejected(self):
         self.authenticate_as(self.employer, "EmployerPassword123!")
@@ -546,6 +666,38 @@ class WorkerCVAPITests(APITestCase):
         content = response.content.decode()
         self.assertIn(self.worker.username, content)
         self.assertIn("Worker with 2 years of experience", content)
+        self.assertIn("Not rated yet", content)
+
+    def test_worker_cv_displays_received_average_rating(self):
+        category = Category.objects.create(name="CV Services")
+        subcategory = Subcategory.objects.create(
+            category=category,
+            name="CV Trade",
+        )
+        job = JobPost.objects.create(
+            employer=self.employer.employer_profile,
+            title="Completed CV job",
+            category=category,
+            subcategory=subcategory,
+            description="A completed engagement used for CV rating evidence.",
+            address="Kathmandu",
+            latitude=Decimal("27.717200"),
+            longitude=Decimal("85.324000"),
+            wage_amount=Decimal("1500.00"),
+        )
+        application = Application.objects.create(
+            worker=self.worker_profile,
+            job=job,
+            status=Application.Status.COMPLETED,
+        )
+        submit_rating(application, reviewer=self.employer, score=4)
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+
+        response = self.client.get(self.preview_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("4.0/5 from 1", response.content.decode())
+        self.assertContains(response, "rating")
 
     def test_worker_can_download_own_cv_as_pdf(self):
         self.authenticate_as(self.worker, "WorkerPassword123!")
@@ -556,6 +708,42 @@ class WorkerCVAPITests(APITestCase):
         self.assertIn("attachment", response["Content-Disposition"])
         self.assertIn(f"cv-{self.worker.username}.pdf", response["Content-Disposition"])
         self.assertTrue(response.content.startswith(b"%PDF"))
+        self.assertIn(b"xref", response.content)
+        self.assertIn(b"trailer", response.content)
+        self.assertIn(self.worker.username.encode("ascii"), response.content)
+        self.assertTrue(response.content.endswith(b"%%EOF\n"))
+
+    @override_settings(CV_PDF_ENGINE="weasyprint")
+    @patch("profiles.services._render_pdf_with_browser")
+    @patch(
+        "profiles.services._render_pdf_with_weasyprint",
+        return_value=b"%PDF-weasyprint",
+    )
+    def test_configured_weasyprint_renderer_is_preferred(
+        self,
+        weasyprint_renderer,
+        browser_renderer,
+    ):
+        pdf = render_worker_cv_pdf(self.worker_profile)
+
+        self.assertEqual(pdf, b"%PDF-weasyprint")
+        weasyprint_renderer.assert_called_once()
+        browser_renderer.assert_not_called()
+
+    @override_settings(CV_PDF_ENGINE="browser")
+    @patch("profiles.services._render_pdf_with_weasyprint", return_value=None)
+    @patch("profiles.services._render_pdf_with_browser", return_value=None)
+    def test_unavailable_optional_renderers_use_valid_basic_pdf(
+        self,
+        browser_renderer,
+        weasyprint_renderer,
+    ):
+        pdf = render_worker_cv_pdf(self.worker_profile)
+
+        browser_renderer.assert_called_once()
+        weasyprint_renderer.assert_called_once()
+        self.assertTrue(pdf.startswith(b"%PDF"))
+        self.assertTrue(pdf.endswith(b"%%EOF\n"))
 
     def test_cv_never_exposes_employer_only_data(self):
         # PAN/VAT is an employer-only field and must never leak through a

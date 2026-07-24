@@ -16,6 +16,8 @@ from django.conf import settings
 
 from .services import evaluate_match, filter_candidate_jobs_for_worker
 
+MAX_SUGGESTED_SKILLS = 3
+
 
 def _settings():
     return settings.RECOMMENDATION_SETTINGS
@@ -46,6 +48,7 @@ class MissingSkillAdvisory:
     skill: object  # taxonomy.SkillTag
     missing_frequency: int
     required_frequency: int
+    reason: str
     job_ids: list = field(default_factory=list)
 
 
@@ -91,6 +94,14 @@ def rank_missing_skills(near_miss_results):
             skill=skills_by_id[skill_id],
             missing_frequency=missing_frequency[skill_id],
             required_frequency=required_frequency.get(skill_id, 0),
+            reason=(
+                f"Learning {skills_by_id[skill_id].name} could strengthen your match for "
+                + (
+                    "1 near-miss job that requires it."
+                    if missing_frequency[skill_id] == 1
+                    else f"{missing_frequency[skill_id]} near-miss jobs that require it."
+                )
+            ),
             job_ids=job_ids_by_skill[skill_id],
         )
         for skill_id in ranked_ids
@@ -105,5 +116,5 @@ class OpportunityAdvisory:
 
 def build_opportunity_advisory(worker_profile):
     near_miss_jobs = find_near_miss_jobs(worker_profile)
-    missing_skills = rank_missing_skills(near_miss_jobs)
+    missing_skills = rank_missing_skills(near_miss_jobs)[:MAX_SUGGESTED_SKILLS]
     return OpportunityAdvisory(near_miss_jobs=near_miss_jobs, missing_skills=missing_skills)

@@ -139,6 +139,29 @@ class RegistrationAPITests(APITestCase):
 
         self.assertIn("phone_number", response.data)
 
+    def test_registration_rejects_phone_number_that_is_not_ten_ascii_digits(self):
+        for index, phone_number in enumerate(
+            ("981111111", "98111111111", "98111abcde", "९८११११११११"),
+            start=1,
+        ):
+            with self.subTest(phone_number=phone_number):
+                response = self.client.post(
+                    self.register_url,
+                    {
+                        "username": f"invalidphone{index}",
+                        "phone_number": phone_number,
+                        "password": "SecurePassword123!",
+                        "role": User.Role.WORKER,
+                    },
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn("phone_number", response.data)
+                self.assertFalse(
+                    User.objects.filter(username=f"invalidphone{index}").exists()
+                )
+
 
 class AuthenticationAPITests(APITestCase):
     """Tests for JWT authentication, permissions, and logout."""

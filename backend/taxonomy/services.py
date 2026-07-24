@@ -169,14 +169,30 @@ def normalize_skill_phrase(
     return SkillMatchResult(None, "unmatched", score, normalized)
 
 
-def normalize_skill_phrases(phrases, *, threshold=None, user=None):
-    """Resolve multiple phrases; returns (matched_skills, unmatched_phrases)."""
+def normalize_skill_phrases(
+    phrases,
+    *,
+    threshold=None,
+    user=None,
+    record_unmatched=True,
+):
+    """Resolve multiple phrases; return ``(matched_skills, unmatched_phrases)``.
+
+    ``record_unmatched=False`` provides a side-effect-free validation pass.
+    The default preserves the profile/job save behaviour of storing unknown
+    terms for later admin review.
+    """
 
     matched = []
     unmatched = []
 
     for phrase in phrases:
-        result = normalize_skill_phrase(phrase, threshold=threshold, user=user)
+        result = normalize_skill_phrase(
+            phrase,
+            threshold=threshold,
+            user=user,
+            record_unmatched=record_unmatched,
+        )
 
         if result.skill is not None:
             matched.append(result.skill)

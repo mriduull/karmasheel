@@ -1,0 +1,478 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Karmasheel workforce matching demonstration interface">
+    <title>Karmasheel | Work that fits</title>
+    <link rel="stylesheet" href="{% static 'frontend/app.css' %}">
+    <script src="{% static 'frontend/app.js' %}" defer></script>
+</head>
+<body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
+    <header class="site-header">
+        <a class="brand" href="/" aria-label="Karmasheel home">
+            <span class="brand-mark" aria-hidden="true">K</span>
+            <span>
+                <strong>Karmasheel</strong>
+                <small>काम र सीपको सही मेल</small>
+            </span>
+        </a>
+        <nav aria-label="Primary navigation">
+            <a href="#find-work">Find work</a>
+            <a class="authenticated-only" href="#profile" hidden>Profile</a>
+            <a class="role-panel" data-role="WORKER" href="#worker-workspace" hidden>My work</a>
+            <a class="role-panel" data-role="EMPLOYER" href="#employer-workspace" hidden>Hire</a>
+        </nav>
+        <div class="session-actions">
+            <span id="session-pill" class="session-pill">Guest</span>
+            <button id="logout-button" class="button button-quiet authenticated-only" type="button" hidden>
+                Log out
+            </button>
+        </div>
+    </header>
+
+    <main id="main-content">
+        <section class="hero">
+            <div>
+                <p class="eyebrow">Local skills. Better opportunities.</p>
+                <h1>Find trusted work and the people ready to do it.</h1>
+                <p class="hero-copy">
+                    A transparent workforce-matching platform for workers and employers in Nepal.
+                    Every recommendation includes a score breakdown and plain-language reasons.
+                </p>
+                <div class="hero-actions">
+                    <a class="button button-primary" href="#find-work">Browse active jobs</a>
+                    <a class="button button-secondary anonymous-only" href="#account-access">Create an account</a>
+                    <a class="button button-secondary authenticated-only" href="#profile" hidden>Complete your profile</a>
+                </div>
+            </div>
+            <aside class="hero-card" aria-label="How Karmasheel works">
+                <span class="hero-card-number">01</span>
+                <h2>Skills stay understandable.</h2>
+                <p>Free-text phrases such as “ghar wiring” are normalized to a shared skill taxonomy.</p>
+                <span class="hero-card-number">02</span>
+                <h2>Matches stay explainable.</h2>
+                <p>Skills, distance, experience, availability and reliability remain visible in every result.</p>
+            </aside>
+        </section>
+
+        <div id="flash-message" class="flash" role="status" aria-live="polite" hidden></div>
+
+        <section id="account-access" class="section anonymous-only">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Get started</p>
+                    <h2>One account, one clear role.</h2>
+                </div>
+                <p>Register as a worker looking for opportunities or an employer ready to hire.</p>
+            </div>
+
+            <div class="auth-grid">
+                <form id="register-form" class="panel form-panel">
+                    <div class="panel-heading">
+                        <span class="panel-index">A</span>
+                        <div>
+                            <h3>Create account</h3>
+                            <p>Your role controls the tools you see.</p>
+                        </div>
+                    </div>
+                    <div class="form-grid two-column">
+                        <label>
+                            Username
+                            <input name="username" autocomplete="username" required maxlength="150">
+                        </label>
+                        <label>
+                            Email
+                            <input name="email" type="email" autocomplete="email">
+                        </label>
+                        <label>
+                            Phone number
+                            <input name="phone_number" autocomplete="tel" required inputmode="numeric"
+                                   pattern="[0-9]{10}" minlength="10" maxlength="10"
+                                   title="Enter exactly 10 digits" placeholder="98XXXXXXXX">
+                        </label>
+                        <label>
+                            Account type
+                            <select name="role" required>
+                                <option value="WORKER">Worker</option>
+                                <option value="EMPLOYER">Employer</option>
+                            </select>
+                        </label>
+                        <label class="full-width">
+                            Password
+                            <input name="password" type="password" autocomplete="new-password" required
+                                   minlength="8" aria-describedby="password-help">
+                            <small id="password-help">Use a strong password that is not similar to your username.</small>
+                        </label>
+                    </div>
+                    <button class="button button-primary" type="submit">Register and sign in</button>
+                </form>
+
+                <form id="login-form" class="panel form-panel panel-dark">
+                    <div class="panel-heading">
+                        <span class="panel-index">B</span>
+                        <div>
+                            <h3>Welcome back</h3>
+                            <p>Use your username and password.</p>
+                        </div>
+                    </div>
+                    <label>
+                        Username
+                        <input name="username" autocomplete="username" required>
+                    </label>
+                    <label>
+                        Password
+                        <input name="password" type="password" autocomplete="current-password" required>
+                    </label>
+                    <button class="button button-light" type="submit">Sign in</button>
+                </form>
+            </div>
+        </section>
+
+        <section id="profile" class="section authenticated-only" hidden>
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Your details</p>
+                    <h2>Keep your profile useful.</h2>
+                </div>
+                <div class="account-overview">
+                    <div id="account-summary" class="account-summary"></div>
+                    <span id="rating-summary" class="rating-summary">No ratings yet</span>
+                </div>
+            </div>
+
+            <form id="worker-profile-form" class="panel form-panel role-panel" data-role="WORKER" hidden>
+                <div class="panel-heading">
+                    <span class="panel-index">W</span>
+                    <div>
+                        <h3>Worker profile</h3>
+                        <p>Skills may be entered as standard names, English synonyms or Romanized Nepali.</p>
+                    </div>
+                </div>
+                <div class="form-grid three-column">
+                    <label class="span-two">
+                        Address
+                        <input name="address" maxlength="255" placeholder="Baneshwor, Kathmandu">
+                    </label>
+                    <label>
+                        Years of experience
+                        <input name="experience_years" type="number" min="0" value="0">
+                    </label>
+                    <label>
+                        Latitude
+                        <input name="latitude" type="number" min="-90" max="90" step="0.000001" placeholder="27.7172">
+                    </label>
+                    <label>
+                        Longitude
+                        <input name="longitude" type="number" min="-180" max="180" step="0.000001" placeholder="85.3240">
+                    </label>
+                    <label>
+                        Travel radius (km)
+                        <input name="preferred_travel_radius_km" type="number" min="0" placeholder="20">
+                    </label>
+                    <label>
+                        Expected wage
+                        <input name="expected_wage" type="number" min="0" step="0.01" placeholder="1500">
+                    </label>
+                    <label class="checkbox-label">
+                        <input name="is_available" type="checkbox">
+                        Available for work
+                    </label>
+                    <label class="full-width">
+                        Skills <span class="label-note">comma-separated</span>
+                        <input name="skill_input" placeholder="ghar wiring, Fan Installation, Painting">
+                    </label>
+                </div>
+                <button class="button button-primary" type="submit">Save worker profile</button>
+            </form>
+
+            <form id="employer-profile-form" class="panel form-panel role-panel" data-role="EMPLOYER" hidden>
+                <div class="panel-heading">
+                    <span class="panel-index">E</span>
+                    <div>
+                        <h3>Employer profile</h3>
+                        <p>Job posting is enabled after an administrator verifies this profile.</p>
+                    </div>
+                </div>
+                <div class="form-grid three-column">
+                    <label>
+                        Organization
+                        <input name="organization_name" maxlength="150" placeholder="Everest Builders">
+                    </label>
+                    <label class="span-two">
+                        Address
+                        <input name="address" maxlength="255" placeholder="Lalitpur, Nepal">
+                    </label>
+                    <label>
+                        Latitude
+                        <input name="latitude" type="number" min="-90" max="90" step="0.000001" placeholder="27.6710">
+                    </label>
+                    <label>
+                        Longitude
+                        <input name="longitude" type="number" min="-180" max="180" step="0.000001" placeholder="85.4298">
+                    </label>
+                    <label>
+                        PAN / VAT number
+                        <input name="pan_vat_number" inputmode="numeric" minlength="9" maxlength="9"
+                               placeholder="123456789">
+                    </label>
+                </div>
+                <div class="inline-actions">
+                    <button class="button button-primary" type="submit">Save employer profile</button>
+                    <span id="verification-badge" class="status-badge">Unverified</span>
+                </div>
+            </form>
+        </section>
+
+        <section id="find-work" class="section section-tinted">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Open opportunities</p>
+                    <h2>Browse active jobs.</h2>
+                </div>
+                <p>Public results never expose private employer or worker information.</p>
+            </div>
+
+            <form id="job-filter-form" class="filter-bar">
+                <label>
+                    Category
+                    <select id="job-filter-category" name="category">
+                        <option value="">All categories</option>
+                    </select>
+                </label>
+                <label>
+                    Subcategory
+                    <select id="job-filter-subcategory" name="subcategory">
+                        <option value="">All subcategories</option>
+                    </select>
+                </label>
+                <label>
+                    Work type
+                    <select name="work_type">
+                        <option value="">All types</option>
+                        <option value="FULL_TIME">Full-time</option>
+                        <option value="PART_TIME">Part-time</option>
+                        <option value="CONTRACT">Contract</option>
+                        <option value="ONE_TIME">One-time</option>
+                    </select>
+                </label>
+                <label>
+                    Latitude
+                    <input id="job-filter-latitude" name="latitude" type="number" min="-90" max="90"
+                           step="0.000001" placeholder="Optional">
+                </label>
+                <label>
+                    Longitude
+                    <input id="job-filter-longitude" name="longitude" type="number" min="-180" max="180"
+                           step="0.000001" placeholder="Optional">
+                </label>
+                <label>
+                    Max distance (km)
+                    <input name="max_distance_km" type="number" min="0" step="0.1" placeholder="Any">
+                </label>
+                <button class="button button-primary" type="submit">Search jobs</button>
+            </form>
+            <div id="public-job-list" class="card-grid" aria-live="polite"></div>
+        </section>
+
+        <section id="worker-workspace" class="section role-panel" data-role="WORKER" hidden>
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Worker workspace</p>
+                    <h2>Your next move, explained.</h2>
+                </div>
+                <div class="inline-actions">
+                    <button id="load-worker-recommendations" class="button button-primary" type="button">
+                        Rank jobs for me
+                    </button>
+                    <button id="load-advisory" class="button button-secondary" type="button">
+                        Show skill opportunities
+                    </button>
+                </div>
+            </div>
+
+            <div class="workspace-grid">
+                <article class="panel">
+                    <div class="panel-heading compact">
+                        <span class="panel-index">01</span>
+                        <div>
+                            <h3>My applications</h3>
+                            <p>Track progress or withdraw while the application is still open.</p>
+                        </div>
+                    </div>
+                    <div id="worker-application-list" class="stack-list"></div>
+                </article>
+
+                <article class="panel">
+                    <div class="panel-heading compact">
+                        <span class="panel-index">02</span>
+                        <div>
+                            <h3>Automatic CV</h3>
+                            <p>Preview the HTML version or download a generated PDF.</p>
+                        </div>
+                    </div>
+                    <div class="inline-actions">
+                        <button id="preview-cv" class="button button-secondary" type="button">Preview CV</button>
+                        <button id="download-cv" class="button button-primary" type="button">Download PDF</button>
+                    </div>
+                </article>
+            </div>
+
+            <div id="worker-recommendation-results" class="result-section" hidden>
+                <h3>Recommended jobs</h3>
+                <div class="card-grid"></div>
+            </div>
+            <div id="advisory-results" class="result-section" hidden>
+                <h3>Opportunity advisory</h3>
+                <div class="advisory-grid"></div>
+            </div>
+        </section>
+
+        <section id="employer-workspace" class="section role-panel" data-role="EMPLOYER" hidden>
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Employer workspace</p>
+                    <h2>Post, review and hire.</h2>
+                </div>
+                <p>Only verified employers may create jobs or view ranked worker recommendations.</p>
+            </div>
+
+            <form id="job-create-form" class="panel form-panel">
+                <div class="panel-heading">
+                    <span class="panel-index">+</span>
+                    <div>
+                        <h3>Create a job</h3>
+                        <p>Required and preferred skills remain separate throughout matching.</p>
+                    </div>
+                </div>
+                <div class="form-grid three-column">
+                    <label class="span-two">
+                        Job title
+                        <input name="title" maxlength="150" required placeholder="Residential electrician">
+                    </label>
+                    <label>
+                        Work type
+                        <select name="work_type" required>
+                            <option value="ONE_TIME">One-time</option>
+                            <option value="CONTRACT">Contract</option>
+                            <option value="PART_TIME">Part-time</option>
+                            <option value="FULL_TIME">Full-time</option>
+                        </select>
+                    </label>
+                    <label>
+                        Category
+                        <select id="job-category" name="category" required>
+                            <option value="">Choose category</option>
+                        </select>
+                    </label>
+                    <label>
+                        Subcategory
+                        <select id="job-subcategory" name="subcategory" required>
+                            <option value="">Choose subcategory</option>
+                        </select>
+                    </label>
+                    <label>
+                        Required experience
+                        <input name="required_experience_years" type="number" min="0" value="0" required>
+                    </label>
+                    <label class="full-width">
+                        Description
+                        <textarea name="description" rows="4" required placeholder="Describe the work and expected outcome."></textarea>
+                    </label>
+                    <label class="span-two">
+                        Work address
+                        <input name="address" maxlength="255" required placeholder="Patan, Lalitpur">
+                    </label>
+                    <label>
+                        Workers needed
+                        <input name="number_of_workers_required" type="number" min="1" value="1" required>
+                    </label>
+                    <label>
+                        Latitude
+                        <input name="latitude" type="number" min="-90" max="90" step="0.000001" required>
+                    </label>
+                    <label>
+                        Longitude
+                        <input name="longitude" type="number" min="-180" max="180" step="0.000001" required>
+                    </label>
+                    <label>
+                        Application deadline
+                        <input name="application_deadline" type="datetime-local">
+                    </label>
+                    <label>
+                        Wage type
+                        <select name="wage_type" required>
+                            <option value="DAILY">Daily</option>
+                            <option value="HOURLY">Hourly</option>
+                            <option value="MONTHLY">Monthly</option>
+                            <option value="FIXED">Fixed</option>
+                        </select>
+                    </label>
+                    <label>
+                        Wage amount
+                        <input name="wage_amount" type="number" min="0" step="0.01" required>
+                    </label>
+                    <label>
+                        Duration (days)
+                        <input name="duration_days" type="number" min="1">
+                    </label>
+                    <label class="full-width">
+                        Required skills <span class="label-note">comma-separated</span>
+                        <input name="required_skills_input" required placeholder="House Wiring, Fault Diagnosis">
+                    </label>
+                    <label class="full-width">
+                        Preferred skills <span class="label-note">comma-separated</span>
+                        <input name="preferred_skills_input" placeholder="Fan Installation">
+                    </label>
+                </div>
+                <button class="button button-primary" type="submit">Publish job</button>
+            </form>
+
+            <div class="workspace-grid employer-grid">
+                <article class="panel">
+                    <div class="panel-heading compact">
+                        <span class="panel-index">01</span>
+                        <div>
+                            <h3>My jobs</h3>
+                            <p>Close a posting, inspect applications or rank matching workers.</p>
+                        </div>
+                    </div>
+                    <div id="employer-job-list" class="stack-list"></div>
+                </article>
+
+                <article class="panel">
+                    <div class="panel-heading compact">
+                        <span class="panel-index">02</span>
+                        <div>
+                            <h3 id="employer-applications-title">Job applications</h3>
+                            <p>Choose a job to move applicants through the enforced status workflow.</p>
+                        </div>
+                    </div>
+                    <div id="employer-application-list" class="stack-list empty-state">
+                        Select “Applications” on one of your jobs.
+                    </div>
+                </article>
+            </div>
+
+            <div id="employer-recommendation-results" class="result-section" hidden>
+                <h3>Recommended workers</h3>
+                <div class="card-grid"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div>
+            <strong>Karmasheel</strong>
+            <p>Transparent local workforce matching for Nepal.</p>
+        </div>
+        <div class="footer-links">
+            <a href="/admin/">Django admin</a>
+            <a href="/api/taxonomy/tree/">Taxonomy API</a>
+        </div>
+    </footer>
+</body>
+</html>

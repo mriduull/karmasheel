@@ -143,6 +143,17 @@
                 <td>{{ experience_years }} year{{ experience_years|pluralize }}</td>
             </tr>
             <tr>
+                <td class="fact-label">Average rating</td>
+                <td>
+                    {% if average_rating is not None %}
+                        {{ average_rating }}/5 from {{ rating_count }}
+                        rating{{ rating_count|pluralize }}
+                    {% else %}
+                        Not rated yet
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
                 <td class="fact-label">Availability</td>
                 <td>{% if is_available %}Available for work{% else %}Not currently available{% endif %}</td>
             </tr>
