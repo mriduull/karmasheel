@@ -2,12 +2,18 @@
 
 Builds a coherent, idempotent demonstration dataset on top of the
 standardized taxonomy (reusing `seed_taxonomy` rather than duplicating
-it): a superuser, one verified and one pending employer, four workers
-with different skills/experience/location/availability/wage/reliability
-profiles, active jobs spanning every seeded subcategory, applications in
-several valid states (including one full worker-to-job hire), a
-completed application rated in both directions, and one deliberately
-unmatched skill phrase for admin review.
+it): a superuser, three verified employers and one pending employer, ten
+workers with deliberately different skills/experience/location/
+availability/wage/reliability profiles, a dozen active jobs spanning
+electrical, plumbing, masonry, painting, cleaning, cooking, hospitality,
+driving/delivery and caregiving work, applications covering every legal
+status in the application state machine (including one full
+worker-to-job hire), a completed application rated in both directions,
+and one deliberately unmatched skill phrase for admin review.
+
+The original four workers (Ramesh, Sita, Hari, Gita) and five jobs keep
+their exact original field values so the scores already documented in
+docs/DEMO_SCRIPT.md keep working; everything else is additive.
 
 Safe to run repeatedly: every record is looked up by a natural key
 (username, employer+title, worker+job, etc.) via get_or_create/
@@ -166,8 +172,52 @@ class Command(BaseCommand):
             },
         )
 
+        # Second verified employer: a hospitality/event company, so
+        # recommendation demos are not all rooted at one employer.
+        hospitality_user, hospitality_created = self._get_or_update_user(
+            "demo_employer_hospitality",
+            phone_number="9811100003",
+            email="demo_employer_hospitality@karmasheel.local",
+            role=User.Role.EMPLOYER,
+            is_contact_verified=True,
+        )
+        self.employer_hospitality, _ = EmployerProfile.objects.update_or_create(
+            user=hospitality_user,
+            defaults={
+                "organization_name": "Everest Hospitality & Events Pvt. Ltd.",
+                "address": "Lazimpat, Kathmandu",
+                "latitude": Decimal("27.717000"),
+                "longitude": Decimal("85.317000"),
+                "pan_vat_number": "300400500",
+                "verification_status": EmployerProfile.VerificationStatus.VERIFIED,
+            },
+        )
+
+        # Third verified employer: a retail/delivery/facility-service
+        # company, covering the driving-delivery and caregiving jobs.
+        retail_user, retail_created = self._get_or_update_user(
+            "demo_employer_retail",
+            phone_number="9811100004",
+            email="demo_employer_retail@karmasheel.local",
+            role=User.Role.EMPLOYER,
+            is_contact_verified=True,
+        )
+        self.employer_retail, _ = EmployerProfile.objects.update_or_create(
+            user=retail_user,
+            defaults={
+                "organization_name": "Valley Retail & Facility Services Pvt. Ltd.",
+                "address": "Koteshwor, Kathmandu",
+                "latitude": Decimal("27.677500"),
+                "longitude": Decimal("85.347000"),
+                "pan_vat_number": "400500600",
+                "verification_status": EmployerProfile.VerificationStatus.VERIFIED,
+            },
+        )
+
         self.summary["employers"] = [
             (verified_user.username, "VERIFIED", verified_created),
+            (hospitality_user.username, "VERIFIED", hospitality_created),
+            (retail_user.username, "VERIFIED", retail_created),
             (pending_user.username, "PENDING", pending_created),
         ]
 
@@ -292,23 +342,194 @@ class Command(BaseCommand):
             self._skill("Cooking", "Meal Preparation", domestic),
         ])
 
+        hospitality = "Hospitality & Food Services"
+        driving = "Driving & Delivery"
+        caregiving = "Caregiving & Personal Support"
+
+        # Bimal: strong plumbing match - every required/preferred skill
+        # for the plumbing job below, close by, experienced, verified.
+        bimal_user, bimal_created = self._get_or_update_user(
+            "demo_worker_bimal",
+            phone_number="9811100015",
+            email="demo_worker_bimal@karmasheel.local",
+            role=User.Role.WORKER,
+            is_contact_verified=True,
+        )
+        self.worker_bimal, _ = WorkerProfile.objects.update_or_create(
+            user=bimal_user,
+            defaults={
+                "address": "Jawalakhel, Lalitpur",
+                "latitude": Decimal("27.671500"),
+                "longitude": Decimal("85.314200"),
+                "experience_years": 5,
+                "is_available": True,
+                "expected_wage": Decimal("900.00"),
+                "preferred_travel_radius_km": 12,
+            },
+        )
+        self.worker_bimal.skills.set([
+            self._skill("Plumbing", "Pipe Fitting", construction),
+            self._skill("Plumbing", "Water Tank Installation", construction),
+            self._skill("Plumbing", "Leak Repair", construction),
+        ])
+
+        # Kamal: multi-skilled across electrical, masonry and painting,
+        # but only ever partially matches each job's required skills, with
+        # moderate experience - useful for several jobs without ever being
+        # the top candidate on any of them.
+        kamal_user, kamal_created = self._get_or_update_user(
+            "demo_worker_kamal",
+            phone_number="9811100016",
+            email="demo_worker_kamal@karmasheel.local",
+            role=User.Role.WORKER,
+            is_contact_verified=True,
+        )
+        self.worker_kamal, _ = WorkerProfile.objects.update_or_create(
+            user=kamal_user,
+            defaults={
+                "address": "Chabahil, Kathmandu",
+                "latitude": Decimal("27.717800"),
+                "longitude": Decimal("85.345500"),
+                "experience_years": 3,
+                "is_available": True,
+                "expected_wage": Decimal("1000.00"),
+                "preferred_travel_radius_km": 20,
+            },
+        )
+        self.worker_kamal.skills.set([
+            self._skill("Electrical", "House Wiring", construction),
+            self._skill("Masonry", "Brick Laying", construction),
+            self._skill("Masonry", "Plastering", construction),
+            self._skill("Painting", "Wall Painting", construction),
+        ])
+
+        # Maya: strong hospitality/waitstaff match.
+        maya_user, maya_created = self._get_or_update_user(
+            "demo_worker_maya",
+            phone_number="9811100017",
+            email="demo_worker_maya@karmasheel.local",
+            role=User.Role.WORKER,
+            is_contact_verified=True,
+        )
+        self.worker_maya, _ = WorkerProfile.objects.update_or_create(
+            user=maya_user,
+            defaults={
+                "address": "Thamel, Kathmandu",
+                "latitude": Decimal("27.715000"),
+                "longitude": Decimal("85.310000"),
+                "experience_years": 2,
+                "is_available": True,
+                "expected_wage": Decimal("800.00"),
+                "preferred_travel_radius_km": 10,
+            },
+        )
+        self.worker_maya.skills.set([
+            self._skill("Waitstaff & Table Service", "Table Service", hospitality),
+            self._skill("Waitstaff & Table Service", "Order Taking", hospitality),
+        ])
+
+        # Sunita: strong elderly-caregiving match.
+        sunita_user, sunita_created = self._get_or_update_user(
+            "demo_worker_sunita",
+            phone_number="9811100018",
+            email="demo_worker_sunita@karmasheel.local",
+            role=User.Role.WORKER,
+            is_contact_verified=True,
+        )
+        self.worker_sunita, _ = WorkerProfile.objects.update_or_create(
+            user=sunita_user,
+            defaults={
+                "address": "Battisputali, Kathmandu",
+                "latitude": Decimal("27.700000"),
+                "longitude": Decimal("85.340000"),
+                "experience_years": 4,
+                "is_available": True,
+                "expected_wage": Decimal("1100.00"),
+                "preferred_travel_radius_km": 15,
+            },
+        )
+        self.worker_sunita.skills.set([
+            self._skill("Elderly Care", "Elderly Personal Care", caregiving),
+            self._skill("Elderly Care", "Companionship Care", caregiving),
+        ])
+
+        # Deepak: strong two-wheeler delivery match.
+        deepak_user, deepak_created = self._get_or_update_user(
+            "demo_worker_deepak",
+            phone_number="9811100019",
+            email="demo_worker_deepak@karmasheel.local",
+            role=User.Role.WORKER,
+            is_contact_verified=True,
+        )
+        self.worker_deepak, _ = WorkerProfile.objects.update_or_create(
+            user=deepak_user,
+            defaults={
+                "address": "Koteshwor, Kathmandu",
+                "latitude": Decimal("27.678500"),
+                "longitude": Decimal("85.349000"),
+                "experience_years": 2,
+                "is_available": True,
+                "expected_wage": Decimal("700.00"),
+                "preferred_travel_radius_km": 15,
+            },
+        )
+        self.worker_deepak.skills.set([
+            self._skill("Two-Wheeler Delivery", "Motorbike Food Delivery", driving),
+            self._skill("Two-Wheeler Delivery", "Parcel Delivery", driving),
+        ])
+
+        # Suresh: the same electrical skills and experience as Ramesh -
+        # otherwise an equally strong candidate - but based far away in
+        # Pokhara with no stated travel radius, so distance (not skill or
+        # experience) is what pushes him below Ramesh in the rankings.
+        suresh_user, suresh_created = self._get_or_update_user(
+            "demo_worker_suresh",
+            phone_number="9811100020",
+            email="demo_worker_suresh@karmasheel.local",
+            role=User.Role.WORKER,
+            is_contact_verified=True,
+        )
+        self.worker_suresh, _ = WorkerProfile.objects.update_or_create(
+            user=suresh_user,
+            defaults={
+                "address": "Lakeside, Pokhara",
+                "latitude": Decimal("28.209600"),
+                "longitude": Decimal("83.985600"),
+                "experience_years": 6,
+                "is_available": True,
+                "expected_wage": Decimal("1200.00"),
+                "preferred_travel_radius_km": None,
+            },
+        )
+        self.worker_suresh.skills.set([
+            self._skill("Electrical", "House Wiring", construction),
+            self._skill("Electrical", "Circuit Breaker Installation", construction),
+            self._skill("Electrical", "Electrical Repair", construction),
+        ])
+
         self.summary["workers"] = [
             (ramesh_user.username, ramesh_created),
             (sita_user.username, sita_created),
             (hari_user.username, hari_created),
             (gita_user.username, gita_created),
+            (bimal_user.username, bimal_created),
+            (kamal_user.username, kamal_created),
+            (maya_user.username, maya_created),
+            (sunita_user.username, sunita_created),
+            (deepak_user.username, deepak_created),
+            (suresh_user.username, suresh_created),
         ]
 
     # ------------------------------------------------------------------
     # Jobs
     # ------------------------------------------------------------------
 
-    def _job(self, *, title, category_name, subcategory_name, required, preferred, description, address, latitude, longitude, required_experience_years, wage_type, wage_amount, work_type, number_of_workers_required=1):
+    def _job(self, *, title, category_name, subcategory_name, required, preferred, description, address, latitude, longitude, required_experience_years, wage_type, wage_amount, work_type, number_of_workers_required=1, employer=None):
         category = Category.objects.get(name=category_name)
         subcategory = Subcategory.objects.get(category=category, name=subcategory_name)
 
         job, created = JobPost.objects.update_or_create(
-            employer=self.verified_employer,
+            employer=employer or self.verified_employer,
             title=title,
             defaults={
                 "category": category,
@@ -421,12 +642,153 @@ class Command(BaseCommand):
             work_type=JobPost.WorkType.ONE_TIME,
         )
 
+        hospitality = "Hospitality & Food Services"
+        driving = "Driving & Delivery"
+        caregiving = "Caregiving & Personal Support"
+
+        # A second electrical job Ramesh fully matches on skills but only
+        # partially on experience (required_experience_years exceeds his
+        # 6 years) and is slightly further away than the wiring job -
+        # gives the worker-to-job demo a second, meaningfully-different
+        # result and demonstrates experience/distance affecting score.
+        self.job_wiring2, wiring2_created = self._job(
+            title="Electrical Rewiring for Old Bungalow",
+            category_name=construction,
+            subcategory_name="Electrical",
+            required=["House Wiring", "Electrical Repair"],
+            preferred=["Circuit Breaker Installation"],
+            description="Full rewiring of an older two-storey bungalow ahead of resale.",
+            address="Kirtipur, Kathmandu",
+            latitude="27.677400",
+            longitude="85.282000",
+            required_experience_years=8,
+            wage_type=JobPost.WageType.DAILY,
+            wage_amount="1250.00",
+            work_type=JobPost.WorkType.CONTRACT,
+        )
+
+        # A third electrical job Ramesh only partially matches - he has
+        # one of the two required skills (House Wiring) but not the other
+        # (Switchboard Installation), and the required experience exceeds
+        # his 6 years - two real, explainable reasons this is a weaker,
+        # but still genuinely suitable, third recommendation.
+        self.job_switchboard, switchboard_created = self._job(
+            title="Switchboard and Panel Upgrade for Retail Outlet",
+            category_name=construction,
+            subcategory_name="Electrical",
+            required=["House Wiring", "Switchboard Installation"],
+            preferred=["Electrical Panel Wiring"],
+            description="Upgrade the switchboard and rewire several branch circuits for a retail shop unit.",
+            address="Koteshwor, Kathmandu",
+            latitude="27.680000",
+            longitude="85.350000",
+            required_experience_years=8,
+            wage_type=JobPost.WageType.DAILY,
+            wage_amount="1100.00",
+            work_type=JobPost.WorkType.CONTRACT,
+            employer=self.employer_retail,
+        )
+
+        # A second masonry job requiring "Tile Installation" alongside
+        # the original one, near Hari, so the missing-skill advisory
+        # surfaces it as recurring across several near-miss jobs.
+        self.job_masonry2, masonry2_created = self._job(
+            title="Floor Tiling and Masonry Repair for Guest House",
+            category_name=construction,
+            subcategory_name="Masonry",
+            required=["Brick Laying", "Tile Installation"],
+            preferred=["Plastering"],
+            description="Repair brickwork and lay new floor tiles for a small guest house.",
+            address="Suryabinayak, Bhaktapur",
+            latitude="27.665000",
+            longitude="85.430000",
+            required_experience_years=2,
+            wage_type=JobPost.WageType.DAILY,
+            wage_amount="1050.00",
+            work_type=JobPost.WorkType.CONTRACT,
+        )
+
+        self.job_painting, painting_created = self._job(
+            title="Exterior Wall Painting for Apartment Complex",
+            category_name=construction,
+            subcategory_name="Painting",
+            required=["Wall Painting", "Surface Primer Application"],
+            preferred=["Ceiling Painting"],
+            description="Prime and paint the exterior walls of a four-storey apartment complex.",
+            address="Baneshwor, Kathmandu",
+            latitude="27.695000",
+            longitude="85.337000",
+            required_experience_years=1,
+            wage_type=JobPost.WageType.DAILY,
+            wage_amount="900.00",
+            work_type=JobPost.WorkType.CONTRACT,
+        )
+
+        self.job_waitstaff, waitstaff_created = self._job(
+            title="Waitstaff for Wedding Reception",
+            category_name=hospitality,
+            subcategory_name="Waitstaff & Table Service",
+            required=["Table Service", "Order Taking"],
+            preferred=["Guest Seating Assistance"],
+            description="Serve guests at a one-evening wedding reception for around 200 people.",
+            address="Lazimpat, Kathmandu",
+            latitude="27.717000",
+            longitude="85.317000",
+            required_experience_years=1,
+            wage_type=JobPost.WageType.DAILY,
+            wage_amount="850.00",
+            work_type=JobPost.WorkType.ONE_TIME,
+            number_of_workers_required=4,
+            employer=self.employer_hospitality,
+        )
+
+        self.job_delivery, delivery_created = self._job(
+            title="Motorbike Delivery Rider for Grocery App",
+            category_name=driving,
+            subcategory_name="Two-Wheeler Delivery",
+            required=["Motorbike Food Delivery", "Parcel Delivery"],
+            preferred=["Route Navigation"],
+            description="Same-day grocery delivery rider for a local delivery app.",
+            address="Old Baneshwor, Kathmandu",
+            latitude="27.689000",
+            longitude="85.336000",
+            required_experience_years=1,
+            wage_type=JobPost.WageType.DAILY,
+            wage_amount="800.00",
+            work_type=JobPost.WorkType.PART_TIME,
+            employer=self.employer_retail,
+        )
+
+        self.job_caregiving, caregiving_created = self._job(
+            title="Elderly Care Companion - Daytime Shift",
+            category_name=caregiving,
+            subcategory_name="Elderly Care",
+            required=["Elderly Personal Care", "Companionship Care"],
+            preferred=["Mobility Assistance"],
+            description="Daytime companionship and personal care for an elderly family member.",
+            address="Battisputali, Kathmandu",
+            latitude="27.701000",
+            longitude="85.339000",
+            required_experience_years=2,
+            wage_type=JobPost.WageType.MONTHLY,
+            wage_amount="22000.00",
+            work_type=JobPost.WorkType.PART_TIME,
+            employer=self.employer_retail,
+        )
+
         self.summary["jobs"] = [
             (self.job_wiring.title, wiring_created),
             (self.job_cleaning.title, cleaning_created),
             (self.job_masonry.title, masonry_created),
             (self.job_cooking.title, cooking_created),
             (self.job_plumbing.title, plumbing_created),
+            (self.job_wiring2.title, wiring2_created),
+            (self.job_switchboard.title, switchboard_created),
+            (self.job_masonry2.title, masonry2_created),
+            (self.job_painting.title, painting_created),
+            (self.job_waitstaff.title, waitstaff_created),
+            (self.job_delivery.title, delivery_created),
+            (self.job_caregiving.title, caregiving_created),
         ]
 
     # ------------------------------------------------------------------
@@ -476,11 +838,16 @@ class Command(BaseCommand):
             if application.status in self._TERMINAL_SIDE_STATUSES:
                 break
 
-            current_rank = self._STATUS_ORDER.get(application.status, -1)
-            target_rank = self._STATUS_ORDER.get(target_status, -1)
+            # Terminal side-statuses (REJECTED/WITHDRAWN/CANCELLED) have no
+            # rank in _STATUS_ORDER - they are a legal transition away from
+            # any non-terminal status on the main path, not a point along
+            # it, so the rank check only applies to main-path targets.
+            if target_status in self._STATUS_ORDER:
+                current_rank = self._STATUS_ORDER.get(application.status, -1)
+                target_rank = self._STATUS_ORDER[target_status]
 
-            if current_rank >= target_rank:
-                continue
+                if current_rank >= target_rank:
+                    continue
 
             transition_application_status(application, target_status, actor=actor)
 
@@ -550,11 +917,66 @@ class Command(BaseCommand):
             steps=[(Application.Status.WITHDRAWN, self.worker_gita.user)],
         )
 
+        # House Wiring for New Apartment Block gets two more applicants
+        # besides Ramesh, so the job-to-worker demo job also demonstrates
+        # "several applicants" in different states: Suresh is shortlisted
+        # despite being far away, Kamal is rejected for lacking the second
+        # required skill.
+        suresh_shortlisted_app, suresh_shortlisted_created = self._advance_application(
+            self.worker_suresh,
+            self.job_wiring,
+            steps=[(Application.Status.SHORTLISTED, employer_user)],
+        )
+        kamal_rejected_app, kamal_rejected_created = self._advance_application(
+            self.worker_kamal,
+            self.job_wiring,
+            steps=[(Application.Status.REJECTED, employer_user)],
+        )
+
+        # Bimal: contacted for the plumbing job (demonstrates CONTACTED).
+        bimal_contacted_app, bimal_contacted_created = self._advance_application(
+            self.worker_bimal,
+            self.job_plumbing,
+            steps=[(Application.Status.CONTACTED, employer_user)],
+        )
+
+        # Maya: hired for the wedding waitstaff job, not yet completed
+        # (demonstrates HIRED as a distinct in-progress state).
+        maya_hired_app, maya_hired_created = self._advance_application(
+            self.worker_maya,
+            self.job_waitstaff,
+            steps=[
+                (Application.Status.SHORTLISTED, self.employer_hospitality.user),
+                (Application.Status.HIRED, self.employer_hospitality.user),
+            ],
+        )
+
+        # Sunita: shortlisted for the caregiving job.
+        sunita_shortlisted_app, sunita_shortlisted_created = self._advance_application(
+            self.worker_sunita,
+            self.job_caregiving,
+            steps=[(Application.Status.SHORTLISTED, self.employer_retail.user)],
+        )
+
+        # Deepak: freshly applied to the delivery job, no employer action
+        # yet (a second plain-APPLIED example alongside Hari's).
+        deepak_applied_app, deepak_applied_created = self._advance_application(
+            self.worker_deepak,
+            self.job_delivery,
+            steps=[],
+        )
+
         self.summary["applications"] = [
             (completed_app.id, completed_app.status, completed_created),
             (shortlisted_app.id, shortlisted_app.status, shortlisted_created),
             (applied_app.id, applied_app.status, applied_created),
             (withdrawn_app.id, withdrawn_app.status, withdrawn_created),
+            (suresh_shortlisted_app.id, suresh_shortlisted_app.status, suresh_shortlisted_created),
+            (kamal_rejected_app.id, kamal_rejected_app.status, kamal_rejected_created),
+            (bimal_contacted_app.id, bimal_contacted_app.status, bimal_contacted_created),
+            (maya_hired_app.id, maya_hired_app.status, maya_hired_created),
+            (sunita_shortlisted_app.id, sunita_shortlisted_app.status, sunita_shortlisted_created),
+            (deepak_applied_app.id, deepak_applied_app.status, deepak_applied_created),
         ]
         self.summary["ratings_created"] = worker_rated or employer_rated
 
@@ -616,6 +1038,26 @@ class Command(BaseCommand):
             "unmatched skill term 'CNC Machine Operation' (admin review demo)",
             self.summary["unmatched_skill_term_created"],
         ))
+
+        write("\nDemo scenario pointers:")
+        write("  - Worker-to-job recommendations: log in as demo_worker_ramesh and "
+              "GET /api/recommendations/jobs/ - 'House Wiring for New Apartment Block' "
+              "ranks first, with two more electrical jobs completing the top three.")
+        write("  - Opportunity advisory (near-miss + missing skills): log in as "
+              "demo_worker_hari and GET /api/recommendations/opportunities/ - "
+              "'Tile Installation' is missing across two nearby masonry jobs.")
+        write(f"  - Job-to-worker recommendations: log in as demo_employer_verified "
+              f"and GET /api/recommendations/jobs/{self.job_wiring.id}/workers/ - job "
+              f"#{self.job_wiring.id} ('{self.job_wiring.title}') has three candidates "
+              f"(Ramesh, Suresh, Kamal) with a clear top pick.")
+        write(f"  - Application-status walkthrough: job #{self.job_wiring.id} "
+              f"('{self.job_wiring.title}') has three applicants in three different "
+              f"states (COMPLETED, SHORTLISTED, REJECTED).")
+        write(f"  - Completed-job ratings: application #{self.summary['applications'][0][0]} "
+              "(demo_worker_ramesh on the House Wiring job) is COMPLETED and rated in "
+              "both directions.")
+        write("  - Restricted pending employer: log in as demo_employer_pending and "
+              "POST /api/jobs/ - returns 403 Forbidden until an admin verifies it.")
 
         write(style.SUCCESS(
             "\nRun again any time - this command is idempotent and safe to rerun."

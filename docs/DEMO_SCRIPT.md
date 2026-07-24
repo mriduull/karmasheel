@@ -11,12 +11,20 @@ Password for **every** account below is `DemoPass123!`.
 | Username | Role |
 |---|---|
 | `demo_admin` | Superuser (Django admin) |
-| `demo_employer_verified` | Employer - VERIFIED |
+| `demo_employer_verified` | Employer - VERIFIED (home-repair services) |
+| `demo_employer_hospitality` | Employer - VERIFIED (hospitality/events) |
+| `demo_employer_retail` | Employer - VERIFIED (retail/delivery/facility) |
 | `demo_employer_pending` | Employer - PENDING (admin-review demonstration) |
 | `demo_worker_ramesh` | Worker - Electrical skills, strong match |
 | `demo_worker_sita` | Worker - Cleaning skills, strong match |
 | `demo_worker_hari` | Worker - Masonry, partial/near-miss match |
 | `demo_worker_gita` | Worker - Cooking, partial/near-miss match, no location on file |
+| `demo_worker_bimal` | Worker - Plumbing skills, strong match |
+| `demo_worker_kamal` | Worker - Electrical/masonry/painting, moderate, never top |
+| `demo_worker_maya` | Worker - Waitstaff/table service, strong match |
+| `demo_worker_sunita` | Worker - Elderly-care skills, strong match |
+| `demo_worker_deepak` | Worker - Two-wheeler delivery skills, strong match |
+| `demo_worker_suresh` | Worker - Same electrical skills as Ramesh, but far away (distance demo) |
 
 ## Recovery note (read first)
 
@@ -121,10 +129,18 @@ As `demo_worker_ramesh` (reuse `$TOKEN` from Step 3):
 curl http://127.0.0.1:8000/api/recommendations/jobs/ -H "Authorization: Bearer $TOKEN"
 ```
 
-**Expected result:** "House Wiring for New Apartment Block" ranks first
-with `final_score` around **98**, `reasons` including "Matches 2 of 2
-required skills", "Located ~2 km from the job", "Meets the required
-experience", "Employer profile is verified".
+**Expected result:** Ramesh gets at least three ranked recommendations.
+"House Wiring for New Apartment Block" ranks first with `final_score`
+around **98**, `reasons` including "Matches 2 of 2 required skills",
+"Located ~2 km from the job", "Meets the required experience", "Employer
+profile is verified". The next two results are meaningfully different but
+still genuinely suitable - each matches at least one required skill:
+"Electrical Rewiring for Old Bungalow" scores lower because Ramesh's 6
+years of experience fall short of the 8 required, and "Switchboard and
+Panel Upgrade for Retail Outlet" scores lowest because Ramesh matches
+only one of its two required skills (House Wiring, but not Switchboard
+Installation) and, like the rewiring job, requires 8 years of experience
+against his 6.
 
 Now log in as `demo_worker_hari` and `demo_worker_gita` in turn and call
 the opportunity advisory endpoint:
@@ -135,8 +151,10 @@ curl http://127.0.0.1:8000/api/recommendations/opportunities/ -H "Authorization:
 ```
 
 **Expected result:** for Hari, `near_miss_jobs` contains "Bathroom & Tile
-Renovation" (`final_score` around **67**) and `missing_skills` lists
-"Tile Installation". For Gita, `near_miss_jobs` contains "Home Cooking for
+Renovation" (`final_score` around **67**) and "Floor Tiling and Masonry
+Repair for Guest House" - `missing_skills` lists "Tile Installation" with
+`job_ids` covering both, showing the same missing skill recurring across
+several nearby jobs. For Gita, `near_miss_jobs` contains "Home Cooking for
 Family Event" (`final_score` around **65**) and `missing_skills` lists
 "Kitchen Helper" - her `warnings` also note her location is unavailable,
 since her profile has no coordinates on file (a deliberate cold-start
@@ -165,11 +183,26 @@ curl http://127.0.0.1:8000/api/jobs/<job_id>/candidates/ -H "Authorization: Bear
 curl http://127.0.0.1:8000/api/recommendations/jobs/<job_id>/workers/ -H "Authorization: Bearer $EMPLOYER_TOKEN"
 ```
 
-**Expected result:** `demo_worker_ramesh` appears in both, ranked first in
-the recommendation endpoint with a full score breakdown. Optionally, log
-in as `demo_employer_pending` and attempt `POST /api/jobs/` - this returns
+**Expected result:** the recommendation endpoint returns at least three
+candidates - `demo_worker_ramesh` ranked first (close by, full skill
+match), `demo_worker_kamal` and `demo_worker_suresh` ranked lower
+(Kamal is missing a required skill and has less experience; Suresh has
+the same skills and experience as Ramesh but is based in Pokhara, so
+distance alone pushes him down the ranking) - each with a full score
+breakdown. The candidates endpoint shows three applicants in different
+states: Ramesh (`COMPLETED`), Suresh (`SHORTLISTED`), Kamal (`REJECTED`).
+
+Optionally, also try the other two verified employers:
+`demo_employer_hospitality` owns "Waitstaff for Wedding Reception" (top
+candidate `demo_worker_maya`), and `demo_employer_retail` owns "Motorbike
+Delivery Rider for Grocery App" (top candidate `demo_worker_deepak`) and
+"Elderly Care Companion - Daytime Shift" (top candidate
+`demo_worker_sunita`).
+
+Finally, log in as `demo_employer_pending` and attempt `POST /api/jobs/`
+and `GET /api/recommendations/jobs/<job_id>/workers/` - both return
 `403 Forbidden`, demonstrating `IsVerifiedEmployer` gating unverified
-employers out of job creation.
+employers out of job creation and worker recommendations.
 
 ---
 
