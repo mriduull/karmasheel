@@ -49,6 +49,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("id",)
 
+    def validate_phone_number(self, value):
+        if len(value) != 10 or not value.isascii() or not value.isdecimal():
+            raise serializers.ValidationError(
+                "Phone number must contain exactly 10 digits."
+            )
+
+        return value
+
     @transaction.atomic
     def create(self, validated_data):
         password = validated_data.pop("password")

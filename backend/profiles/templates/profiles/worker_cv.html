@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ full_name }} - CV</title>
+<style>
+    @page {
+        size: A4;
+        margin: 2cm;
+    }
+
+    body {
+        font-family: "DejaVu Sans", Arial, sans-serif;
+        color: #1a1a1a;
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    h1 {
+        font-size: 22px;
+        margin-bottom: 0;
+    }
+
+    .subtitle {
+        color: #555555;
+        margin-top: 2px;
+        margin-bottom: 16px;
+    }
+
+    .section {
+        margin-top: 18px;
+    }
+
+    .section h2 {
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid #cccccc;
+        padding-bottom: 4px;
+        margin-bottom: 8px;
+    }
+
+    .fact-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .fact-table td {
+        padding: 3px 0;
+        vertical-align: top;
+    }
+
+    .fact-label {
+        width: 35%;
+        color: #555555;
+    }
+
+    .skills-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .skills-list li {
+        display: inline-block;
+        background: #eef1f5;
+        border-radius: 3px;
+        padding: 3px 8px;
+        margin: 0 6px 6px 0;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 3px;
+        font-size: 11px;
+    }
+
+    .badge-verified {
+        background: #d9f2e3;
+        color: #1c6b41;
+    }
+
+    .badge-unverified {
+        background: #f2e5d9;
+        color: #8a5a1c;
+    }
+
+    footer {
+        margin-top: 24px;
+        color: #999999;
+        font-size: 10px;
+    }
+</style>
+</head>
+<body>
+    <h1>{{ full_name }}</h1>
+    <div class="subtitle">{{ address|default:"Location not provided" }}</div>
+
+    <div class="section">
+        <h2>Professional Summary</h2>
+        <p>{{ professional_summary }}</p>
+    </div>
+
+    <div class="section">
+        <h2>Contact</h2>
+        <table class="fact-table">
+            <tr>
+                <td class="fact-label">Phone</td>
+                <td>{{ phone_number }}</td>
+            </tr>
+            <tr>
+                <td class="fact-label">Contact verification</td>
+                <td>
+                    {% if is_contact_verified %}
+                        <span class="badge badge-verified">Verified</span>
+                    {% else %}
+                        <span class="badge badge-unverified">Unverified</span>
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Skills</h2>
+        {% if skills %}
+        <ul class="skills-list">
+            {% for skill in skills %}
+            <li>{{ skill.name }}</li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>No standardized skills recorded yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="section">
+        <h2>Work Details</h2>
+        <table class="fact-table">
+            <tr>
+                <td class="fact-label">Experience</td>
+                <td>{{ experience_years }} year{{ experience_years|pluralize }}</td>
+            </tr>
+            <tr>
+                <td class="fact-label">Average rating</td>
+                <td>
+                    {% if average_rating is not None %}
+                        {{ average_rating }}/5 from {{ rating_count }}
+                        rating{{ rating_count|pluralize }}
+                    {% else %}
+                        Not rated yet
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td class="fact-label">Availability</td>
+                <td>{% if is_available %}Available for work{% else %}Not currently available{% endif %}</td>
+            </tr>
+            {% if expected_wage is not None %}
+            <tr>
+                <td class="fact-label">Expected wage</td>
+                <td>NPR {{ expected_wage }}</td>
+            </tr>
+            {% endif %}
+            {% if preferred_travel_radius_km is not None %}
+            <tr>
+                <td class="fact-label">Preferred travel radius</td>
+                <td>{{ preferred_travel_radius_km }} km</td>
+            </tr>
+            {% endif %}
+        </table>
+    </div>
+
+    <footer>Generated on {{ generated_at|date:"Y-m-d" }} by Karmasheel.</footer>
+</body>
+</html>

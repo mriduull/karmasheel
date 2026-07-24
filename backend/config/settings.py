@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR.parent / ".env")
@@ -26,7 +27,23 @@ SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+]
+
+# CORS (django-cors-headers)
+# Comma-separated list of origins allowed to make cross-origin requests
+# to this API, read from the environment - e.g.
+# CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+# Deliberately does NOT use CORS_ALLOW_ALL_ORIGINS: only origins
+# explicitly listed in the environment are permitted.
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
 
 
 # Application definition
@@ -43,6 +60,7 @@ INSTALLED_APPS = [
     # Third-party applications
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
+    "corsheaders",
 
     # Project applications
     "accounts",
@@ -66,6 +84,10 @@ REST_FRAMEWORK = {
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # CorsMiddleware must sit above middleware that can generate
+    # responses (e.g. CommonMiddleware) so CORS headers are attached
+    # to every response, including error responses.
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -142,4 +164,64 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# CV PDF renderer. ``auto`` prefers WeasyPrint on Unix-like deployment
+# environments and a locally installed Chromium browser on Windows, then
+# falls back to a dependency-free basic PDF if neither renderer is available.
+CV_PDF_ENGINE = os.getenv("CV_PDF_ENGINE", "auto").strip().lower()
+if CV_PDF_ENGINE not in {"auto", "basic", "browser", "weasyprint"}:
+    raise ImproperlyConfigured(
+        "CV_PDF_ENGINE must be one of: auto, basic, browser, weasyprint."
+    )
+
+
+# Skill-normalization service (Week 2)
+# Minimum RapidFuzz confidence score (0-100) for a fuzzy skill match to be
+# accepted automatically. Phrases scoring below this are stored in
+# UnmatchedSkillTerm for admin review instead of being auto-matched.
+SKILL_MATCH_THRESHOLD = float(os.getenv("SKILL_MATCH_THRESHOLD", "85"))
+
+# Explainable hybrid recommendation engine (Week 4)
+# All component weights live here rather than as magic numbers in
+# recommendations/services.py or views. FINAL_WEIGHT_* must sum to 1.0 -
+# this is validated at startup, see recommendations.apps.RecommendationsConfig.
+RECOMMENDATION_SETTINGS = {
+    # Distance score falloff: 100 at 0 km, linearly down to 0 at this
+    # distance (and beyond).
+    "MAX_DISTANCE_KM": float(os.getenv("RECOMMENDATION_MAX_DISTANCE_KM", "20")),
+
+    # Used in place of a component that cannot be computed (e.g. distance
+    # when coordinates are missing) - neither rewards nor penalizes.
+    "NEUTRAL_SCORE_WHEN_UNKNOWN": 50.0,
+
+    # skill_score = SKILL_WEIGHT_REQUIRED_COVERAGE * required_skill_coverage
+    #             + SKILL_WEIGHT_COSINE_SIMILARITY * cosine_similarity_score
+    "SKILL_WEIGHT_REQUIRED_COVERAGE": 0.70,
+    "SKILL_WEIGHT_COSINE_SIMILARITY": 0.30,
+
+    # reciprocal_preference_score is a separate, explanatory "mutual fit"
+    # metric returned alongside the final score. It is NOT an input to
+    # final_match_score, to avoid double-counting the same underlying
+    # component scores - see recommendations/services.py for details.
+    "RECIPROCAL_WEIGHT_EMPLOYER_SIDE": 0.60,
+    "RECIPROCAL_WEIGHT_WORKER_SIDE": 0.40,
+
+    # final_match_score weights. Must sum to 1.0.
+    "FINAL_WEIGHT_SKILL": 0.40,
+    "FINAL_WEIGHT_DISTANCE": 0.20,
+    "FINAL_WEIGHT_EXPERIENCE": 0.15,
+    "FINAL_WEIGHT_AVAILABILITY": 0.15,
+    "FINAL_WEIGHT_RELIABILITY": 0.10,
+
+    # Safe result-list limits for both recommendation endpoints.
+    "DEFAULT_RESULT_LIMIT": 20,
+    "MAX_RESULT_LIMIT": 50,
+
+    # Week 5 opportunity advisory: a job is a "near miss" for a worker
+    # when their final_match_score falls in this inclusive range - close
+    # enough to be reachable, not so close it's already a good match.
+    "NEAR_MISS_MIN_SCORE": float(os.getenv("RECOMMENDATION_NEAR_MISS_MIN_SCORE", "40")),
+    "NEAR_MISS_MAX_SCORE": float(os.getenv("RECOMMENDATION_NEAR_MISS_MAX_SCORE", "75")),
+}

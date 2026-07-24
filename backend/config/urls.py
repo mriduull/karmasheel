@@ -16,13 +16,50 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
+from django.views.generic import TemplateView
+
+
+admin.site.site_header = "Karmasheel Administration"
+admin.site.site_title = "Karmasheel Administration"
+admin.site.index_title = "Karmasheel Administration"
 
 
 urlpatterns = [
+    path(
+        "",
+        TemplateView.as_view(template_name="frontend/index.html"),
+        name="frontend",
+    ),
+
     path("admin/", admin.site.urls),
 
     path(
         "api/auth/",
         include("accounts.urls"),
+    ),
+
+    path(
+        "api/profiles/",
+        include("profiles.urls"),
+    ),
+
+    path(
+        "api/taxonomy/",
+        include("taxonomy.urls"),
+    ),
+
+    path(
+        "api/jobs/",
+        include("jobs.urls"),
+    ),
+
+    path(
+        "api/applications/",
+        include("applications.urls"),
+    ),
+
+    path(
+        "api/recommendations/",
+        include("recommendations.urls"),
     ),
 ]

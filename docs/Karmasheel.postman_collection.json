@@ -1,0 +1,1195 @@
+{
+  "info": {
+    "_postman_id": "b18af438-3bcd-4e1f-9bb2-6e6b189fd9cd",
+    "name": "Karmasheel - End-to-End Demo",
+    "description": "Importable Week 6 walkthrough for the complete worker and employer pipeline. All credentials are disposable local-demo values. Run against a freshly migrated and seeded database, and complete the documented Django-admin employer verification checkpoint before publishing the job.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "access",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "worker_access",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "worker_refresh",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "employer_access",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "employer_refresh",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "employer_username",
+      "value": "postman_demo_employer",
+      "type": "string"
+    },
+    {
+      "key": "employer_password",
+      "value": "DemoEmployer2026!",
+      "type": "string"
+    },
+    {
+      "key": "employer_phone",
+      "value": "9800000901",
+      "type": "string"
+    },
+    {
+      "key": "worker_username",
+      "value": "postman_demo_worker",
+      "type": "string"
+    },
+    {
+      "key": "worker_password",
+      "value": "DemoWorker2026!",
+      "type": "string"
+    },
+    {
+      "key": "worker_phone",
+      "value": "9800000902",
+      "type": "string"
+    },
+    {
+      "key": "category_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "subcategory_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "job_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "application_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Public setup",
+      "description": "The taxonomy command must already have been run. This request stores the Construction & Repair and Electrical IDs used by later requests.",
+      "item": [
+        {
+          "name": "Load taxonomy tree and save Electrical IDs",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Taxonomy loaded', () => pm.response.to.have.status(200));",
+                  "const tree = pm.response.json();",
+                  "const category = tree.find(item => item.name === 'Construction & Repair') || tree[0];",
+                  "const subcategory = category && (category.subcategories.find(item => item.name === 'Electrical') || category.subcategories[0]);",
+                  "pm.expect(category, 'seeded category').to.exist;",
+                  "pm.expect(subcategory, 'seeded subcategory').to.exist;",
+                  "pm.collectionVariables.set('category_id', String(category.id));",
+                  "pm.collectionVariables.set('subcategory_id', String(subcategory.id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/taxonomy/tree/"
+          }
+        },
+        {
+          "name": "Browse active jobs (public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Public browse is available', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/jobs/browse/?category={{category_id}}&subcategory={{subcategory_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 - Employer onboarding",
+      "description": "Disposable demo account. After these requests, use Django admin to mark the user contact verified and the employer profile VERIFIED before continuing to the employer job folder.",
+      "item": [
+        {
+          "name": "Register employer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Employer registered', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{employer_username}}\",\n  \"email\": \"postman-employer@example.test\",\n  \"phone_number\": \"{{employer_phone}}\",\n  \"password\": \"{{employer_password}}\",\n  \"role\": \"EMPLOYER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/auth/register/"
+          }
+        },
+        {
+          "name": "Login employer and save tokens",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Employer login succeeded', () => pm.response.to.have.status(200));",
+                  "const tokens = pm.response.json();",
+                  "pm.collectionVariables.set('employer_access', tokens.access);",
+                  "pm.collectionVariables.set('employer_refresh', tokens.refresh);",
+                  "pm.collectionVariables.set('access', tokens.access);",
+                  "pm.collectionVariables.set('refresh', tokens.refresh);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{employer_username}}\",\n  \"password\": \"{{employer_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/auth/login/"
+          }
+        },
+        {
+          "name": "Update employer profile",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('employer_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('employer_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Employer profile updated', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organization_name\": \"Postman Demo Builders\",\n  \"address\": \"Patan, Lalitpur\",\n  \"latitude\": 27.6710,\n  \"longitude\": 85.4298,\n  \"pan_vat_number\": \"123456789\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/profiles/employer/me/"
+          }
+        },
+        {
+          "name": "ADMIN CHECKPOINT - verify employer manually",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "description": "Open this URL in a browser. In Accounts > Users mark the contact verified; in Profiles > Employer profiles mark the employer verified. This intentionally cannot be automated through the public API.",
+            "url": "{{base_url}}/admin/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Worker onboarding",
+      "item": [
+        {
+          "name": "Register worker",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Worker registered', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{worker_username}}\",\n  \"email\": \"postman-worker@example.test\",\n  \"phone_number\": \"{{worker_phone}}\",\n  \"password\": \"{{worker_password}}\",\n  \"role\": \"WORKER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/auth/register/"
+          }
+        },
+        {
+          "name": "Login worker and save tokens",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Worker login succeeded', () => pm.response.to.have.status(200));",
+                  "const tokens = pm.response.json();",
+                  "pm.collectionVariables.set('worker_access', tokens.access);",
+                  "pm.collectionVariables.set('worker_refresh', tokens.refresh);",
+                  "pm.collectionVariables.set('access', tokens.access);",
+                  "pm.collectionVariables.set('refresh', tokens.refresh);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{worker_username}}\",\n  \"password\": \"{{worker_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/auth/login/"
+          }
+        },
+        {
+          "name": "Update worker profile and normalize ghar wiring",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('worker_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('worker_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Worker profile updated', () => pm.response.to.have.status(200));",
+                  "pm.test('ghar wiring normalized to House Wiring', () => {",
+                  "  const names = pm.response.json().skills.map(skill => skill.name);",
+                  "  pm.expect(names).to.include('House Wiring');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address\": \"Baneshwor, Kathmandu\",\n  \"latitude\": 27.6915,\n  \"longitude\": 85.3420,\n  \"experience_years\": 4,\n  \"is_available\": true,\n  \"expected_wage\": 1800,\n  \"preferred_travel_radius_km\": 25,\n  \"skill_input\": [\"ghar wiring\", \"fan installation\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/profiles/worker/me/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Employer job pipeline",
+      "description": "Run only after the employer has been manually verified in Django admin.",
+      "item": [
+        {
+          "name": "Create Electrical job and save job_id",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('employer_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('employer_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Verified employer created a job', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('job_id', String(pm.response.json().id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Residential Electrician\",\n  \"category\": {{category_id}},\n  \"subcategory\": {{subcategory_id}},\n  \"description\": \"Complete safe residential wiring and install a ceiling fan.\",\n  \"address\": \"Patan, Lalitpur\",\n  \"latitude\": 27.6710,\n  \"longitude\": 85.4298,\n  \"required_experience_years\": 2,\n  \"wage_type\": \"DAILY\",\n  \"wage_amount\": 2200,\n  \"work_type\": \"ONE_TIME\",\n  \"duration_days\": 3,\n  \"number_of_workers_required\": 1,\n  \"required_skills_input\": [\"House Wiring\"],\n  \"preferred_skills_input\": [\"fan installation\"],\n  \"status\": \"ACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/jobs/"
+          }
+        },
+        {
+          "name": "Create near-miss job - Circuit Breaker Installation",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('employer_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('employer_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('First near-miss job created', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Breaker Upgrade\",\n  \"category\": {{category_id}},\n  \"subcategory\": {{subcategory_id}},\n  \"description\": \"Upgrade a residential distribution board and install circuit breakers.\",\n  \"address\": \"Patan, Lalitpur\",\n  \"latitude\": 27.6800,\n  \"longitude\": 85.3500,\n  \"required_experience_years\": 2,\n  \"wage_type\": \"DAILY\",\n  \"wage_amount\": 2200,\n  \"work_type\": \"ONE_TIME\",\n  \"duration_days\": 2,\n  \"number_of_workers_required\": 1,\n  \"required_skills_input\": [\"Circuit Breaker Installation\"],\n  \"preferred_skills_input\": [\"House Wiring\"],\n  \"status\": \"ACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Creates advisory input without replacing the primary job_id.",
+            "url": "{{base_url}}/api/jobs/"
+          }
+        },
+        {
+          "name": "Create near-miss job - Electrical Repair",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('employer_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('employer_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Second near-miss job created', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Electrical Fault Repair\",\n  \"category\": {{category_id}},\n  \"subcategory\": {{subcategory_id}},\n  \"description\": \"Diagnose and repair a residential electrical fault.\",\n  \"address\": \"Baneshwor, Kathmandu\",\n  \"latitude\": 27.6900,\n  \"longitude\": 85.3450,\n  \"required_experience_years\": 2,\n  \"wage_type\": \"DAILY\",\n  \"wage_amount\": 2200,\n  \"work_type\": \"ONE_TIME\",\n  \"duration_days\": 1,\n  \"number_of_workers_required\": 1,\n  \"required_skills_input\": [\"Electrical Repair\"],\n  \"preferred_skills_input\": [\"House Wiring\"],\n  \"status\": \"ACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Creates a second distinct missing-skill signal for opportunity advisory.",
+            "url": "{{base_url}}/api/jobs/"
+          }
+        },
+        {
+          "name": "List employer jobs",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('employer_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('employer_refresh'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/jobs/"
+          }
+        },
+        {
+          "name": "Filter candidate workers",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('employer_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('employer_refresh'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/jobs/{{job_id}}/candidates/?max_distance_km=25"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Worker matching and application",
+      "item": [
+        {
+          "name": "Get explainable job recommendations",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('worker_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('worker_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Recommendations returned', () => pm.response.to.have.status(200));",
+                  "pm.test('Score breakdown and reasons are present', () => {",
+                  "  const results = pm.response.json();",
+                  "  pm.expect(results.length).to.be.above(0);",
+                  "  pm.expect(results[0]).to.have.property('final_score');",
+                  "  pm.expect(results[0]).to.have.property('skill');",
+                  "  pm.expect(results[0].reasons).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/recommendations/jobs/"
+          }
+        },
+        {
+          "name": "Apply and save application_id",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('worker_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('worker_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Application created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('application_id', String(pm.response.json().id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job\": {{job_id}},\n  \"worker_note\": \"Available for this job and experienced in house wiring.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/applications/"
+          }
+        },
+        {
+          "name": "List worker applications",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('worker_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('worker_refresh'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/applications/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Employer review and completion",
+      "item": [
+        {
+          "name": "Get job-to-worker recommendations",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('employer_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('employer_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Worker recommendations returned', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/recommendations/jobs/{{job_id}}/workers/"
+          }
+        },
+        {
+          "name": "List applications for owned job",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('employer_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('employer_refresh'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/jobs/{{job_id}}/applications/"
+          }
+        },
+        {
+          "name": "APPLIED to SHORTLISTED",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('employer_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('employer_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Application shortlisted', () => pm.expect(pm.response.json().status).to.eql('SHORTLISTED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"SHORTLISTED\",\n  \"employer_note\": \"Skills and location are a good fit.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/applications/{{application_id}}/status/"
+          }
+        },
+        {
+          "name": "SHORTLISTED to HIRED",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('employer_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('employer_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Application hired', () => pm.expect(pm.response.json().status).to.eql('HIRED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"HIRED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/applications/{{application_id}}/status/"
+          }
+        },
+        {
+          "name": "HIRED to COMPLETED",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('employer_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('employer_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Application completed', () => pm.expect(pm.response.json().status).to.eql('COMPLETED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/applications/{{application_id}}/status/"
+          }
+        },
+        {
+          "name": "Employer rates worker",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('employer_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('employer_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Employer rating created', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"score\": 5,\n  \"review_text\": \"Work completed safely and on time.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/applications/{{application_id}}/rating/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Completed work, CV and advisory",
+      "item": [
+        {
+          "name": "Worker rates employer",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('worker_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('worker_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Worker rating created', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"score\": 5,\n  \"review_text\": \"Clear requirements and prompt completion.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/applications/{{application_id}}/rating/"
+          }
+        },
+        {
+          "name": "Get worker rating summary",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('worker_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('worker_refresh'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/applications/ratings/summary/"
+          }
+        },
+        {
+          "name": "Preview worker CV (HTML)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('worker_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('worker_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTML CV rendered', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('text/html');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/profiles/worker/me/cv/preview/"
+          }
+        },
+        {
+          "name": "Download worker CV (PDF)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('worker_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('worker_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('PDF CV rendered', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/profiles/worker/me/cv/pdf/"
+          }
+        },
+        {
+          "name": "Get opportunity advisory",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('worker_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('worker_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Opportunity advisory returned', () => pm.response.to.have.status(200));",
+                  "pm.test('Advisory shape is stable', () => {",
+                  "  const result = pm.response.json();",
+                  "  pm.expect(result.near_miss_jobs).to.be.an('array');",
+                  "  pm.expect(result.missing_skills).to.be.an('array');",
+                  "  pm.expect(result.missing_skills.length).to.be.above(0);",
+                  "  pm.expect(result.missing_skills.length).to.be.at.most(3);",
+                  "  result.missing_skills.forEach(item => pm.expect(item.reason).to.be.a('string').and.not.empty);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/recommendations/opportunities/"
+          }
+        },
+        {
+          "name": "Logout worker",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('worker_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('worker_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Worker refresh token blacklisted', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{worker_refresh}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/auth/logout/"
+          }
+        },
+        {
+          "name": "Logout employer",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('access', pm.collectionVariables.get('employer_access'));",
+                  "pm.collectionVariables.set('refresh', pm.collectionVariables.get('employer_refresh'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Employer refresh token blacklisted', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{employer_refresh}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/auth/logout/"
+          }
+        }
+      ]
+    }
+  ]
+}
