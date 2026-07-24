@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Pencil, Users, XCircle } from 'lucide-react'
+import { ArrowLeft, Pencil, TrendingUp, Users, XCircle } from 'lucide-react'
 import { useOwnerJob, ownerJobQueryKey } from '@/hooks/useOwnerJob'
 import { MY_JOBS_QUERY_KEY } from '@/hooks/useMyJobs'
+import { useEmployerVerificationStatus } from '@/hooks/useEmployerVerificationStatus'
 import { updateJob } from '@/api/endpoints/jobs'
 import { ApiError, toBannerMessage } from '@/api/errors'
 import { formatDateTime, formatWage, formatWorkType } from '@/lib/formatters'
@@ -29,6 +30,7 @@ export function EmployerJobDetail() {
   const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
   const jobQuery = useOwnerJob(id)
+  const { status: verificationStatus } = useEmployerVerificationStatus()
   const [closeTarget, setCloseTarget] = useState<EmployerJobPost | null>(null)
   const [closeError, setCloseError] = useState<string | null>(null)
 
@@ -171,6 +173,26 @@ export function EmployerJobDetail() {
               View Applications
             </Button>
           </Link>
+
+          <Link to={`/employer/jobs/${job.id}/candidates`}>
+            <Button variant="secondary" className="w-full">
+              <Users size={18} aria-hidden="true" />
+              View Candidates
+            </Button>
+          </Link>
+
+          {verificationStatus === 'VERIFIED' ? (
+            <Link to={`/employer/jobs/${job.id}/recommendations`}>
+              <Button variant="secondary" className="w-full">
+                <TrendingUp size={18} aria-hidden="true" />
+                Recommended Workers
+              </Button>
+            </Link>
+          ) : (
+            <p className="text-sm text-text-secondary">
+              Recommended workers are available once your account is verified.
+            </p>
+          )}
 
           {/* Editing stays legal for a closed job (verified directly:
               `JobPostDetailView._update` has no active/closed check at

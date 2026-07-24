@@ -7,7 +7,7 @@ import { axe } from 'jest-axe'
 import { server } from '@/test/msw/server'
 import { API_ROOT } from '@/test/msw/handlers'
 import { renderWithProviders, resetAuthStore, setAuthenticatedUser } from '@/test/utils'
-import { buildApplicationFixture } from '@/test/fixtures'
+import { buildApplicationFixture, buildRatingFixture } from '@/test/fixtures'
 import type { ApplicationStatus } from '@/types/application'
 import { WorkerApplications } from './Applications'
 
@@ -201,6 +201,92 @@ describe('WorkerApplications', () => {
     ).toBeInTheDocument()
     // Dialog stays open so the user can see what happened, not silently dropped.
     expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+  })
+
+  it('rates the employer from a COMPLETED application and refreshes the row', async () => {
+    const user = userEvent.setup()
+    let postBody: unknown = null
+
+    server.use(
+      http.get(`${API_ROOT}/applications/`, () =>
+        HttpResponse.json([buildApplicationFixture({ id: 8, status: 'COMPLETED' })]),
+      ),
+      http.get(`${API_ROOT}/applications/8/rating/`, () => HttpResponse.json([])),
+      http.post(`${API_ROOT}/applications/8/rating/`, async ({ request }) => {
+        postBody = await request.json()
+        return HttpResponse.json(
+          buildRatingFixture({ direction: 'WORKER_TO_EMPLOYER', score: 5, review_text: 'Great employer' }),
+          { status: 201 },
+        )
+      }),
+    )
+
+    renderWithProviders(<WorkerApplications />)
+
+    await user.click(await screen.findByRole('button', { name: 'Rate this employer' }))
+
+    const dialog = await screen.findByRole('alertdialog')
+    await user.click(within(dialog).getByRole('button', { name: '5 stars' }))
+    await user.type(within(dialog).getByLabelText(/review \(optional\)/i), 'Great employer')
+    await user.click(within(dialog).getByRole('button', { name: 'Submit rating' }))
+
+    await waitFor(() => expect(postBody).toEqual({ score: 5, review_text: 'Great employer' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  })
+
+  it('shows the existing rating instead of a Rate action when already rated', async () => {
+    server.use(
+      http.get(`${API_ROOT}/applications/`, () =>
+        HttpResponse.json([buildApplicationFixture({ id: 8, status: 'COMPLETED' })]),
+      ),
+      http.get(`${API_ROOT}/applications/8/rating/`, () =>
+        HttpResponse.json([buildRatingFixture({ direction: 'WORKER_TO_EMPLOYER', score: 4 })]),
+      ),
+    )
+
+    renderWithProviders(<WorkerApplications />)
+
+    await screen.findByText('House Wiring for New Apartment Block')
+    expect(screen.queryByRole('button', { name: 'Rate this employer' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('img', { name: '4.0 out of 5 stars' })).toBeInTheDocument()
+  })
+
+  it('shows a backend validation error inside the rating dialog without closing it', async () => {
+    const user = userEvent.setup()
+
+    server.use(
+      http.get(`${API_ROOT}/applications/`, () =>
+        HttpResponse.json([buildApplicationFixture({ id: 8, status: 'COMPLETED' })]),
+      ),
+      http.get(`${API_ROOT}/applications/8/rating/`, () => HttpResponse.json([])),
+      http.post(`${API_ROOT}/applications/8/rating/`, () =>
+        HttpResponse.json({ detail: 'You have already rated this application.' }, { status: 400 }),
+      ),
+    )
+
+    renderWithProviders(<WorkerApplications />)
+
+    await user.click(await screen.findByRole('button', { name: 'Rate this employer' }))
+    const dialog = await screen.findByRole('alertdialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Submit rating' }))
+
+    expect(
+      await within(dialog).findByText('You have already rated this application.'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+  })
+
+  it('never offers a Rate action for a non-COMPLETED application', async () => {
+    server.use(
+      http.get(`${API_ROOT}/applications/`, () =>
+        HttpResponse.json([buildApplicationFixture({ id: 8, status: 'HIRED' })]),
+      ),
+    )
+
+    renderWithProviders(<WorkerApplications />)
+
+    await screen.findByText('Hired')
+    expect(screen.queryByRole('button', { name: 'Rate this employer' })).not.toBeInTheDocument()
   })
 
   it('has no automatically-detectable accessibility violations', async () => {

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Briefcase, PlusCircle, User } from 'lucide-react'
+import { Briefcase, PlusCircle, Star, User } from 'lucide-react'
 import { useAuthStore } from '@/state/authStore'
 import { useEmployerProfile } from '@/hooks/useEmployerProfile'
 import { useMyJobs } from '@/hooks/useMyJobs'
@@ -79,6 +79,14 @@ export function EmployerDashboard() {
         >
           <User size={28} aria-hidden="true" className="text-brand-primary" />
           <span className="text-base font-semibold text-text-primary">Employer Profile</span>
+        </Link>
+
+        <Link
+          to="/employer/ratings"
+          className="flex min-h-touch flex-col items-center gap-2 rounded-md border border-text-secondary/10 bg-surface p-6 text-center shadow-card transition-colors hover:bg-surface-muted"
+        >
+          <Star size={28} aria-hidden="true" className="text-brand-primary" />
+          <span className="text-base font-semibold text-text-primary">Your Ratings</span>
         </Link>
       </div>
 

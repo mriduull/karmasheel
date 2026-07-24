@@ -1,6 +1,7 @@
 import { formatDateTime } from '@/lib/formatters'
 import { ApplicationStatusChip } from './ApplicationStatusChip'
 import { ApplicationTransitionActions } from './ApplicationTransitionActions'
+import { RateEngagementButton } from './RateEngagementButton'
 import type { Application } from '@/types/application'
 
 interface ApplicantCardProps {
@@ -34,6 +35,7 @@ export function ApplicantCard({ application, jobId }: ApplicantCardProps) {
       <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
         <ApplicationStatusChip status={application.status} viewerRole="EMPLOYER" />
         <ApplicationTransitionActions application={application} jobId={jobId} />
+        <RateEngagementButton application={application} viewerRole="EMPLOYER" />
       </div>
     </div>
   )

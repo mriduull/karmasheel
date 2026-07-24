@@ -8,7 +8,7 @@ import { axe } from 'jest-axe'
 import { server } from '@/test/msw/server'
 import { API_ROOT } from '@/test/msw/handlers'
 import { renderWithProviders, resetAuthStore, setAuthenticatedUser } from '@/test/utils'
-import { buildApplicationFixture, buildEmployerJobFixture } from '@/test/fixtures'
+import { buildApplicationFixture, buildEmployerJobFixture, buildRatingFixture } from '@/test/fixtures'
 import { EmployerJobApplications } from './JobApplications'
 
 const EMPLOYER_USER = {
@@ -221,6 +221,76 @@ describe('EmployerJobApplications', () => {
     await user.click(screen.getByRole('button', { name: 'Try again' }))
 
     expect(await screen.findByText('demo_worker_ramesh')).toBeInTheDocument()
+  })
+
+  it('rates the worker from a COMPLETED application', async () => {
+    const user = userEvent.setup()
+    let postBody: unknown = null
+
+    server.use(
+      http.get(`${API_ROOT}/jobs/5/`, () => HttpResponse.json(buildEmployerJobFixture({ id: 5 }))),
+      http.get(`${API_ROOT}/jobs/5/applications/`, () =>
+        HttpResponse.json([buildApplicationFixture({ id: 1, status: 'COMPLETED' })]),
+      ),
+      http.get(`${API_ROOT}/applications/1/rating/`, () => HttpResponse.json([])),
+      http.post(`${API_ROOT}/applications/1/rating/`, async ({ request }) => {
+        postBody = await request.json()
+        return HttpResponse.json(buildRatingFixture({ direction: 'EMPLOYER_TO_WORKER', score: 5 }), {
+          status: 201,
+        })
+      }),
+    )
+
+    renderAt('5')
+
+    await user.click(await screen.findByRole('button', { name: 'Rate this worker' }))
+    const dialog = await screen.findByRole('alertdialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Submit rating' }))
+
+    await waitFor(() => expect(postBody).toEqual({ score: 5 }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  })
+
+  it('prevents a duplicate rating by showing the existing one instead of the action', async () => {
+    server.use(
+      http.get(`${API_ROOT}/jobs/5/`, () => HttpResponse.json(buildEmployerJobFixture({ id: 5 }))),
+      http.get(`${API_ROOT}/jobs/5/applications/`, () =>
+        HttpResponse.json([buildApplicationFixture({ id: 1, status: 'COMPLETED' })]),
+      ),
+      http.get(`${API_ROOT}/applications/1/rating/`, () =>
+        HttpResponse.json([buildRatingFixture({ direction: 'EMPLOYER_TO_WORKER', score: 5 })]),
+      ),
+    )
+
+    renderAt('5')
+
+    await screen.findByText('demo_worker_ramesh')
+    expect(screen.queryByRole('button', { name: 'Rate this worker' })).not.toBeInTheDocument()
+  })
+
+  it('shows a real backend failure from the rating submission', async () => {
+    const user = userEvent.setup()
+
+    server.use(
+      http.get(`${API_ROOT}/jobs/5/`, () => HttpResponse.json(buildEmployerJobFixture({ id: 5 }))),
+      http.get(`${API_ROOT}/jobs/5/applications/`, () =>
+        HttpResponse.json([buildApplicationFixture({ id: 1, status: 'COMPLETED' })]),
+      ),
+      http.get(`${API_ROOT}/applications/1/rating/`, () => HttpResponse.json([])),
+      http.post(`${API_ROOT}/applications/1/rating/`, () =>
+        HttpResponse.json({ detail: 'Only completed applications can be rated.' }, { status: 400 }),
+      ),
+    )
+
+    renderAt('5')
+
+    await user.click(await screen.findByRole('button', { name: 'Rate this worker' }))
+    const dialog = await screen.findByRole('alertdialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Submit rating' }))
+
+    expect(
+      await within(dialog).findByText('Only completed applications can be rated.'),
+    ).toBeInTheDocument()
   })
 
   it('has no automatically-detectable accessibility violations', async () => {

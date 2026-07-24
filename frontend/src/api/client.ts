@@ -90,12 +90,15 @@ async function parseSuccessResponse<T>(response: Response): Promise<T> {
 }
 
 /**
- * Shared request function for every endpoint module. Backend list
- * endpoints are never paginated (see types/api.ts:ApiList) — this
- * function returns whatever JSON the backend sends with no `results`
- * unwrapping assumed.
+ * Shared request function for every endpoint module — issues the request,
+ * attaches auth, and handles the one-refresh-and-retry mutex on a 401.
+ * Returns the raw, successful `Response` so callers can read it as JSON,
+ * text, or a blob as appropriate (`apiFetch` below is the common JSON/text/
+ * PDF case; `src/api/endpoints/profiles.ts`'s CV-PDF download uses this
+ * directly since it also needs the `Content-Disposition` filename header,
+ * which `apiFetch`'s parsed return value discards).
  */
-export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function apiFetchRaw(path: string, options: RequestOptions = {}): Promise<Response> {
   const { body, isPublic, _isRetry, headers, ...rest } = options
 
   const finalHeaders = new Headers(headers)
@@ -121,7 +124,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   }
 
   if (response.ok) {
-    return parseSuccessResponse<T>(response)
+    return response
   }
 
   if (response.status === 401 && !isPublic) {
@@ -134,7 +137,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
       }
 
       // Retry exactly once, with the freshly-stored access token.
-      return apiFetch<T>(path, { ...options, _isRetry: true })
+      return apiFetchRaw(path, { ...options, _isRetry: true })
     }
 
     // Already retried once with a supposedly-fresh token and still
@@ -144,6 +147,17 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   }
 
   throw await parseErrorResponse(response)
+}
+
+/**
+ * Shared request function for every endpoint module. Backend list
+ * endpoints are never paginated (see types/api.ts:ApiList) — this
+ * function returns whatever JSON the backend sends with no `results`
+ * unwrapping assumed.
+ */
+export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const response = await apiFetchRaw(path, options)
+  return parseSuccessResponse<T>(response)
 }
 
 export { ApiError }

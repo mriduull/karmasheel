@@ -120,6 +120,26 @@ export interface JobCreatePayload {
  * rejects `'CLOSED' -> 'ACTIVE'`, so this type intentionally does not
  * offer `'ACTIVE'` as a settable value on an existing job.
  */
+/**
+ * jobs/serializers.py:WorkerCandidateSerializer — GET /api/jobs/<id>/candidates/,
+ * the coarse, unscored candidate list. Deliberately has no phone number and
+ * no score/ranking field at all — never synthesize one client-side; this
+ * endpoint is a pre-filter, not a ranking (see RecommendedWorkerSummary in
+ * types/recommendation.ts for the scored equivalent).
+ */
+export interface WorkerCandidate {
+  id: number
+  username: string
+  address: string
+  latitude: string | null
+  longitude: string | null
+  experience_years: number
+  is_available: boolean
+  expected_wage: string | null
+  preferred_travel_radius_km: number | null
+  skills: SkillTagSummary[]
+}
+
 export interface JobUpdatePayload {
   title?: string
   category?: number

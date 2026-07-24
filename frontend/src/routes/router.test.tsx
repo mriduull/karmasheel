@@ -7,7 +7,12 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { server } from '@/test/msw/server'
 import { API_ROOT } from '@/test/msw/handlers'
-import { buildEmployerProfileFixture, buildWorkerProfileFixture } from '@/test/fixtures'
+import {
+  buildEmployerJobFixture,
+  buildEmployerProfileFixture,
+  buildWorkerProfileFixture,
+  buildWorkerRecommendationFixture,
+} from '@/test/fixtures'
 import { routeConfig } from './router'
 import {
   createTestQueryClient,
@@ -115,7 +120,7 @@ describe('router', () => {
     renderAt('/jobs/5')
   })
 
-  it('Worker navigation exposes exactly the four F2 destinations, no F4 placeholders', async () => {
+  it('Worker navigation exposes all eight real Worker destinations (F2 + F4), no dead links', async () => {
     setAuthenticatedUser(WORKER_USER)
     renderAt('/worker')
     await screen.findByRole('heading', { name: /welcome/i })
@@ -128,12 +133,18 @@ describe('router', () => {
     const links = nav.querySelectorAll('a')
     const hrefs = new Set(Array.from(links).map((link) => link.getAttribute('href')))
 
-    expect(hrefs).toEqual(new Set(['/worker', '/jobs', '/worker/applications', '/worker/profile']))
-    // No misleading links to unfinished F4 screens (recommendations,
-    // opportunity advisory, CV, ratings).
-    for (const unsupported of ['/worker/recommendations', '/worker/opportunities', '/worker/cv', '/worker/ratings']) {
-      expect(hrefs).not.toContain(unsupported)
-    }
+    expect(hrefs).toEqual(
+      new Set([
+        '/worker',
+        '/jobs',
+        '/worker/applications',
+        '/worker/recommendations',
+        '/worker/opportunities',
+        '/worker/profile',
+        '/worker/cv',
+        '/worker/ratings',
+      ]),
+    )
   })
 
   it('logout from a Worker-guarded route requests a hard navigation to the public landing page, not /login', async () => {
@@ -161,6 +172,66 @@ describe('router', () => {
     restore()
   })
 
+  it('a verified employer reaches the real per-job Recommended Workers page', async () => {
+    setAuthenticatedUser(EMPLOYER_USER)
+    server.use(
+      http.get(`${API_ROOT}/profiles/employer/me/`, () =>
+        HttpResponse.json(buildEmployerProfileFixture({ verification_status: 'VERIFIED' })),
+      ),
+      http.get(`${API_ROOT}/jobs/5/`, () => HttpResponse.json(buildEmployerJobFixture({ id: 5 }))),
+      http.get(`${API_ROOT}/jobs/5/applications/`, () => HttpResponse.json([])),
+      http.get(`${API_ROOT}/recommendations/jobs/5/workers/`, () =>
+        HttpResponse.json([buildWorkerRecommendationFixture()]),
+      ),
+    )
+
+    renderAt('/employer/jobs/5/recommendations')
+
+    expect(await screen.findByText('demo_worker_ramesh')).toBeInTheDocument()
+  })
+
+  it('a PENDING employer is blocked from the per-job Recommended Workers page with a plain explanation, not a raw 403', async () => {
+    setAuthenticatedUser(EMPLOYER_USER)
+    server.use(
+      http.get(`${API_ROOT}/profiles/employer/me/`, () =>
+        HttpResponse.json(buildEmployerProfileFixture({ verification_status: 'PENDING' })),
+      ),
+    )
+
+    renderAt('/employer/jobs/5/recommendations')
+
+    expect(await screen.findByRole('heading', { name: 'Not available' })).toBeInTheDocument()
+    expect(screen.getByText(/an administrator reviews new employer accounts/i)).toBeInTheDocument()
+  })
+
+  it('a Worker cannot reach an employer-only recommendation route — redirected to their own dashboard', async () => {
+    setAuthenticatedUser(WORKER_USER)
+
+    renderAt('/employer/jobs/5/recommendations')
+
+    expect(await screen.findByRole('heading', { name: /welcome, demo_worker_ramesh/i })).toBeInTheDocument()
+  })
+
+  it.each(['/worker/recommendations', '/worker/opportunities', '/worker/cv', '/worker/ratings'])(
+    'an Employer cannot reach the Worker-only route %s — redirected to their own dashboard',
+    async (path) => {
+      setAuthenticatedUser(EMPLOYER_USER)
+      renderAt(path)
+
+      expect(
+        await screen.findByRole('heading', { name: /welcome, demo_employer_verified/i }),
+      ).toBeInTheDocument()
+    },
+  )
+
+  it.each(['/worker/recommendations', '/worker/opportunities', '/worker/cv', '/worker/ratings'])(
+    'redirects an unauthenticated visitor away from %s to Login',
+    (path) => {
+      renderAt(path)
+      expect(screen.getByRole('heading', { name: 'Log In' })).toBeInTheDocument()
+    },
+  )
+
   it('does not include any route for an unsupported feature (password reset, chat, etc.)', () => {
     const definedPaths = routeConfig.flatMap((route) =>
       'children' in route && route.children ? route.children.map((child) => child.path) : [route.path],
@@ -175,13 +246,32 @@ describe('router', () => {
       '/notifications',
       '/complaints',
       '/map',
+      // No endpoint aggregates applications across jobs
+      // (docs/FRONTEND_IMPLEMENTATION_PLAN.md correction #4) — the only
+      // entry point is a specific owned job's Applications page.
       '/employer/applicants',
+      // No public worker directory/profile page exists anywhere.
+      '/workers',
+    ]) {
+      expect(definedPaths).not.toContain(unsupported)
+    }
+  })
+
+  it('Phase F4 routes exist: worker Recommendations/Opportunities/CV/Ratings, employer per-job Candidates/Recommendations, employer Ratings', () => {
+    const definedPaths = routeConfig.flatMap((route) =>
+      'children' in route && route.children ? route.children.map((child) => child.path) : [route.path],
+    )
+
+    for (const supported of [
       '/worker/recommendations',
       '/worker/opportunities',
       '/worker/cv',
       '/worker/ratings',
+      '/employer/jobs/:id/candidates',
+      '/employer/jobs/:id/recommendations',
+      '/employer/ratings',
     ]) {
-      expect(definedPaths).not.toContain(unsupported)
+      expect(definedPaths).toContain(supported)
     }
   })
 })

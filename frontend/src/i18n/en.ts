@@ -23,6 +23,10 @@ export const en = {
     worker: {
       dashboard: 'Home',
       applications: 'Applications',
+      recommendations: 'Recommendations',
+      opportunities: 'Opportunity Advisory',
+      cv: 'CV',
+      ratings: 'Ratings',
       profile: 'Profile',
     },
     employer: {
@@ -30,6 +34,7 @@ export const en = {
       myJobs: 'My Jobs',
       profile: 'Profile',
       postAJob: 'Post a Job',
+      ratings: 'Ratings',
     },
     dashboard: 'Dashboard',
   },

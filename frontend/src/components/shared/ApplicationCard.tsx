@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ApplicationStatusChip } from './ApplicationStatusChip'
+import { RateEngagementButton } from './RateEngagementButton'
 import { canWorkerWithdraw } from '@/lib/applicationTransitions'
 import { formatDateTime } from '@/lib/formatters'
 import { Button } from '@/components/primitives/Button'
@@ -45,6 +46,7 @@ export function ApplicationCard({ application, onWithdraw }: ApplicationCardProp
             Withdraw
           </Button>
         )}
+        <RateEngagementButton application={application} viewerRole="WORKER" />
       </div>
     </div>
   )

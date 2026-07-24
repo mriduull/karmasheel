@@ -13,6 +13,10 @@ import { Unauthorized } from '@/pages/shared/Unauthorized'
 import { WorkerDashboard } from '@/pages/worker/Dashboard'
 import { WorkerProfile } from '@/pages/worker/Profile'
 import { WorkerApplications } from '@/pages/worker/Applications'
+import { WorkerRecommendations } from '@/pages/worker/Recommendations'
+import { WorkerOpportunities } from '@/pages/worker/Opportunities'
+import { WorkerCV } from '@/pages/worker/CV'
+import { WorkerRatings } from '@/pages/worker/Ratings'
 import { EmployerDashboard } from '@/pages/employer/Dashboard'
 import { EmployerJobs } from '@/pages/employer/Jobs'
 import { EmployerProfile } from '@/pages/employer/Profile'
@@ -20,12 +24,17 @@ import { EmployerJobForm } from '@/pages/employer/JobForm'
 import { EmployerJobDetail } from '@/pages/employer/JobDetail'
 import { EmployerJobEdit } from '@/pages/employer/JobEdit'
 import { EmployerJobApplications } from '@/pages/employer/JobApplications'
+import { EmployerCandidates } from '@/pages/employer/Candidates'
+import { EmployerRecommendations } from '@/pages/employer/Recommendations'
+import { EmployerRatings } from '@/pages/employer/Ratings'
 
 /**
- * Route tree for Phase F0. Every page below `/jobs` and the worker/employer
- * routes is a placeholder (pages/shared/ComingSoon) — the goal of this
- * phase is the routes, guards, and layouts themselves, not the final
- * screens (docs/FRONTEND_IMPLEMENTATION_PLAN.md, Phase F0).
+ * Full route tree through Phase F4 (docs/FRONTEND_IMPLEMENTATION_PLAN.md).
+ * `/employer/jobs/:id/recommendations` is the only Phase F4 route gated by
+ * `RequireVerifiedEmployer` — it mirrors the backend's
+ * `IsVerifiedEmployer` gate on `GET /api/recommendations/jobs/<id>/workers/`
+ * exactly; `/employer/jobs/:id/candidates` is owner-only at any
+ * verification status, matching `JobCandidatesView`'s lack of that gate.
  *
  * No route exists here for password reset, chat, payments, notifications,
  * complaints, maps, a public profile directory, an employer-wide
@@ -88,6 +97,38 @@ export const routeConfig = [
           </RequireRole>
         ),
       },
+      {
+        path: '/worker/recommendations',
+        element: (
+          <RequireRole role="WORKER">
+            <WorkerRecommendations />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/worker/opportunities',
+        element: (
+          <RequireRole role="WORKER">
+            <WorkerOpportunities />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/worker/cv',
+        element: (
+          <RequireRole role="WORKER">
+            <WorkerCV />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/worker/ratings',
+        element: (
+          <RequireRole role="WORKER">
+            <WorkerRatings />
+          </RequireRole>
+        ),
+      },
     ],
   },
   {
@@ -142,10 +183,34 @@ export const routeConfig = [
         ),
       },
       {
+        path: '/employer/jobs/:id/candidates',
+        element: (
+          <RequireRole role="EMPLOYER">
+            <EmployerCandidates />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/employer/jobs/:id/recommendations',
+        element: (
+          <RequireVerifiedEmployer>
+            <EmployerRecommendations />
+          </RequireVerifiedEmployer>
+        ),
+      },
+      {
         path: '/employer/profile',
         element: (
           <RequireRole role="EMPLOYER">
             <EmployerProfile />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/employer/ratings',
+        element: (
+          <RequireRole role="EMPLOYER">
+            <EmployerRatings />
           </RequireRole>
         ),
       },

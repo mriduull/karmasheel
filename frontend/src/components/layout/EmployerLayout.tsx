@@ -1,20 +1,21 @@
 import { Outlet } from 'react-router-dom'
-import { Briefcase, Home, Plus, User } from 'lucide-react'
+import { Briefcase, Home, Plus, Star, User } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useEmployerVerificationStatus } from '@/hooks/useEmployerVerificationStatus'
 import { NavShell, type NavItem } from './NavShell'
 
 /**
- * Home · My Jobs · Profile, plus "Post a Job" only once verification
- * status resolves to VERIFIED (never shown while loading/pending/
- * rejected/errored — an unverified Employer reaches the explanation via
- * My Jobs/Dashboard instead, not via a nav item that would 403). Per
- * docs/FRONTEND_IMPLEMENTATION_PLAN.md correction #4, there is
- * deliberately no employer-wide "Applicants" nav item: no endpoint
- * aggregates applications across jobs (only
+ * Home · My Jobs · Profile · Ratings, plus "Post a Job" only once
+ * verification status resolves to VERIFIED (never shown while loading/
+ * pending/rejected/errored — an unverified Employer reaches the
+ * explanation via My Jobs/Dashboard instead, not via a nav item that
+ * would 403). Per docs/FRONTEND_IMPLEMENTATION_PLAN.md correction #4,
+ * there is deliberately no employer-wide "Applicants" nav item: no
+ * endpoint aggregates applications across jobs (only
  * `GET /api/jobs/<job_id>/applications/`, scoped to one job), so "My
- * Jobs" is the only entry point — the applications screen (Phase F3) is
- * reached only via a specific job.
+ * Jobs" is the only entry point. Recommended Workers and Candidates are
+ * likewise per-job destinations (Phase F4), reached only from a specific
+ * owned job's page, never a standalone nav item.
  */
 export function EmployerLayout() {
   const { t } = useTranslation()
@@ -24,6 +25,7 @@ export function EmployerLayout() {
     { to: '/employer', label: t('nav.employer.dashboard'), icon: Home },
     { to: '/employer/jobs', label: t('nav.employer.myJobs'), icon: Briefcase },
     { to: '/employer/profile', label: t('nav.employer.profile'), icon: User },
+    { to: '/employer/ratings', label: t('nav.employer.ratings'), icon: Star },
   ]
 
   if (status === 'VERIFIED') {

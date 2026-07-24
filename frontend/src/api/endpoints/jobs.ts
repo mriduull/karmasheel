@@ -1,6 +1,12 @@
 import { apiFetch } from '@/api/client'
 import type { ApiList } from '@/types/api'
-import type { EmployerJobPost, JobCreatePayload, JobUpdatePayload, PublicJobPost } from '@/types/job'
+import type {
+  EmployerJobPost,
+  JobCreatePayload,
+  JobUpdatePayload,
+  PublicJobPost,
+  WorkerCandidate,
+} from '@/types/job'
 
 export interface JobBrowseFilters {
   category?: number
@@ -106,4 +112,21 @@ export function fetchOwnerJob(id: number | string): Promise<EmployerJobPost> {
  */
 export function updateJob(id: number | string, payload: JobUpdatePayload): Promise<EmployerJobPost> {
   return apiFetch<EmployerJobPost>(`/jobs/${id}/`, { method: 'PATCH', body: payload })
+}
+
+/**
+ * GET /api/jobs/<id>/candidates/?max_distance_km= — owner-only, any
+ * verification status (`jobs/views.py:JobCandidatesView`, gated by
+ * `IsEmployer` only — no `IsVerifiedEmployer` check, unlike the scored
+ * recommendation endpoint). A coarse, unscored candidate pool filtered by
+ * subcategory/availability/distance — deliberately distinct from
+ * `fetchJobWorkerRecommendations` in src/api/endpoints/recommendations.ts,
+ * which is the ranked, explained, verified-employer-only endpoint.
+ */
+export function fetchJobCandidates(
+  jobId: number | string,
+  maxDistanceKm?: number,
+): Promise<ApiList<WorkerCandidate>> {
+  const query = maxDistanceKm !== undefined ? `?max_distance_km=${maxDistanceKm}` : ''
+  return apiFetch<ApiList<WorkerCandidate>>(`/jobs/${jobId}/candidates/${query}`)
 }

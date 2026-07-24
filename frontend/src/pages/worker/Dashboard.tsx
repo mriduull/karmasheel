@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Briefcase, ClipboardList, User } from 'lucide-react'
+import { Briefcase, ClipboardList, FileText, Lightbulb, Star, TrendingUp, User } from 'lucide-react'
 import { useAuthStore } from '@/state/authStore'
 import { useWorkerProfile } from '@/hooks/useWorkerProfile'
 import { useMyApplications } from '@/hooks/useMyApplications'
@@ -14,13 +14,20 @@ const SHORTCUTS = [
   { to: '/worker/profile', label: 'Complete / Edit Profile', icon: User },
   { to: '/jobs', label: 'Browse Jobs', icon: Briefcase },
   { to: '/worker/applications', label: 'My Applications', icon: ClipboardList },
+  { to: '/worker/recommendations', label: 'Recommended Jobs', icon: TrendingUp },
+  { to: '/worker/opportunities', label: 'Opportunity Advisory', icon: Lightbulb },
+  { to: '/worker/cv', label: 'Your CV', icon: FileText },
+  { to: '/worker/ratings', label: 'Your Ratings', icon: Star },
 ]
 
 /**
  * Two independent data sections (profile, applications) — each with its
  * own loading/error UI, so a failure in one never blocks the other from
- * rendering. No recommendations, opportunity advisory, CV, or ratings
- * here — those are Phase F4; no invented analytics/notifications/charts.
+ * rendering. Recommendations/Opportunity Advisory/CV/Ratings are plain
+ * navigation shortcuts here (Phase F4) — each fetches its own data only
+ * once its destination screen becomes active, per design spec §3.1's
+ * "navigation itself never fetches restricted data speculatively." No
+ * invented analytics/notifications/charts.
  */
 export function WorkerDashboard() {
   const user = useAuthStore((state) => state.user)
