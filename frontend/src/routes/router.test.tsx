@@ -7,7 +7,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { server } from '@/test/msw/server'
 import { API_ROOT } from '@/test/msw/handlers'
-import { buildWorkerProfileFixture } from '@/test/fixtures'
+import { buildEmployerProfileFixture, buildWorkerProfileFixture } from '@/test/fixtures'
 import { routeConfig } from './router'
 import {
   createTestQueryClient,
@@ -53,6 +53,10 @@ describe('router', () => {
       http.get(`${API_ROOT}/jobs/browse/`, () => HttpResponse.json([])),
       http.get(`${API_ROOT}/profiles/worker/me/`, () => HttpResponse.json(buildWorkerProfileFixture())),
       http.get(`${API_ROOT}/applications/`, () => HttpResponse.json([])),
+      http.get(`${API_ROOT}/profiles/employer/me/`, () =>
+        HttpResponse.json(buildEmployerProfileFixture({ verification_status: 'VERIFIED' })),
+      ),
+      http.get(`${API_ROOT}/jobs/`, () => HttpResponse.json([])),
     )
   })
 
@@ -93,7 +97,9 @@ describe('router', () => {
     async (path) => {
       setAuthenticatedUser(EMPLOYER_USER)
       renderAt(path)
-      expect(await screen.findByRole('heading', { name: 'Employer Dashboard' })).toBeInTheDocument()
+      expect(
+        await screen.findByRole('heading', { name: /welcome, demo_employer_verified/i }),
+      ).toBeInTheDocument()
     },
   )
 

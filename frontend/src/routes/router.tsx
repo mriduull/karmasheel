@@ -17,6 +17,9 @@ import { EmployerDashboard } from '@/pages/employer/Dashboard'
 import { EmployerJobs } from '@/pages/employer/Jobs'
 import { EmployerProfile } from '@/pages/employer/Profile'
 import { EmployerJobForm } from '@/pages/employer/JobForm'
+import { EmployerJobDetail } from '@/pages/employer/JobDetail'
+import { EmployerJobEdit } from '@/pages/employer/JobEdit'
+import { EmployerJobApplications } from '@/pages/employer/JobApplications'
 
 /**
  * Route tree for Phase F0. Every page below `/jobs` and the worker/employer
@@ -112,6 +115,30 @@ export const routeConfig = [
           <RequireVerifiedEmployer>
             <EmployerJobForm />
           </RequireVerifiedEmployer>
+        ),
+      },
+      {
+        path: '/employer/jobs/:id',
+        element: (
+          <RequireRole role="EMPLOYER">
+            <EmployerJobDetail />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/employer/jobs/:id/edit',
+        element: (
+          <RequireRole role="EMPLOYER">
+            <EmployerJobEdit />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/employer/jobs/:id/applications',
+        element: (
+          <RequireRole role="EMPLOYER">
+            <EmployerJobApplications />
+          </RequireRole>
         ),
       },
       {

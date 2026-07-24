@@ -16,8 +16,21 @@ const WAGE_TYPE_UNIT: Record<WageType, string> = {
   FIXED: '(fixed)',
 }
 
+/** Mirrors `jobs/models.py:JobPost.WageType` choices' human labels exactly
+ * (distinct from `WAGE_TYPE_UNIT` above, which is a per-amount suffix). */
+const WAGE_TYPE_LABELS: Record<WageType, string> = {
+  HOURLY: 'Hourly',
+  DAILY: 'Daily',
+  MONTHLY: 'Monthly',
+  FIXED: 'Fixed',
+}
+
 export function formatWorkType(workType: WorkType): string {
   return WORK_TYPE_LABELS[workType]
+}
+
+export function formatWageTypeLabel(wageType: WageType): string {
+  return WAGE_TYPE_LABELS[wageType]
 }
 
 /** `wage_amount` arrives as a DRF DecimalField string (e.g. "1300.00"). */
@@ -36,4 +49,21 @@ export function formatDateTime(isoString: string): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   })
+}
+
+/** Converts a backend ISO 8601 string to the `YYYY-MM-DDTHH:mm` value an
+ * `<input type="datetime-local">` expects, in the browser's local time
+ * (datetime-local has no timezone concept of its own — this is the
+ * standard, unavoidable interpretation). */
+export function toDatetimeLocalInputValue(isoString: string): string {
+  const date = new Date(isoString)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+/** Converts a `datetime-local` input value (interpreted as local time, by
+ * the same convention as `toDatetimeLocalInputValue`) back to an ISO 8601
+ * string for the backend. */
+export function fromDatetimeLocalInputValue(value: string): string {
+  return new Date(value).toISOString()
 }

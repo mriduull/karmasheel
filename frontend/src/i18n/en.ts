@@ -29,7 +29,9 @@ export const en = {
       dashboard: 'Home',
       myJobs: 'My Jobs',
       profile: 'Profile',
+      postAJob: 'Post a Job',
     },
+    dashboard: 'Dashboard',
   },
   common: {
     loading: 'Loading…',
@@ -45,6 +47,8 @@ export const en = {
     genericBody: "You don't have permission to view this page.",
     unverifiedEmployer:
       "Available once your account is verified. An administrator reviews new employer accounts — there's no in-app way to speed this up.",
+    rejectedEmployer:
+      "Your employer verification wasn't approved, so this isn't available. There's no in-app appeal — contact an administrator through your organization's usual channel if you believe this is a mistake.",
   },
   comingSoon: {
     body: 'This screen is built in {{phase}} of the implementation plan. This route, its guard, and the surrounding navigation are already wired up.',

@@ -2,18 +2,27 @@ import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { PageContainer } from '@/components/primitives/PageContainer'
 import { Button } from '@/components/primitives/Button'
+import type { EmployerVerificationStatus } from '@/hooks/useEmployerVerificationStatus'
 
 type Reason = 'unverified-employer'
 
 /** Plain explanatory message for a 403-shaped situation (e.g. an
  * unverified employer hitting a verified-only route) — never a bare
- * "Forbidden," per design spec §21. */
+ * "Forbidden," per design spec §21. Distinguishes PENDING/UNVERIFIED
+ * (still awaiting review) from REJECTED (a decision was already made) —
+ * the real `EmployerProfile.VerificationStatus` choices, not invented
+ * ones. */
 export function Unauthorized() {
   const { t } = useTranslation()
   const location = useLocation()
-  const reason = (location.state as { reason?: Reason } | null)?.reason
+  const state = location.state as { reason?: Reason; status?: EmployerVerificationStatus } | null
 
-  const body = reason === 'unverified-employer' ? t('unauthorized.unverifiedEmployer') : t('unauthorized.genericBody')
+  const body =
+    state?.reason === 'unverified-employer'
+      ? state.status === 'REJECTED'
+        ? t('unauthorized.rejectedEmployer')
+        : t('unauthorized.unverifiedEmployer')
+      : t('unauthorized.genericBody')
 
   return (
     <PageContainer>

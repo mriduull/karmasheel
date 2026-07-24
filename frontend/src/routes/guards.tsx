@@ -3,6 +3,10 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/state/authStore'
 import { useEmployerVerificationStatus } from '@/hooks/useEmployerVerificationStatus'
 import { LoadingIndicator } from '@/components/primitives/LoadingIndicator'
+import { ErrorBanner } from '@/components/primitives/ErrorBanner'
+import { PageContainer } from '@/components/primitives/PageContainer'
+import { toBannerMessage } from '@/api/errors'
+import type { ApiError } from '@/api/errors'
 import type { Role } from '@/types/user'
 
 function roleHome(role: Role): string {
@@ -56,16 +60,15 @@ export function RequireRole({ role, children }: { role: Role; children: ReactNod
  * and additionally requires `verification_status === "VERIFIED"`, matching
  * the backend's `IsVerifiedEmployer` permission
  * (backend/jobs/permissions.py) so the frontend never shows an action the
- * API would 403. The verification-status source is a stub until Phase F3
- * wires it to `GET /api/profiles/employer/me/` — see
- * hooks/useEmployerVerificationStatus.ts.
+ * API would 403. Real data, from `GET /api/profiles/employer/me/`
+ * (`useEmployerVerificationStatus`).
  */
 export function RequireVerifiedEmployer({ children }: { children: ReactNode }) {
-  const { status, isLoading } = useEmployerVerificationStatus()
+  const { status, isLoading, isError, error, refetch } = useEmployerVerificationStatus()
 
   return (
     <RequireRole role="EMPLOYER">
-      <VerifiedGate status={status} isLoading={isLoading}>
+      <VerifiedGate status={status} isLoading={isLoading} isError={isError} error={error} refetch={refetch}>
         {children}
       </VerifiedGate>
     </RequireRole>
@@ -75,10 +78,16 @@ export function RequireVerifiedEmployer({ children }: { children: ReactNode }) {
 function VerifiedGate({
   status,
   isLoading,
+  isError,
+  error,
+  refetch,
   children,
 }: {
   status: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | null
   isLoading: boolean
+  isError: boolean
+  error: ApiError | null
+  refetch: () => void
   children: ReactNode
 }) {
   if (isLoading) {
@@ -89,8 +98,25 @@ function VerifiedGate({
     )
   }
 
+  // A fetch failure is never silently treated as "unverified" — that
+  // would hide a network/server problem behind a permission message that
+  // doesn't describe what actually happened. Shown with a retry instead
+  // of redirecting away.
+  if (isError) {
+    return (
+      <PageContainer>
+        <ErrorBanner
+          message={
+            error ? toBannerMessage(error) : "We couldn't check your verification status."
+          }
+          onRetry={refetch}
+        />
+      </PageContainer>
+    )
+  }
+
   if (status !== 'VERIFIED') {
-    return <Navigate to="/unauthorized" replace state={{ reason: 'unverified-employer' }} />
+    return <Navigate to="/unauthorized" replace state={{ reason: 'unverified-employer', status }} />
   }
 
   return <>{children}</>

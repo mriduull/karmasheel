@@ -1,8 +1,13 @@
+import '@/i18n'
 import type { ReactElement } from 'react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { screen } from '@testing-library/react'
+import { http, HttpResponse } from 'msw'
 import { Route, Routes } from 'react-router-dom'
+import { server } from '@/test/msw/server'
+import { API_ROOT } from '@/test/msw/handlers'
 import { renderWithProviders, resetAuthStore, setAuthenticatedUser } from '@/test/utils'
+import { buildEmployerProfileFixture } from '@/test/fixtures'
 import { PublicOnly, RequireAuth, RequireRole, RequireVerifiedEmployer } from './guards'
 import type { CurrentUser } from '@/types/user'
 
@@ -187,8 +192,13 @@ describe('RequireRole', () => {
 describe('RequireVerifiedEmployer', () => {
   beforeEach(() => resetAuthStore())
 
-  it('redirects an unverified employer to /unauthorized (verification-status stub defaults to UNVERIFIED until Phase F3)', async () => {
+  it('redirects a PENDING employer to /unauthorized', async () => {
     setAuthenticatedUser(EMPLOYER_USER)
+    server.use(
+      http.get(`${API_ROOT}/profiles/employer/me/`, () =>
+        HttpResponse.json(buildEmployerProfileFixture({ verification_status: 'PENDING' })),
+      ),
+    )
     renderWithProviders(
       <TestRoutes
         element={
@@ -202,8 +212,94 @@ describe('RequireVerifiedEmployer', () => {
     expect(await screen.findByText('unauthorized-page')).toBeInTheDocument()
   })
 
-  it('redirects a worker (wrong role entirely) to /worker before even checking verification', () => {
+  it('redirects a REJECTED employer to /unauthorized', async () => {
+    setAuthenticatedUser(EMPLOYER_USER)
+    server.use(
+      http.get(`${API_ROOT}/profiles/employer/me/`, () =>
+        HttpResponse.json(buildEmployerProfileFixture({ verification_status: 'REJECTED' })),
+      ),
+    )
+    renderWithProviders(
+      <TestRoutes
+        element={
+          <RequireVerifiedEmployer>
+            <Probe label="post-a-job" />
+          </RequireVerifiedEmployer>
+        }
+      />,
+      { route: '/protected' },
+    )
+    expect(await screen.findByText('unauthorized-page')).toBeInTheDocument()
+  })
+
+  it('renders children for a VERIFIED employer', async () => {
+    setAuthenticatedUser(EMPLOYER_USER)
+    server.use(
+      http.get(`${API_ROOT}/profiles/employer/me/`, () =>
+        HttpResponse.json(buildEmployerProfileFixture({ verification_status: 'VERIFIED' })),
+      ),
+    )
+    renderWithProviders(
+      <TestRoutes
+        element={
+          <RequireVerifiedEmployer>
+            <Probe label="post-a-job" />
+          </RequireVerifiedEmployer>
+        }
+      />,
+      { route: '/protected' },
+    )
+    expect(await screen.findByText('post-a-job')).toBeInTheDocument()
+  })
+
+  it('does not expose protected content while verification status is still loading', () => {
+    setAuthenticatedUser(EMPLOYER_USER)
+    server.use(
+      http.get(`${API_ROOT}/profiles/employer/me/`, () => new Promise(() => {})),
+    )
+    renderWithProviders(
+      <TestRoutes
+        element={
+          <RequireVerifiedEmployer>
+            <Probe label="post-a-job" />
+          </RequireVerifiedEmployer>
+        }
+      />,
+      { route: '/protected' },
+    )
+    expect(screen.queryByText('post-a-job')).not.toBeInTheDocument()
+    expect(screen.queryByText('unauthorized-page')).not.toBeInTheDocument()
+  })
+
+  it('shows a retryable error instead of redirecting when the verification check fails', async () => {
+    setAuthenticatedUser(EMPLOYER_USER)
+    server.use(
+      http.get(`${API_ROOT}/profiles/employer/me/`, () => HttpResponse.error()),
+    )
+    renderWithProviders(
+      <TestRoutes
+        element={
+          <RequireVerifiedEmployer>
+            <Probe label="post-a-job" />
+          </RequireVerifiedEmployer>
+        }
+      />,
+      { route: '/protected' },
+    )
+    expect(await screen.findByRole('button', { name: /try again/i })).toBeInTheDocument()
+    expect(screen.queryByText('unauthorized-page')).not.toBeInTheDocument()
+    expect(screen.queryByText('post-a-job')).not.toBeInTheDocument()
+  })
+
+  it('redirects a worker (wrong role entirely) to /worker before showing any verification UI', () => {
     setAuthenticatedUser(WORKER_USER)
+    // RequireVerifiedEmployer calls useEmployerVerificationStatus() before
+    // RequireRole's redirect check runs (hooks always execute), so this
+    // endpoint is hit even though its result is never used here — mocked
+    // only to avoid an unhandled-request error, not because it matters.
+    server.use(
+      http.get(`${API_ROOT}/profiles/employer/me/`, () => HttpResponse.json(buildEmployerProfileFixture())),
+    )
     renderWithProviders(
       <TestRoutes
         element={

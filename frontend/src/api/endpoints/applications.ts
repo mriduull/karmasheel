@@ -31,3 +31,15 @@ export function updateApplicationStatus(
 ): Promise<Application> {
   return apiFetch<Application>(`/applications/${id}/status/`, { method: 'PATCH', body: payload })
 }
+
+/**
+ * GET /api/jobs/<job_id>/applications/ — the owning Employer's view of
+ * one job's applications, bare array. Note the URL: this view
+ * (`applications/views.py:JobApplicationsView`) is routed under
+ * `jobs/urls.py`, not `applications/urls.py` — there is no
+ * employer-wide "all my applicants" endpoint at all, only this
+ * per-job one. 403 for a non-owner, 404 if the job doesn't exist.
+ */
+export function fetchJobApplications(jobId: number | string): Promise<ApiList<Application>> {
+  return apiFetch<ApiList<Application>>(`/jobs/${jobId}/applications/`)
+}

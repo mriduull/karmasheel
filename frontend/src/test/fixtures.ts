@@ -1,6 +1,7 @@
 import type { Category, CategoryTree, Subcategory } from '@/types/taxonomy'
-import type { PublicJobPost } from '@/types/job'
+import type { EmployerJobPost, PublicJobPost } from '@/types/job'
 import type { WorkerProfile } from '@/types/profile'
+import type { EmployerProfile } from '@/types/employer'
 import type { Application } from '@/types/application'
 
 export const CATEGORY_FIXTURES: Category[] = [
@@ -73,6 +74,53 @@ export function buildWorkerProfileFixture(overrides: Partial<WorkerProfile> = {}
     preferred_travel_radius_km: 15,
     skills: [{ id: 2, name: 'House Wiring', subcategory: 'Electrical' }],
     unmatched_terms: [],
+    created_at: '2026-07-22T12:00:00Z',
+    updated_at: '2026-07-22T12:00:00Z',
+    ...overrides,
+  }
+}
+
+export function buildEmployerProfileFixture(overrides: Partial<EmployerProfile> = {}): EmployerProfile {
+  return {
+    id: 4,
+    organization_name: 'Kathmandu Home Services Pvt. Ltd.',
+    address: 'Baneshwor, Kathmandu',
+    latitude: '27.693800',
+    longitude: '85.335500',
+    pan_vat_number: '123456789',
+    verification_status: 'VERIFIED',
+    created_at: '2026-07-22T12:00:00Z',
+    updated_at: '2026-07-22T12:00:00Z',
+    ...overrides,
+  }
+}
+
+export function buildEmployerJobFixture(overrides: Partial<EmployerJobPost> = {}): EmployerJobPost {
+  return {
+    id: 5,
+    title: 'House Wiring for New Apartment Block',
+    category: 1,
+    category_name: 'Construction & Repair',
+    subcategory: 1,
+    subcategory_name: 'Electrical',
+    employer_name: 'Kathmandu Home Services Pvt. Ltd.',
+    required_skills: [{ id: 2, name: 'House Wiring', subcategory: 'Electrical' }],
+    preferred_skills: [{ id: 4, name: 'Electrical Repair', subcategory: 'Electrical' }],
+    unmatched_required_terms: [],
+    unmatched_preferred_terms: [],
+    description: 'Complete wiring and breaker installation for a new four-unit apartment block.',
+    address: 'Baneshwor, Kathmandu',
+    latitude: '27.693800',
+    longitude: '85.335500',
+    required_experience_years: 3,
+    wage_type: 'DAILY',
+    wage_amount: '1300.00',
+    work_type: 'CONTRACT',
+    scheduled_datetime: null,
+    duration_days: null,
+    number_of_workers_required: 2,
+    application_deadline: '2026-08-21T12:00:00Z',
+    status: 'ACTIVE',
     created_at: '2026-07-22T12:00:00Z',
     updated_at: '2026-07-22T12:00:00Z',
     ...overrides,
