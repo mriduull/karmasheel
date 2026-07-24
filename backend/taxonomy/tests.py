@@ -1,19 +1,74 @@
 import json
+import tempfile
+from decimal import Decimal
 from importlib import import_module
+from unittest.mock import patch
 
 from django.apps import apps as global_apps
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from .management.commands.seed_taxonomy import (
+    DEFAULT_DATA_FILE,
+    TaxonomyDataError,
+    load_taxonomy_data,
+    validate_taxonomy_data,
+)
 from .models import Category, SkillAlias, SkillTag, Subcategory, UnmatchedSkillTerm
 from .services import normalize_skill_phrase, normalize_skill_phrases, preprocess_skill_phrase
 
 
 User = get_user_model()
+
+
+def _write_json_tempfile(data):
+    handle = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", delete=False, encoding="utf-8"
+    )
+    json.dump(data, handle)
+    handle.close()
+    return handle.name
+
+
+def _minimal_valid_dataset():
+    """A tiny, self-consistent taxonomy dataset for validation/command
+    tests that don't need the full curated v1 file."""
+
+    return {
+        "version": 1,
+        "categories": [
+            {
+                "name": "Test Category",
+                "existing": False,
+                "subcategories": [
+                    {
+                        "name": "Test Subcategory",
+                        "existing": False,
+                        "skills": [
+                            {
+                                "name": "Test Skill One",
+                                "existing": False,
+                                "aliases": [
+                                    {"phrase": "test skill synonym", "language": "EN"},
+                                    {"phrase": "test skill nepali", "language": "NE_ROMANIZED"},
+                                ],
+                            },
+                            {
+                                "name": "Test Skill Two",
+                                "existing": False,
+                                "aliases": [],
+                            },
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
 
 
 class PreprocessSkillPhraseTests(TestCase):
@@ -652,3 +707,472 @@ class TaxonomyAdminTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertIn("/admin/login/", response.url)
+
+
+class TaxonomyDataValidationTests(TestCase):
+    """Unit tests for the curated-data validation used by
+    `seed_taxonomy` (Week 6 taxonomy v1), independent of the real data
+    file - each test builds its own minimal fixture so a bug in the big
+    curated dataset can never mask a bug in the validation logic itself.
+    """
+
+    def test_valid_minimal_dataset_passes(self):
+        validate_taxonomy_data(_minimal_valid_dataset()["categories"])
+
+    def test_empty_category_name_is_rejected(self):
+        data = _minimal_valid_dataset()
+        data["categories"][0]["name"] = "   "
+
+        with self.assertRaises(TaxonomyDataError):
+            validate_taxonomy_data(data["categories"])
+
+    def test_empty_subcategory_name_is_rejected(self):
+        data = _minimal_valid_dataset()
+        data["categories"][0]["subcategories"][0]["name"] = ""
+
+        with self.assertRaises(TaxonomyDataError):
+            validate_taxonomy_data(data["categories"])
+
+    def test_empty_skill_name_is_rejected(self):
+        data = _minimal_valid_dataset()
+        data["categories"][0]["subcategories"][0]["skills"][0]["name"] = ""
+
+        with self.assertRaises(TaxonomyDataError):
+            validate_taxonomy_data(data["categories"])
+
+    def test_duplicate_category_name_case_variant_is_rejected(self):
+        data = _minimal_valid_dataset()
+        data["categories"].append({
+            "name": "test category",
+            "existing": False,
+            "subcategories": data["categories"][0]["subcategories"],
+        })
+
+        with self.assertRaises(TaxonomyDataError):
+            validate_taxonomy_data(data["categories"])
+
+    def test_duplicate_subcategory_punctuation_or_case_variant_is_rejected(self):
+        data = _minimal_valid_dataset()
+        data["categories"][0]["subcategories"].append({
+            "name": "test-subcategory!",
+            "existing": False,
+            "skills": [{"name": "Another Skill", "existing": False, "aliases": []}],
+        })
+
+        with self.assertRaises(TaxonomyDataError):
+            validate_taxonomy_data(data["categories"])
+
+    def test_duplicate_skill_within_subcategory_is_rejected(self):
+        data = _minimal_valid_dataset()
+        data["categories"][0]["subcategories"][0]["skills"].append(
+            {"name": "test skill one", "existing": False, "aliases": []}
+        )
+
+        with self.assertRaises(TaxonomyDataError):
+            validate_taxonomy_data(data["categories"])
+
+    def test_generic_overly_broad_skill_name_is_rejected(self):
+        data = _minimal_valid_dataset()
+        data["categories"][0]["subcategories"][0]["skills"][0]["name"] = "General Labor"
+
+        with self.assertRaises(TaxonomyDataError):
+            validate_taxonomy_data(data["categories"])
+
+    def test_alias_with_invalid_language_is_rejected(self):
+        data = _minimal_valid_dataset()
+        data["categories"][0]["subcategories"][0]["skills"][0]["aliases"] = [
+            {"phrase": "bad language alias", "language": "FRENCH"}
+        ]
+
+        with self.assertRaises(TaxonomyDataError):
+            validate_taxonomy_data(data["categories"])
+
+    def test_alias_repeating_its_own_skill_name_is_rejected(self):
+        data = _minimal_valid_dataset()
+        data["categories"][0]["subcategories"][0]["skills"][0]["aliases"] = [
+            {"phrase": "Test Skill One", "language": "EN"}
+        ]
+
+        with self.assertRaises(TaxonomyDataError):
+            validate_taxonomy_data(data["categories"])
+
+    def test_alias_matching_a_different_skills_canonical_name_is_rejected(self):
+        data = _minimal_valid_dataset()
+        data["categories"][0]["subcategories"][0]["skills"][0]["aliases"] = [
+            {"phrase": "Test Skill Two", "language": "EN"}
+        ]
+
+        with self.assertRaises(TaxonomyDataError):
+            validate_taxonomy_data(data["categories"])
+
+    def test_same_normalized_alias_pointing_to_two_different_skills_is_rejected(self):
+        data = _minimal_valid_dataset()
+        data["categories"][0]["subcategories"][0]["skills"][0]["aliases"] = [
+            {"phrase": "shared alias phrase", "language": "EN"}
+        ]
+        data["categories"][0]["subcategories"][0]["skills"][1]["aliases"] = [
+            {"phrase": "Shared Alias Phrase", "language": "EN"}
+        ]
+
+        with self.assertRaises(TaxonomyDataError):
+            validate_taxonomy_data(data["categories"])
+
+    def test_alias_colliding_with_a_different_skill_already_in_database_is_rejected(self):
+        data = _minimal_valid_dataset()
+        data["categories"][0]["subcategories"][0]["skills"][0]["aliases"] = [
+            {"phrase": "already taken phrase", "language": "EN"}
+        ]
+
+        with self.assertRaises(TaxonomyDataError):
+            validate_taxonomy_data(
+                data["categories"],
+                existing_alias_owner=lambda phrase: (
+                    "Some Other Existing Skill" if phrase == "already taken phrase" else None
+                ),
+            )
+
+    def test_alias_matching_database_owner_of_the_same_skill_is_accepted(self):
+        data = _minimal_valid_dataset()
+        data["categories"][0]["subcategories"][0]["skills"][0]["aliases"] = [
+            {"phrase": "already taken phrase", "language": "EN"}
+        ]
+
+        validate_taxonomy_data(
+            data["categories"],
+            existing_alias_owner=lambda phrase: (
+                "Test Skill One" if phrase == "already taken phrase" else None
+            ),
+        )
+
+    def test_missing_categories_key_is_rejected_at_load_time(self):
+        path = _write_json_tempfile({"not_categories": []})
+
+        with self.assertRaises(TaxonomyDataError):
+            load_taxonomy_data(path)
+
+    def test_malformed_json_is_rejected_at_load_time(self):
+        handle = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+        handle.write("{not valid json")
+        handle.close()
+
+        with self.assertRaises(TaxonomyDataError):
+            load_taxonomy_data(handle.name)
+
+    def test_missing_file_is_rejected_at_load_time(self):
+        with self.assertRaises(TaxonomyDataError):
+            load_taxonomy_data("/nonexistent/path/does-not-exist.json")
+
+
+class SeedTaxonomyTransactionRollbackTests(TestCase):
+    """Invalid curated data must never leave partial rows behind (Week 6
+    taxonomy v1 requirement)."""
+
+    def test_invalid_data_raises_command_error_and_writes_nothing(self):
+        path = _write_json_tempfile({
+            "categories": [
+                {
+                    "name": "Broken Category",
+                    "subcategories": [
+                        {
+                            "name": "Broken Subcategory",
+                            "skills": [
+                                {
+                                    "name": "Skill A",
+                                    "aliases": [{"phrase": "shared phrase", "language": "EN"}],
+                                },
+                                {
+                                    "name": "Skill B",
+                                    "aliases": [{"phrase": "shared phrase", "language": "EN"}],
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ]
+        })
+
+        with self.assertRaises(CommandError):
+            call_command("seed_taxonomy", file=path)
+
+        self.assertEqual(Category.objects.count(), 0)
+        self.assertEqual(Subcategory.objects.count(), 0)
+        self.assertEqual(SkillTag.objects.count(), 0)
+        self.assertEqual(SkillAlias.objects.count(), 0)
+
+    def test_malformed_json_raises_command_error_and_writes_nothing(self):
+        handle = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+        handle.write("{this is not json")
+        handle.close()
+
+        with self.assertRaises(CommandError):
+            call_command("seed_taxonomy", file=handle.name)
+
+        self.assertEqual(Category.objects.count(), 0)
+
+    def test_db_level_failure_partway_through_rolls_back_everything(self):
+        """Even data that passes validation must not leave partial rows
+        if something fails while writing it - proves the load runs
+        inside one real database transaction, not just that validation
+        happens to catch bad input upfront."""
+
+        with patch(
+            "taxonomy.management.commands.seed_taxonomy._get_or_create_alias",
+            side_effect=RuntimeError("simulated failure partway through the load"),
+        ):
+            with self.assertRaises(RuntimeError):
+                call_command("seed_taxonomy", file=str(DEFAULT_DATA_FILE))
+
+        # The very first skill processed ("House Wiring") already has
+        # aliases, so the category/subcategory/skill rows for it are
+        # created and then the mocked failure fires on its first alias.
+        # If the load were not wrapped in one real transaction, that
+        # category/subcategory/skill would still be present here.
+        self.assertEqual(Category.objects.count(), 0)
+        self.assertEqual(Subcategory.objects.count(), 0)
+        self.assertEqual(SkillTag.objects.count(), 0)
+
+
+class SeedTaxonomyV1CommandTests(TestCase):
+    """Tests against the real curated v1 dataset
+    (taxonomy/data/taxonomy_v1.json), run once per class via
+    setUpTestData since a full load touches several hundred rows."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_taxonomy")
+
+    def test_meets_minimum_category_count(self):
+        self.assertGreaterEqual(Category.objects.count(), 12)
+
+    def test_meets_minimum_subcategory_count(self):
+        self.assertGreaterEqual(Subcategory.objects.count(), 45)
+
+    def test_meets_minimum_standardized_skill_count(self):
+        self.assertGreaterEqual(SkillTag.objects.count(), 300)
+
+    def test_meets_minimum_alias_count(self):
+        self.assertGreaterEqual(SkillAlias.objects.count(), 200)
+
+    def test_required_occupational_areas_are_present(self):
+        expected_categories = {
+            "Construction & Repair",
+            "Domestic & Local Services",
+            "Hospitality & Food Services",
+            "Driving & Delivery",
+            "Security Services",
+            "Facility & Property Maintenance",
+            "Caregiving & Personal Support",
+            "Retail & Customer Service",
+            "Office & Administrative Support",
+            "Event & Temporary Work",
+        }
+        actual_categories = set(Category.objects.values_list("name", flat=True))
+        self.assertTrue(expected_categories.issubset(actual_categories))
+
+    def test_existing_week2_categories_are_not_duplicated(self):
+        self.assertEqual(
+            Category.objects.filter(name__iexact="Construction & Repair").count(), 1
+        )
+        self.assertEqual(
+            Category.objects.filter(name__iexact="Domestic & Local Services").count(), 1
+        )
+
+    def test_existing_week2_subcategories_are_reused_under_the_same_category(self):
+        construction = Category.objects.get(name="Construction & Repair")
+        for name in ("Electrical", "Plumbing", "Masonry"):
+            self.assertEqual(
+                Subcategory.objects.filter(category=construction, name__iexact=name).count(),
+                1,
+                msg=f"{name} should exist exactly once under Construction & Repair",
+            )
+
+    def test_existing_week2_alias_still_resolves_to_the_same_skill(self):
+        result = normalize_skill_phrase("ghar wiring")
+
+        self.assertIsNotNone(result.skill)
+        self.assertEqual(result.skill.name, "House Wiring")
+        self.assertEqual(result.method, "exact_alias")
+
+    def test_new_v1_alias_resolves_to_its_intended_skill(self):
+        result = normalize_skill_phrase("budhesakal herchah")
+
+        self.assertIsNotNone(result.skill)
+        self.assertEqual(result.skill.name, "Elderly Personal Care")
+        self.assertEqual(result.method, "exact_alias")
+
+    def test_english_alias_normalization_is_case_insensitive(self):
+        lower = normalize_skill_phrase("home wiring")
+        mixed_case = normalize_skill_phrase("Home WIRING")
+
+        self.assertEqual(lower.skill, mixed_case.skill)
+        self.assertEqual(mixed_case.method, "exact_alias")
+
+    def test_romanized_nepali_alias_normalization_is_case_insensitive(self):
+        lower = normalize_skill_phrase("ghar wiring")
+        mixed_case = normalize_skill_phrase("Ghar Wiring")
+
+        self.assertEqual(lower.skill, mixed_case.skill)
+        self.assertEqual(mixed_case.method, "exact_alias")
+
+    def test_rerun_creates_no_duplicates_and_leaves_counts_unchanged(self):
+        category_count = Category.objects.count()
+        subcategory_count = Subcategory.objects.count()
+        skill_count = SkillTag.objects.count()
+        alias_count = SkillAlias.objects.count()
+
+        call_command("seed_taxonomy")
+
+        self.assertEqual(Category.objects.count(), category_count)
+        self.assertEqual(Subcategory.objects.count(), subcategory_count)
+        self.assertEqual(SkillTag.objects.count(), skill_count)
+        self.assertEqual(SkillAlias.objects.count(), alias_count)
+
+    def test_api_tree_endpoint_query_count_stays_bounded_at_v1_scale(self):
+        client = APITestCase.client_class()
+
+        with self.assertNumQueries(3):
+            response = client.get(reverse("taxonomy:tree"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_api_response_shapes_are_unchanged_at_v1_scale(self):
+        client = APITestCase.client_class()
+
+        categories_response = client.get(reverse("taxonomy:categories"))
+        self.assertEqual(categories_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(set(categories_response.data[0].keys()), {"id", "name"})
+
+        subcategories_response = client.get(reverse("taxonomy:subcategories"))
+        self.assertEqual(subcategories_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            set(subcategories_response.data[0].keys()), {"id", "name", "category"}
+        )
+
+        skills_response = client.get(reverse("taxonomy:skills"))
+        self.assertEqual(skills_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(set(skills_response.data[0].keys()), {"id", "name", "subcategory"})
+
+        tree_response = client.get(reverse("taxonomy:tree"))
+        self.assertEqual(tree_response.status_code, status.HTTP_200_OK)
+        first_category = tree_response.data[0]
+        self.assertEqual(set(first_category.keys()), {"id", "name", "subcategories"})
+        first_subcategory = first_category["subcategories"][0]
+        self.assertEqual(set(first_subcategory.keys()), {"id", "name", "skills"})
+        if first_subcategory["skills"]:
+            self.assertEqual(set(first_subcategory["skills"][0].keys()), {"id", "name"})
+
+
+class SeedTaxonomyPreservesExistingRelationshipsTests(TestCase):
+    """Worker and job skill relationships must survive an idempotent
+    re-run of seed_taxonomy untouched (Week 6 taxonomy v1 requirement)."""
+
+    def setUp(self):
+        call_command("seed_taxonomy")
+
+        self.electrical_skill = SkillTag.objects.get(
+            name="House Wiring", subcategory__name="Electrical"
+        )
+        self.cleaning_skill = SkillTag.objects.get(
+            name="House Cleaning", subcategory__name="Cleaning"
+        )
+
+        worker_user = User.objects.create_user(
+            username="taxonomyworker",
+            phone_number="9800000301",
+            password="WorkerPassword123!",
+            role=User.Role.WORKER,
+        )
+        from profiles.models import WorkerProfile
+
+        self.worker_profile = WorkerProfile.objects.create(user=worker_user)
+        self.worker_profile.skills.add(self.electrical_skill)
+
+        from profiles.models import EmployerProfile
+
+        employer_user = User.objects.create_user(
+            username="taxonomyemployer",
+            phone_number="9800000302",
+            password="EmployerPassword123!",
+            role=User.Role.EMPLOYER,
+        )
+        employer_profile = EmployerProfile.objects.create(
+            user=employer_user,
+            verification_status=EmployerProfile.VerificationStatus.VERIFIED,
+        )
+
+        from jobs.models import JobPost
+
+        self.job = JobPost.objects.create(
+            employer=employer_profile,
+            title="Test Wiring Job",
+            category=self.electrical_skill.subcategory.category,
+            subcategory=self.electrical_skill.subcategory,
+            description="Test job for relationship-preservation coverage.",
+            address="Kathmandu",
+            latitude=Decimal("27.700000"),
+            longitude=Decimal("85.300000"),
+            wage_amount=Decimal("1000.00"),
+        )
+        self.job.required_skills.add(self.electrical_skill)
+        self.job.preferred_skills.add(self.cleaning_skill)
+
+    def test_worker_skill_relationship_survives_rerun(self):
+        call_command("seed_taxonomy")
+
+        self.worker_profile.refresh_from_db()
+        self.assertIn(self.electrical_skill, self.worker_profile.skills.all())
+        self.assertEqual(self.worker_profile.skills.get().id, self.electrical_skill.id)
+
+    def test_job_required_and_preferred_skills_survive_rerun(self):
+        call_command("seed_taxonomy")
+
+        self.job.refresh_from_db()
+        self.assertIn(self.electrical_skill, self.job.required_skills.all())
+        self.assertIn(self.cleaning_skill, self.job.preferred_skills.all())
+
+    def test_skill_ids_are_unchanged_after_rerun(self):
+        electrical_id_before = self.electrical_skill.id
+
+        call_command("seed_taxonomy")
+
+        electrical_after = SkillTag.objects.get(
+            name="House Wiring", subcategory__name="Electrical"
+        )
+        self.assertEqual(electrical_after.id, electrical_id_before)
+
+
+class SeedTaxonomyReusesArbitraryExistingRecordsTests(TestCase):
+    """General reuse-not-duplicate coverage beyond the two Week 2
+    hardcoded regression tests above - a differently-cased pre-existing
+    row anywhere in the curated tree must be reused, not duplicated."""
+
+    def test_differently_cased_new_v1_category_is_reused(self):
+        pre_existing = Category.objects.create(name="hospitality & food services")
+
+        call_command("seed_taxonomy")
+
+        matches = Category.objects.filter(name__iexact="Hospitality & Food Services")
+        self.assertEqual(matches.count(), 1)
+        self.assertEqual(matches.first().id, pre_existing.id)
+        self.assertEqual(matches.first().name, "Hospitality & Food Services")
+
+    def test_differently_cased_new_v1_subcategory_is_reused(self):
+        category = Category.objects.create(name="Driving & Delivery")
+        pre_existing = Subcategory.objects.create(category=category, name="car & taxi driving")
+
+        call_command("seed_taxonomy")
+
+        matches = Subcategory.objects.filter(category=category, name__iexact="Car & Taxi Driving")
+        self.assertEqual(matches.count(), 1)
+        self.assertEqual(matches.first().id, pre_existing.id)
+
+    def test_differently_cased_new_v1_skill_is_reused(self):
+        category = Category.objects.create(name="Security Services")
+        subcategory = Subcategory.objects.create(category=category, name="Security Guarding")
+        pre_existing = SkillTag.objects.create(subcategory=subcategory, name="premises patrolling")
+
+        call_command("seed_taxonomy")
+
+        matches = SkillTag.objects.filter(subcategory=subcategory, name__iexact="Premises Patrolling")
+        self.assertEqual(matches.count(), 1)
+        self.assertEqual(matches.first().id, pre_existing.id)

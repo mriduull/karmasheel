@@ -1,0 +1,4119 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "name": "Construction & Repair",
+      "existing": true,
+      "subcategories": [
+        {
+          "name": "Electrical",
+          "existing": true,
+          "skills": [
+            {
+              "name": "House Wiring",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "home wiring",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "ghar wiring",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Circuit Breaker Installation",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "breaker installation",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "switch board installation",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Electrical Repair",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "electric repair",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "bijuli repair",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Ceiling Fan Installation",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "fan installation",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "pankha jadan",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Switchboard Installation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "switch board fitting",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "switch jadan",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Earthing And Grounding Installation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "earthing work",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "earthing garne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Inverter Installation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "inverter setup",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "inverter jadan",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Electrical Panel Wiring",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "panel wiring",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Plumbing",
+          "existing": true,
+          "skills": [
+            {
+              "name": "Pipe Fitting",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "pipe fixing",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "pipe milaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Leak Repair",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "water leak fixing",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "chuhawat thik garne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Bathroom Fitting Installation",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "bathroom fixture installation",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "bathroom jadan",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Water Tank Installation",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "tank installation",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "tanki jadan",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "PVC Pipe Jointing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "pvc pipe joining",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "pvc pipe jodne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Drainage Line Installation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "drain pipe installation",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "ninala jadan",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Water Pump Installation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "pump fitting",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "pump jadan",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Valve Installation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "valve fitting",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Masonry",
+          "existing": true,
+          "skills": [
+            {
+              "name": "Brick Laying",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "bricklaying work",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "itta thoknu",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Plastering",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "wall plastering",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "plaster garne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Tile Installation",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "tile fitting",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "tile jadan",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Concrete Mixing",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "cement mixing",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "dhalan misaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Foundation Laying",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "foundation work",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "jag halne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Wall Alignment And Leveling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "wall leveling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Stone Fitting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "stone masonry",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "dhunga jadan",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Cement Rendering",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "wall rendering",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Painting",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Wall Painting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "house painting",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "ghar rang lagaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Ceiling Painting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "ceiling coloring",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Spray Painting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "spray coloring",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Waterproof Coating Application",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "waterproofing coating",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "waterproof lagaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Surface Primer Application",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "primer coating",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Distemper Painting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "distemper coloring",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Textured Wall Finishing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "texture painting",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Carpentry",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Furniture Making",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "furniture building",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "furniture banaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Door And Window Framing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "door window framing",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "dhoka jhyal banaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Wood Cutting And Shaping",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "wood cutting",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "kath katne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Furniture Repair",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "furniture fixing",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "furniture thik garne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Wooden Flooring Installation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "wood flooring",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Cabinet Installation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "cabinet fitting",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Wood Polishing And Varnishing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "wood polishing",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "kath polish garne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Plywood Paneling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "plywood fitting",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Welding & Metalwork",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Arc Welding",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "electric welding",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "welding garne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Gas Welding",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "gas welding work",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Metal Grill Fabrication",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "grill making",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "grill banaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Metal Cutting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "iron cutting",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Steel Fixing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "rebar fixing",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "taar banding",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Gate And Railing Fabrication",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "gate making",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "gate banaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Welding Machine Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "welding machine use",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Tiling & Flooring",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Floor Tiling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "floor tile fitting",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "floor tile jadan",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Wall Tiling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "wall tile fitting",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Marble Flooring Installation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "marble fitting",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "marble jadan",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Granite Fitting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "granite installation",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Epoxy Flooring",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "epoxy floor coating",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Tile Grouting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "grouting work",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Vitrified Tile Cutting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "tile cutting",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Roofing",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Roof Sheet Installation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "roofing sheet fitting",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "chhana jadan",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Roof Waterproofing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "roof waterproof coating",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Gutter Installation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "rain gutter fitting",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Roof Truss Assembly",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "roof frame assembly",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Roof Repair",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "roof fixing",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "chhana thik garne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Skylight Installation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "skylight fitting",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Scaffolding & Formwork",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Scaffolding Erection",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "scaffold setup",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Shuttering And Formwork",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "formwork setup",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "dhalan ko formwork",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Scaffold Dismantling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "scaffold removal",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Concrete Formwork Assembly",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "formwork assembly",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Site Safety Rigging",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "safety rigging",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Ladder And Platform Safety Setup",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "platform safety setup",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "General Construction Labor",
+          "existing": false,
+          "skills": [
+            {
+              "name": "General Construction Helper",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "construction helper",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "majdur kaam",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Material Loading And Unloading",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "material handling",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "samaan boknu",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Excavation Work",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "digging work",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "khanne kaam",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Site Cleanup",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "construction site cleaning",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Cement Carrying",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "cement handling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Demolition Work",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "building demolition",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "bhatkaune kaam",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Debris Removal",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "waste removal",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Domestic & Local Services",
+      "existing": true,
+      "subcategories": [
+        {
+          "name": "Cleaning",
+          "existing": true,
+          "skills": [
+            {
+              "name": "House Cleaning",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "home cleaning",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "ghar safai",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Deep Cleaning",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "thorough cleaning",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "gahiro safai",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Window Cleaning",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "glass cleaning",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "jhyal safai",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Carpet Cleaning",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "rug cleaning",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "carpet safai",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Bathroom Cleaning",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "toilet cleaning",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "bathroom safai",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Kitchen Cleaning",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "kitchen safai",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Sofa Cleaning",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "upholstery cleaning",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Office Cleaning",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "office safai",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Balcony Cleaning",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "terrace cleaning",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cooking",
+          "existing": true,
+          "skills": [
+            {
+              "name": "Home Cooking",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "household cooking",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "ghar khana pakaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Catering Assistance",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "catering help",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "bhoj sahayog",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Meal Preparation",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "food preparation",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "khana taiyari",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Kitchen Helper",
+              "existing": true,
+              "aliases": [
+                {
+                  "phrase": "kitchen assistant",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "bhansa sahayak",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Nepali Cuisine Cooking",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "traditional nepali cooking",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "nepali khana pakaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Indian Cuisine Cooking",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "indian food cooking",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Baking",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "cake and bread baking",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Tiffin Service Cooking",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "daily tiffin cooking",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "tiffin pakaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Snack Preparation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "nasta banaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Laundry & Ironing",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Clothes Washing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "laundry washing",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "lugha dhune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Ironing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "clothes pressing",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "istri garne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Dry Cleaning Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "dry clean help",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Stain Removal",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "stain cleaning",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Laundry Folding And Sorting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "laundry folding",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Curtain Washing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "curtain cleaning",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Gardening & Outdoor Maintenance",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Lawn Mowing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "grass cutting",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "ghans katne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Plant Care",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "gardening care",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "bot herchah",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Hedge Trimming",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "bush trimming",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Garden Watering",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "plant watering",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "pani halne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Landscaping Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "garden landscaping",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Outdoor Cleaning",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "yard cleaning",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Composting Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "compost making",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Pest Control",
+          "existing": false,
+          "skills": [
+            {
+              "name": "General Pest Spraying",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "pest spraying",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "kira niyantran",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Termite Treatment",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "termite control",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "dimak niyantran",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Rodent Control",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "rat control",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "musa niyantran",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Mosquito Fogging",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "mosquito control",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Bed Bug Treatment",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "bed bug control",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Hospitality & Food Services",
+      "existing": false,
+      "subcategories": [
+        {
+          "name": "Restaurant Cooking",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Restaurant Line Cooking",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "line cook work",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Grill Cooking",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "bbq grilling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Tandoor Cooking",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "tandoor roti making",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "tandoor pakaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Continental Cooking",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "western cuisine cooking",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Menu Portioning",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "food portioning",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Food Plating",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "dish plating",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Sauce And Gravy Preparation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "gravy making",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Waitstaff & Table Service",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Table Service",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "waiter service",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "table sewa",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Order Taking",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "customer order taking",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Guest Seating Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "seating arrangement help",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Room Service Delivery",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "in-room dining service",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Table Setting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "table layout setting",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Bill Presentation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "bill delivering to table",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Hotel Housekeeping",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Guest Room Cleaning",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "hotel room cleaning",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "kotha safai",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Bed Making",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "bed arranging",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Linen Change",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "bedsheet changing",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Minibar Restocking",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "minibar refilling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Hotel Laundry Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "hotel linen laundry",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Bathroom Amenity Restocking",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "toiletry restocking",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Barista & Beverage Service",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Coffee Brewing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "coffee making",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "coffee banaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Tea Preparation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "tea making",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "chiya banaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Juice And Beverage Preparation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "juice making",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Bartending Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "bar service help",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Cash Handling At Counter",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "counter billing",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Milkshake Preparation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "milkshake making",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Catering & Event Food",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Bulk Food Preparation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "large scale cooking",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "thulo bhoj pakaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Buffet Setup",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "buffet arrangement",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Event Catering Service",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "function catering",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Food Packing For Events",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "food packing",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Serving At Functions",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "bhoj serving",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Table Clearing At Events",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "table clearing",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Front Desk & Reception (Hospitality)",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Guest Check-In Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "hotel check-in help",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Reservation Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "booking handling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Guest Query Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "guest inquiry handling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Telephone Handling At Desk",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "front desk phone handling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Cash And Billing At Front Desk",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "hotel billing",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Guest Feedback Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "guest complaint handling",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Driving & Delivery",
+      "existing": false,
+      "subcategories": [
+        {
+          "name": "Two-Wheeler Delivery",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Motorbike Food Delivery",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "food delivery riding",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "khana delivery",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Parcel Delivery",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "package delivery",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "samaan delivery",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Route Navigation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "delivery route finding",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Cash-On-Delivery Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "cod payment handling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Two-Wheeler Maintenance Basics",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "bike basic maintenance",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Delivery App Navigation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "delivery app usage",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Car & Taxi Driving",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Car Driving",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "private car driving",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "car chalaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Taxi Driving",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "taxi service driving",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "taxi chalaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Airport Pickup And Drop",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "airport transfer driving",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Passenger Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "passenger help",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Ride-Hailing App Operation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "ride app driving",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Fuel And Vehicle Upkeep",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "vehicle upkeep",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Heavy Vehicle & Truck Driving",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Truck Driving",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "lorry driving",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "truck chalaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Goods Loading Supervision",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "cargo loading oversight",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Long Route Driving",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "long distance driving",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Vehicle Safety Check",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "pre-trip vehicle check",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Reversing And Parking Heavy Vehicles",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "heavy vehicle parking",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Fuel Log Maintenance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "fuel record keeping",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Courier & Logistics",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Parcel Sorting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "package sorting",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Warehouse Loading",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "godown loading",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Delivery Route Planning",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "route planning",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Proof Of Delivery Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "delivery confirmation handling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Package Tracking",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "parcel tracking",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Fragile Item Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "careful item handling",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Security Services",
+      "existing": false,
+      "subcategories": [
+        {
+          "name": "Security Guarding",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Premises Patrolling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "site patrolling",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "ghumphir garne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Visitor Log Management",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "visitor register maintenance",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Gate Duty",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "gate guarding",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "gate ko suraksha",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Frisking And Bag Checking",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "security checking",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Night Watch Duty",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "night guarding",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "raati pahara",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Incident Reporting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "security incident reporting",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Visitor Identity Verification",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "id verification",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Fire Safety & Emergency Response",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Fire Extinguisher Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "fire extinguisher operation",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Fire Alarm Monitoring",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "fire alarm watching",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Emergency Evacuation Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "evacuation support",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "First Aid Response",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "basic first aid",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Fire Drill Coordination",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "fire drill support",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Access Control & Surveillance",
+          "existing": false,
+          "skills": [
+            {
+              "name": "CCTV Monitoring",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "camera monitoring",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Access Card Management",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "id card management",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Entry Gate Control",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "entry control",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Alarm System Monitoring",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "security alarm monitoring",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Security Log Recording",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "duty log recording",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Facility & Property Maintenance",
+      "existing": false,
+      "subcategories": [
+        {
+          "name": "General Facility Maintenance",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Building Maintenance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "property upkeep",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "bhawan herchah",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Minor Repair Work",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "small repair work",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "sano marmat",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Furniture Assembly",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "furniture setup",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Light Fixture Replacement",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "bulb and fixture changing",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Facility Inspection Rounds",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "maintenance rounds",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Preventive Maintenance Checks",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "routine maintenance checks",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Signage And Fixture Mounting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "signboard mounting",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "HVAC & Refrigeration Support",
+          "existing": false,
+          "skills": [
+            {
+              "name": "AC Servicing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "air conditioner servicing",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "ac service",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Refrigerator Repair Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "fridge repair help",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Cooling System Cleaning",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "ac cleaning",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Ventilation System Maintenance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "exhaust system maintenance",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Gas Refilling Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "ac gas refill help",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Water Cooler Maintenance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "water dispenser maintenance",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Parking & Building Support",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Parking Attendant Duty",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "parking assistance",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "parking sahayak",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Vehicle Parking Management",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "parking coordination",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Elevator Operation Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "lift operation help",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Common Area Upkeep",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "shared area cleaning",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Visitor Vehicle Guidance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "vehicle guidance",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Caregiving & Personal Support",
+      "existing": false,
+      "subcategories": [
+        {
+          "name": "Elderly Care",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Elderly Personal Care",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "senior citizen care",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "budhesakal herchah",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Mobility Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "walking support",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "hidne sahayog",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Medication Reminder Support",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "medicine reminder help",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "ausadhi samjhaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Companionship Care",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "elderly companionship",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Vital Signs Monitoring",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "bp and pulse checking",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Elderly Meal Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "feeding assistance for elderly",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Elderly Bathing Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "bathing help for elderly",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Child Care & Babysitting",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Babysitting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "child minding",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "bachcha herne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Infant Feeding Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "baby feeding help",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Child Supervision",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "child watching",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Homework Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "study help for children",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Child Hygiene Care",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "child cleanliness care",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Play Activity Supervision",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "supervised play time",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Newborn Care Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "newborn baby care",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "naya janmeko bachcha herchah",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Home Health Aide",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Patient Personal Hygiene Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "patient hygiene help",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Wheelchair Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "wheelchair support",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Bedridden Patient Care",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "bedridden care",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "ochhyan ko birami herchah",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Basic Nursing Support",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "home nursing help",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Medication Schedule Tracking",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "medicine schedule tracking",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Physiotherapy Exercise Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "physio exercise help",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Special Needs Support",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Disability Support Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "disability care help",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Physical Therapy Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "therapy support",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Special Needs Communication Support",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "communication support",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Mobility Equipment Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "mobility aid handling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Sign Language Basic Communication",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "basic sign language use",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Retail & Customer Service",
+      "existing": false,
+      "subcategories": [
+        {
+          "name": "Shop Sales Assistant",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Customer Greeting And Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "customer welcoming",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Product Display Arrangement",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "shelf display arrangement",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Sales Counter Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "counter sales help",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Product Demonstration",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "product showing",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Upselling Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "suggestive selling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Gift Wrapping",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "gift packing",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cashier & Billing",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Cash Billing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "checkout billing",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "bill banaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Point Of Sale Terminal Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "pos machine handling",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "pos billing machine use",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Cash Register Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "cash counter handling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Receipt Management",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "bill receipt handling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Discount And Offer Application",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "discount application",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Inventory & Stock Management",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Stock Counting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "inventory counting",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "saman ginti",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Inventory Recording",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "stock recording",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Shelf Restocking",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "shelf refilling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Stock Room Organization",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "storeroom organizing",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Goods Receiving",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "delivery receiving",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Barcode Scanning",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "barcode reading",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Customer Support",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Customer Query Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "customer inquiry handling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Complaint Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "customer complaint resolution",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Phone Customer Support",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "telephone support",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Returns And Exchange Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "product return handling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Online Order Support",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "e-commerce order support",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Office & Administrative Support",
+      "existing": false,
+      "subcategories": [
+        {
+          "name": "General Office Assistant",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Office Filing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "document filing",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "file milaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Photocopying And Scanning",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "photocopy and scan work",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Courier Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "office courier handling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Office Supply Management",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "stationery management",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Meeting Room Setup",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "conference room setup",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Document Binding And Printing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "printing and binding",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Data Entry",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Data Entry",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "computer data entry",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "data entry kaam",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Spreadsheet Data Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "excel data handling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Form Digitization",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "paper form digitizing",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Database Record Updating",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "record updating",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Typing And Transcription",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "typing work",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "typing kaam",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Reception & Front Office",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Visitor Reception",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "front desk reception",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Telephone Call Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "office phone handling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Appointment Scheduling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "meeting scheduling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Front Desk Coordination",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "reception coordination",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Mail Sorting And Distribution",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "office mail sorting",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Visitor Badge Issuance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "visitor pass issuing",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Basic Bookkeeping Support",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Basic Bookkeeping",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "simple bookkeeping",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "hisab kitab",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Invoice Preparation",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "bill preparation",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Expense Recording",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "expense tracking",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Petty Cash Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "small cash handling",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Payment Follow-Up Calls",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "payment reminder calls",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Event & Temporary Work",
+      "existing": false,
+      "subcategories": [
+        {
+          "name": "Event Setup & Logistics",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Stage Setup",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "stage building",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "stage banaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Tent And Pandal Setup",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "tent pitching",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "pandal banaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Chair And Table Arrangement",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "seating arrangement",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Decoration Setup",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "event decoration",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "sajawat garne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Event Equipment Transport",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "equipment transport for events",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Backdrop And Banner Setup",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "banner installation",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Event Staffing & Ushering",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Guest Ushering",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "guest guiding",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Crowd Flow Management",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "crowd management",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Registration Desk Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "event registration help",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Event Coordination Support",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "event support staff work",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Parking Coordination At Events",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "event parking management",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Sound & Basic AV Support",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Sound System Setup",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "speaker system setup",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "sound system jadan",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Microphone Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "microphone setup",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Basic Lighting Setup",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "event lighting setup",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Projector And Screen Setup",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "projector setup",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Cable And Wiring Setup For Events",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "event cable setup",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "General Labor & Loading",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Event Material Loading",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "event goods loading",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "General Event Helper",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "event helper work",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Cleanup After Events",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "post-event cleaning",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Manual Loading And Unloading",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "loading and unloading work",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "boknu sarne kaam",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Furniture Rearrangement For Events",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "furniture moving for events",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Beauty & Personal Care Services",
+      "existing": false,
+      "subcategories": [
+        {
+          "name": "Barbering",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Haircutting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "hair cutting service",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "kapal katne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Beard Trimming",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "beard shaping",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "dahi katne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Hair Styling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "hairstyling service",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Shaving Service",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "clean shave service",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Head Massage",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "head oil massage",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "tauko malish",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Hair Coloring",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "hair dye service",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Beautician Services",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Facial Treatment",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "facial service",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Threading",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "eyebrow threading",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Waxing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "hair removal waxing",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Manicure And Pedicure",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "nail care service",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Bridal Makeup",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "wedding makeup",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "dulahi makeup",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Basic Makeup Application",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "makeup service",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Eyebrow Shaping",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "eyebrow trimming",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Spa & Massage Therapy",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Body Massage",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "full body massage",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "jiu malish",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Foot Reflexology",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "foot massage therapy",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Spa Treatment Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "spa service help",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Aromatherapy Massage",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "aroma oil massage",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Hot Stone Massage Assistance",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "hot stone therapy help",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tailoring & Garment Work",
+      "existing": false,
+      "subcategories": [
+        {
+          "name": "Tailoring & Stitching",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Garment Stitching",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "clothes stitching",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "lugha silaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Pattern Cutting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "fabric pattern cutting",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Blouse Stitching",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "blouse making",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Suit Stitching",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "suit tailoring",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Machine Embroidery",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "embroidery work",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "kadai kaam",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Hand Stitching",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "hand sewing",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Kurta Stitching",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "kurta making",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Garment Fabrication",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Garment Cutting",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "fabric cutting",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "kapada katne",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Fabric Measuring",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "cloth measuring",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Bulk Garment Production",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "garment factory production",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Sewing Machine Handling",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "sewing machine use",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "silai machine chalaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Garment Finishing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "final garment finishing",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Quality Checking Of Garments",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "garment quality inspection",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Alterations & Repair",
+          "existing": false,
+          "skills": [
+            {
+              "name": "Clothing Alteration",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "clothes altering",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "lugha milaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Zipper Repair",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "zip fixing",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Hemming",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "hem stitching",
+                  "language": "EN"
+                }
+              ]
+            },
+            {
+              "name": "Button Fixing",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "button stitching",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "button lagaune",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
+              "name": "Waist Size Adjustment",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "waist alteration",
+                  "language": "EN"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
