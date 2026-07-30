@@ -1,121 +1,258 @@
 # Karmasheel
 
-Karmasheel is a Django REST Framework workforce-matching platform for
-blue-collar and local-service workers in Nepal. Workers describe their skills
-in familiar language, employers publish structured jobs, and the platform
-returns ranked matches with visible component scores and plain-language
-reasons.
+Karmasheel is a Django REST Framework and PostgreSQL workforce-matching
+platform connecting blue-collar and local-service workers with employers in
+Nepal, using structured skills, location, availability, experience,
+preferences, and reliability indicators. Recommendations are transparent and
+explainable - every match score comes with a plain-language breakdown, never
+a black-box model.
 
-The repository includes:
+## Local Development
 
-- JWT registration, login, refresh and logout for worker and employer roles
-- worker and employer profiles with manually reviewed verification
-- a seeded skill taxonomy and English/Romanized-Nepali normalization
-- jobs, distance/category filtering and an enforced application state machine
-- explainable worker-to-job and job-to-worker recommendations
-- HTML/PDF worker CVs, completed-work ratings and opportunity advisory
-- Django admin workflows for every persisted model
-- a dependency-free demonstration UI at `/`
-- an importable Postman collection and a complete demonstration script
+For the full, copyable, fresh-clone setup sequence (backend **and**
+frontend, PostgreSQL, seeding, and troubleshooting) see
+**[`docs/DEVELOPMENT_SETUP.md`](docs/DEVELOPMENT_SETUP.md)**. The
+condensed backend-only version below still works, but the full guide is
+kept up to date first.
 
-## Fastest local demo
+## Implemented features
 
-The demo settings use a local SQLite database and a non-production secret.
-They are intentionally zero-configuration and must not be deployed.
+- **Accounts** - custom `User` model (username + unique phone number),
+  JWT authentication (login/refresh/logout with blacklisting), worker/employer
+  roles, manual contact verification via the Django admin.
+- **Profiles** - worker and employer profile CRUD; PAN/VAT format validation;
+  auto-generated worker CV (HTML preview and PDF download) built entirely
+  from stored profile fields.
+- **Taxonomy** - structured categories, subcategories, and standardized
+  skills; English and Romanized-Nepali aliases; a skill-normalization
+  service (text preprocessing -> exact name match -> exact alias match ->
+  RapidFuzz fuzzy fallback -> unmatched-term storage for admin review).
+- **Jobs** - job-post CRUD with required/preferred skills stored separately,
+  active/closed status, employer-ownership permissions, worker job browsing,
+  category/subcategory/availability/Haversine-distance filtering in both
+  directions (worker-to-job and job-to-worker).
+- **Applications** - duplicate-prevention, an enforced application-status
+  state machine (worker withdrawal; employer shortlist/contact/reject/hire/
+  complete), and post-completion ratings in both directions with an
+  aggregate rating summary per user.
+- **Recommendations** - an explainable hybrid scoring engine: required-skill
+  coverage + cosine similarity over binary skill vectors, Haversine-distance
+  falloff, experience scoring, wage/travel-radius preference scoring, and a
+  cold-start-safe reliability score, combined into a configurable weighted
+  final score with deterministic, human-readable reasons/warnings. Also
+  includes opportunity advisory: near-miss job detection and ranked
+  missing-skill suggestions for a worker.
+- **Demo data** - a single idempotent management command
+  (`seed_demo`, see below) that builds a complete, coherent demonstration
+  dataset exercising every feature above.
 
-Prerequisites: Python 3.12 or newer and Git.
+## Technology stack
 
-On PowerShell:
+- Python 3.12
+- Django 6.0 / Django REST Framework
+- PostgreSQL
+- Simple JWT (`djangorestframework-simplejwt`)
+- RapidFuzz (fuzzy skill matching)
+- WeasyPrint (CV PDF generation)
+- django-cors-headers
 
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python backend\manage.py migrate --settings=config.demo_settings
-python backend\manage.py seed_taxonomy --settings=config.demo_settings
-python backend\manage.py createsuperuser --settings=config.demo_settings
-python backend\manage.py runserver --settings=config.demo_settings
+## Prerequisites
+
+- Python 3.12+
+- PostgreSQL 14+ (running locally or reachable over the network)
+- A C toolchain / system libraries required by WeasyPrint for PDF rendering
+  (Pango, Cairo, GDK-Pixbuf). On Debian/Ubuntu:
+  ```bash
+  sudo apt-get install libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libcairo2
+  ```
+
+## Repository structure
+
+```
+karmasheel/
+├── backend/                 # Django project
+│   ├── config/               # Settings, root URLconf, WSGI/ASGI, test_settings
+│   ├── accounts/              # Custom User model, auth endpoints, seed_demo command
+│   ├── profiles/              # Worker/employer profiles, CV generation
+│   ├── taxonomy/              # Categories, subcategories, skills, aliases, seed_taxonomy
+│   ├── jobs/                  # Job posts, filtering services
+│   ├── applications/          # Applications, state machine, ratings
+│   ├── recommendations/       # Hybrid scoring engine, opportunity advisory
+│   └── manage.py
+├── docs/
+│   ├── IMPLEMENTATION_PLAN.md  # Original six-week scope
+│   ├── DEFERRED_SCOPE.md       # What's implemented vs. deferred (Phase 4)
+│   ├── DEMO_SCRIPT.md          # Step-by-step demonstration walkthrough
+│   └── postman/                # Postman collection, environment, walkthrough
+├── frontend/                 # React + TypeScript + Vite client (see docs/DEVELOPMENT_SETUP.md)
+├── .env.example
+└── requirements.txt
 ```
 
-On macOS/Linux, activate with `source venv/bin/activate` and use `/` instead
-of `\` in command paths.
+## Setup
 
-Open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) for the demo interface
-and [http://127.0.0.1:8000/admin/](http://127.0.0.1:8000/admin/) for the
-interim admin dashboard.
+### 1. Clone and create a virtual environment
 
-The PDF endpoint prefers installed Edge/Chrome on Windows and WeasyPrint on
-Unix-like systems. Both paths preserve Unicode; if neither is available,
-Karmasheel uses a small dependency-free emergency PDF renderer. The
-application and CV download therefore still run on a plain Windows setup.
-
-## PostgreSQL development
-
-The primary `config.settings` configuration uses PostgreSQL. Copy
-`.env.example` to `.env`, replace every placeholder, create the configured
-database/user, then run:
-
-```powershell
-python backend\manage.py migrate
-python backend\manage.py seed_taxonomy
-python backend\manage.py createsuperuser
-python backend\manage.py runserver
+```bash
+cd karmasheel
+python3 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 ```
 
-The application reads secrets and database credentials from `.env`; `.env`
-is ignored by Git. Never reuse the demo secret or sample Postman credentials
-outside a disposable local database.
+### 2. Install dependencies
 
-## Verification
-
-The test configuration is self-contained and uses in-memory SQLite:
-
-```powershell
-python backend\manage.py check --settings=config.test_settings
-python backend\manage.py makemigrations --check --dry-run --settings=config.test_settings
-python backend\manage.py test accounts profiles taxonomy jobs applications recommendations config --settings=config.test_settings
+```bash
+pip install -r requirements.txt
 ```
 
-For the PostgreSQL configuration, run the same commands without the
-`--settings` flag after creating `.env` and the database.
+### 3. Configure environment variables
 
-When running tests without explicit app labels, first `cd backend`; Django's
-default discovery starts from the current directory.
+Copy the example file and fill in real local values - **never commit `.env`**:
 
-## Demonstration and API
-
-- [End-to-end demo and API walkthrough](docs/DEMO_WALKTHROUGH.md)
-- [Importable Postman collection](docs/Karmasheel.postman_collection.json)
-- [Six-week implementation scope](docs/IMPLEMENTATION_PLAN.md)
-
-The Postman collection uses `base_url`, `access`, and `refresh` collection
-variables. Requests save worker/employer tokens and created resource IDs as
-the workflow progresses.
-
-## Project layout
-
-```text
-backend/
-  accounts/          custom user, JWT workflow, demonstration frontend assets
-  profiles/          worker/employer profiles and CV generation
-  taxonomy/          categories, skills, aliases and normalization
-  jobs/              job CRUD and coarse candidate filtering
-  applications/      applications, state transitions and ratings
-  recommendations/   scoring, explanations and opportunity advisory
-  config/            project URLs and settings
-docs/                scope, demo script and Postman collection
+```bash
+cp .env.example .env
 ```
 
-Business rules live in service modules, serializers validate and represent
-data, and permissions explicitly separate public, worker, employer, owner
-and verified-employer operations.
+| Variable | Purpose |
+|---|---|
+| `DJANGO_SECRET_KEY` | Django's cryptographic secret key. Generate your own (e.g. `python -c "import secrets; print(secrets.token_urlsafe(50))"`) - do not reuse the example value anywhere. |
+| `DJANGO_DEBUG` | `True` for local development. **Must be `False` in production.** `seed_demo` refuses to run when this is `False` (see below). |
+| `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | PostgreSQL connection settings. |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated list of origins allowed to call the API (e.g. a local frontend dev server). No wildcard is used. |
+| `SKILL_MATCH_THRESHOLD` | Optional. RapidFuzz confidence (0-100) above which a fuzzy skill match is auto-accepted. Defaults to `85`. |
+| `RECOMMENDATION_MAX_DISTANCE_KM` | Optional. Distance at which the distance score reaches 0. Defaults to `20`. |
+| `RECOMMENDATION_NEAR_MISS_MIN_SCORE` / `_MAX_SCORE` | Optional. Inclusive final-score range treated as a "near miss" by the opportunity advisory. Defaults to `40` / `75`. |
 
-## Deferred scope
+### 4. Create the PostgreSQL database
 
-This six-week version intentionally does not include OTP/SMS delivery,
-certification verification, payments, chat, attendance, wage enforcement,
-native mobile apps, map/geocoding providers, background queues, vector
-search, embeddings or machine learning. Contact and employer verification
-remain manual Django-admin actions. See the defense note in the
-[demo walkthrough](docs/DEMO_WALKTHROUGH.md#deferred-scope-and-defense-note).
+```bash
+sudo -u postgres psql -c "CREATE DATABASE karmasheel_db;"
+sudo -u postgres psql -c "CREATE USER karmasheel_user WITH PASSWORD 'your-postgresql-password';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE karmasheel_db TO karmasheel_user;"
+```
+
+Match the database/user names and password to whatever you put in `.env`.
+
+### 5. Run migrations
+
+```bash
+cd backend
+python manage.py migrate
+```
+
+### 6. Seed data
+
+Two management commands are available, and can be run independently or
+together:
+
+```bash
+# Taxonomy only (categories, subcategories, skills, aliases) - no accounts, jobs, or applications.
+python manage.py seed_taxonomy
+
+# A full demo dataset: taxonomy (via seed_taxonomy) + a superuser, verified
+# and pending employers, four workers with varied skills/experience/
+# location/availability/reliability, active jobs across every subcategory,
+# applications in several valid states, a completed application rated in
+# both directions, and one unmatched skill term for admin review.
+python manage.py seed_demo
+```
+
+`seed_demo` is **idempotent** - safe to run as many times as you like. It
+prints a summary of what was created vs. already up to date, plus every demo
+account's username and shared password. It refuses to run when
+`DJANGO_DEBUG=False` (pass `--force` only if you are certain the target
+database is not production - you should not need this for local development).
+
+### 7. Create an admin account (if you skipped `seed_demo`)
+
+`seed_demo` already creates a superuser (`demo_admin`, printed at the end of
+the command). If you'd rather create your own instead:
+
+```bash
+python manage.py createsuperuser
+```
+
+### 8. Run the development server
+
+```bash
+python manage.py runserver
+```
+
+The API is now available at `http://127.0.0.1:8000/`, and the Django admin
+at `http://127.0.0.1:8000/admin/`.
+
+## API base paths
+
+All endpoints are namespaced under `/api/`:
+
+| Path | App |
+|---|---|
+| `/api/auth/` | Registration, login, token refresh, logout, `/me/` |
+| `/api/profiles/` | Worker/employer profile CRUD, CV preview/PDF |
+| `/api/taxonomy/` | Categories, subcategories, skills, taxonomy tree |
+| `/api/jobs/` | Job CRUD, public browsing, candidate listing |
+| `/api/applications/` | Apply, status transitions, ratings |
+| `/api/recommendations/` | Worker-to-job / job-to-worker recommendations, opportunity advisory |
+| `/admin/` | Django admin |
+
+## Postman collection
+
+Located at `docs/postman/`:
+
+- `Karmasheel_API.postman_collection.json` - the full request collection.
+- `Karmasheel_Local.postman_environment.json` - matching environment
+  (local-only demo credentials).
+- `POSTMAN_WALKTHROUGH.md` - setup, run order, and a fresh-database manual
+  verification step (an employer must be verified before it can post jobs).
+
+To run it: import both JSON files into Postman, select the **Karmasheel
+Local** environment, confirm `base_url` matches your running server, then
+follow the run order in `POSTMAN_WALKTHROUGH.md`.
+
+## Running tests
+
+```bash
+cd backend
+python manage.py test --settings=config.test_settings --keepdb
+```
+
+`config.test_settings` swaps in a fast, intentionally-insecure password
+hasher so fixture users don't pay real PBKDF2 cost on every test; `--keepdb`
+reuses the test database between runs instead of rebuilding it each time.
+
+To run one app's tests only:
+
+```bash
+python manage.py test accounts --settings=config.test_settings --keepdb
+```
+
+Or a focused class/method:
+
+```bash
+python manage.py test accounts.tests.SeedDemoCommandTests --settings=config.test_settings --keepdb
+```
+
+## Known limitations and deferred scope
+
+See [`docs/DEFERRED_SCOPE.md`](docs/DEFERRED_SCOPE.md) for a full breakdown
+of implemented, partially-implemented, and intentionally-deferred features
+(complaints, trusted-worker rehiring, notifications, advanced analytics,
+file uploads, embeddings/NLP, production deployment, and more).
+
+The `frontend/` directory contains a working React + TypeScript + Vite
+client (see [`docs/DEVELOPMENT_SETUP.md`](docs/DEVELOPMENT_SETUP.md) to run
+it locally); the API itself remains independently usable and demonstrated
+via Postman/curl and the Django admin.
+
+## Common setup problems and fixes
+
+| Problem | Fix |
+|---|---|
+| `django.db.utils.OperationalError: connection to server ... failed` | PostgreSQL isn't running, or `DB_HOST`/`DB_PORT` in `.env` don't match. Confirm with `pg_isready` or `sudo systemctl status postgresql`. |
+| `django.db.utils.OperationalError: password authentication failed` | `DB_USER`/`DB_PASSWORD` in `.env` don't match the database role you created. |
+| `KeyError: 'DJANGO_SECRET_KEY'` (or `DB_NAME`, etc.) on startup | `.env` is missing or not in the repository root (`config/settings.py` loads it from `BASE_DIR.parent / ".env"`, i.e. `karmasheel/.env`, not `backend/.env`). |
+| `seed_demo` raises `CommandError: ... refuses to run with DEBUG=False` | Set `DJANGO_DEBUG=True` in `.env` for local development, or pass `--force` if you are certain the database is not production. |
+| WeasyPrint import/PDF errors (`OSError: cannot load library ...`) | Install the system libraries listed under Prerequisites - WeasyPrint needs Pango/Cairo/GDK-Pixbuf, not just the Python package. |
+| Job creation returns `403 Forbidden` for an employer that should be allowed | Only employers with `verification_status = VERIFIED` may create jobs (`IsVerifiedEmployer`). Verify the employer through the Django admin, or run `seed_demo`, which seeds an already-verified employer. |
+| Tests are slow / hang on user creation | Make sure you passed `--settings=config.test_settings` - it swaps in a fast password hasher; without it, hundreds of fixture users each pay real PBKDF2 cost. |
+| Re-running `seed_demo` seems to create duplicate-looking jobs/applications | It shouldn't - every record is matched by a natural key (username, employer+title, worker+job) via `get_or_create`/`update_or_create`. If you see unexpected duplicates, check whether they predate `seed_demo` (e.g. from earlier manual testing or a Postman run) rather than being created by it. |

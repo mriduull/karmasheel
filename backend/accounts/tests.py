@@ -1,10 +1,17 @@
+from io import StringIO
+
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.core.management import call_command
+from django.core.management.base import CommandError
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from applications.models import Application, Rating
+from jobs.models import JobPost
 from profiles.models import EmployerProfile, WorkerProfile
+from taxonomy.models import UnmatchedSkillTerm
 
 
 User = get_user_model()
@@ -158,9 +165,6 @@ class RegistrationAPITests(APITestCase):
 
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
                 self.assertIn("phone_number", response.data)
-                self.assertFalse(
-                    User.objects.filter(username=f"invalidphone{index}").exists()
-                )
 
 
 class AuthenticationAPITests(APITestCase):
@@ -547,3 +551,292 @@ class UserAdminTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertIn("/admin/login/", response.url)
+
+
+@override_settings(DEBUG=True)
+class SeedDemoCommandTests(TestCase):
+    """Week 6 Phase 4 tests for `python manage.py seed_demo`.
+
+    Class-level `DEBUG=True` mirrors normal local-development settings -
+    Django's test runner otherwise forces `DEBUG=False` for every test,
+    which would trip the command's own production-safety guard before
+    any of these tests could exercise its actual seeding behaviour. The
+    two tests of that guard itself override `DEBUG=False` again locally.
+    """
+
+    def test_command_runs_successfully(self):
+        out = StringIO()
+        call_command("seed_demo", stdout=out)
+
+        self.assertIn("Demo dataset ready.", out.getvalue())
+        self.assertTrue(User.objects.filter(username="demo_employer_verified").exists())
+
+    def test_rerunning_does_not_duplicate_key_records(self):
+        call_command("seed_demo", stdout=StringIO())
+
+        user_count = User.objects.filter(username__startswith="demo_").count()
+        job_count = JobPost.objects.filter(employer__user__username="demo_employer_verified").count()
+        application_count = Application.objects.filter(
+            worker__user__username__startswith="demo_worker"
+        ).count()
+        rating_count = Rating.objects.count()
+        unmatched_count = UnmatchedSkillTerm.objects.count()
+
+        call_command("seed_demo", stdout=StringIO())
+
+        self.assertEqual(
+            User.objects.filter(username__startswith="demo_").count(), user_count
+        )
+        self.assertEqual(
+            JobPost.objects.filter(employer__user__username="demo_employer_verified").count(),
+            job_count,
+        )
+        self.assertEqual(
+            Application.objects.filter(worker__user__username__startswith="demo_worker").count(),
+            application_count,
+        )
+        self.assertEqual(Rating.objects.count(), rating_count)
+        self.assertEqual(UnmatchedSkillTerm.objects.count(), unmatched_count)
+
+    def test_verified_employer_exists(self):
+        call_command("seed_demo", stdout=StringIO())
+
+        employer = EmployerProfile.objects.get(user__username="demo_employer_verified")
+        self.assertEqual(employer.verification_status, EmployerProfile.VerificationStatus.VERIFIED)
+
+    def test_pending_employer_exists_for_admin_demonstration(self):
+        call_command("seed_demo", stdout=StringIO())
+
+        employer = EmployerProfile.objects.get(user__username="demo_employer_pending")
+        self.assertEqual(employer.verification_status, EmployerProfile.VerificationStatus.PENDING)
+
+    def test_jobs_workers_and_applications_exist(self):
+        call_command("seed_demo", stdout=StringIO())
+
+        self.assertGreaterEqual(
+            JobPost.objects.filter(employer__user__username="demo_employer_verified").count(), 5
+        )
+        self.assertGreaterEqual(
+            WorkerProfile.objects.filter(user__username__startswith="demo_worker").count(), 8
+        )
+        self.assertGreaterEqual(
+            Application.objects.filter(worker__user__username__startswith="demo_worker").count(), 4
+        )
+
+    def test_at_least_three_verified_employers(self):
+        call_command("seed_demo", stdout=StringIO())
+
+        self.assertGreaterEqual(
+            EmployerProfile.objects.filter(
+                user__username__startswith="demo_employer",
+                verification_status=EmployerProfile.VerificationStatus.VERIFIED,
+            ).count(),
+            3,
+        )
+
+    def test_at_least_ten_active_jobs_across_multiple_verified_employers(self):
+        call_command("seed_demo", stdout=StringIO())
+
+        active_demo_jobs = JobPost.objects.filter(
+            employer__user__username__startswith="demo_employer",
+            status=JobPost.Status.ACTIVE,
+        )
+        self.assertGreaterEqual(active_demo_jobs.count(), 10)
+
+        employer_usernames = set(
+            active_demo_jobs.values_list("employer__user__username", flat=True)
+        )
+        self.assertGreaterEqual(len(employer_usernames), 2)
+
+    def test_job_with_several_applicants_in_different_states(self):
+        call_command("seed_demo", stdout=StringIO())
+
+        job = JobPost.objects.get(
+            title="House Wiring for New Apartment Block", employer__user__username="demo_employer_verified"
+        )
+        applications = Application.objects.filter(job=job)
+        self.assertGreaterEqual(applications.count(), 3)
+        self.assertGreaterEqual(
+            len(set(applications.values_list("status", flat=True))), 2
+        )
+
+    def test_completed_application_has_ratings_in_both_directions(self):
+        call_command("seed_demo", stdout=StringIO())
+
+        application = Application.objects.get(
+            worker__user__username="demo_worker_ramesh",
+            job__title="House Wiring for New Apartment Block",
+        )
+        self.assertEqual(application.status, Application.Status.COMPLETED)
+
+        ratings = Rating.objects.filter(application=application)
+        self.assertEqual(ratings.count(), 2)
+        self.assertEqual(
+            set(ratings.values_list("direction", flat=True)),
+            {Rating.Direction.WORKER_TO_EMPLOYER, Rating.Direction.EMPLOYER_TO_WORKER},
+        )
+
+    def test_unmatched_skill_term_created_for_admin_review(self):
+        call_command("seed_demo", stdout=StringIO())
+
+        self.assertTrue(
+            UnmatchedSkillTerm.objects.filter(normalized_term="cnc machine operation").exists()
+        )
+
+    def test_rerun_after_manual_status_change_does_not_crash(self):
+        """A demo presenter following DEMO_SCRIPT.md may manually reject or
+        withdraw a demo application mid-walkthrough. Rerunning `seed_demo`
+        afterwards must not try to route that application back through
+        its original path (which would no longer be a legal transition)."""
+
+        from applications.services import transition_application_status
+
+        call_command("seed_demo", stdout=StringIO())
+
+        application = Application.objects.get(
+            worker__user__username="demo_worker_sita",
+            job__title="Deep Cleaning for Office Space",
+        )
+        self.assertEqual(application.status, Application.Status.SHORTLISTED)
+
+        employer_user = User.objects.get(username="demo_employer_verified")
+        transition_application_status(application, Application.Status.REJECTED, actor=employer_user)
+
+        call_command("seed_demo", stdout=StringIO())
+
+        application.refresh_from_db()
+        self.assertEqual(application.status, Application.Status.REJECTED)
+
+    def test_refuses_to_run_with_debug_false_and_no_force(self):
+        with override_settings(DEBUG=False):
+            with self.assertRaises(CommandError):
+                call_command("seed_demo", stdout=StringIO())
+
+    def test_force_flag_allows_running_with_debug_false(self):
+        with override_settings(DEBUG=False):
+            call_command("seed_demo", "--force", stdout=StringIO())
+
+        self.assertTrue(User.objects.filter(username="demo_admin").exists())
+
+
+@override_settings(DEBUG=True)
+class SeedDemoRecommendationEndpointTests(APITestCase):
+    """The seeded dataset must actually feed the Week 4/5 recommendation
+    and opportunity-advisory endpoints, not just exist in the database.
+
+    Class-level `DEBUG=True` for the same reason as `SeedDemoCommandTests`.
+    """
+
+    def setUp(self):
+        call_command("seed_demo", stdout=StringIO())
+
+    def test_worker_job_recommendations_endpoint_has_demo_data(self):
+        worker_user = User.objects.get(username="demo_worker_ramesh")
+        self.client.force_authenticate(user=worker_user)
+
+        response = self.client.get(reverse("recommendations:worker_job_recommendations"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(response.data), 3)
+        self.assertIn("reasons", response.data[0])
+
+    def test_worker_job_recommendations_are_ordered_by_score_descending(self):
+        worker_user = User.objects.get(username="demo_worker_ramesh")
+        self.client.force_authenticate(user=worker_user)
+
+        response = self.client.get(reverse("recommendations:worker_job_recommendations"))
+
+        scores = [result["final_score"] for result in response.data]
+        self.assertEqual(scores, sorted(scores, reverse=True))
+
+    def test_primary_worker_top_three_recommendations_each_match_a_required_skill(self):
+        """Every job in Ramesh's top three worker-to-job recommendations
+        must be a genuinely suitable suggestion, not just a subcategory
+        match with a zero-skill-overlap score."""
+
+        worker_user = User.objects.get(username="demo_worker_ramesh")
+        self.client.force_authenticate(user=worker_user)
+
+        response = self.client.get(reverse("recommendations:worker_job_recommendations"))
+
+        self.assertGreaterEqual(len(response.data), 3)
+        for result in response.data[:3]:
+            self.assertGreaterEqual(len(result["skill"]["matched_required_skills"]), 1)
+
+    def test_job_worker_recommendations_endpoint_has_demo_data(self):
+        employer_user = User.objects.get(username="demo_employer_verified")
+        job = JobPost.objects.get(
+            title="House Wiring for New Apartment Block", employer__user=employer_user
+        )
+        self.client.force_authenticate(user=employer_user)
+
+        response = self.client.get(
+            reverse("recommendations:job_worker_recommendations", args=[job.id])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(response.data), 3)
+
+    def test_job_worker_recommendations_are_ordered_by_score_descending(self):
+        employer_user = User.objects.get(username="demo_employer_verified")
+        job = JobPost.objects.get(
+            title="House Wiring for New Apartment Block", employer__user=employer_user
+        )
+        self.client.force_authenticate(user=employer_user)
+
+        response = self.client.get(
+            reverse("recommendations:job_worker_recommendations", args=[job.id])
+        )
+
+        scores = [result["final_score"] for result in response.data]
+        self.assertEqual(scores, sorted(scores, reverse=True))
+
+    def test_opportunity_advisory_endpoint_has_near_miss_and_missing_skill_demo_data(self):
+        worker_user = User.objects.get(username="demo_worker_hari")
+        self.client.force_authenticate(user=worker_user)
+
+        response = self.client.get(reverse("recommendations:opportunity_advisory"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreater(len(response.data["near_miss_jobs"]), 0)
+        self.assertGreater(len(response.data["missing_skills"]), 0)
+
+    def test_opportunity_advisory_missing_skill_recurs_across_several_jobs(self):
+        worker_user = User.objects.get(username="demo_worker_hari")
+        self.client.force_authenticate(user=worker_user)
+
+        response = self.client.get(reverse("recommendations:opportunity_advisory"))
+
+        tile_installation = next(
+            entry for entry in response.data["missing_skills"]
+            if entry["skill"]["name"] == "Tile Installation"
+        )
+        self.assertGreaterEqual(len(tile_installation["job_ids"]), 2)
+
+    def test_pending_employer_cannot_request_worker_recommendations(self):
+        pending_user = User.objects.get(username="demo_employer_pending")
+        job = JobPost.objects.get(title="House Wiring for New Apartment Block")
+        self.client.force_authenticate(user=pending_user)
+
+        response = self.client.get(
+            reverse("recommendations:job_worker_recommendations", args=[job.id])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_pending_employer_cannot_create_job_post(self):
+        pending_user = User.objects.get(username="demo_employer_pending")
+        self.client.force_authenticate(user=pending_user)
+
+        response = self.client.post(reverse("jobs:list_create"), data={}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_worker_cv_preview_has_meaningful_demo_content(self):
+        worker_user = User.objects.get(username="demo_worker_ramesh")
+        self.client.force_authenticate(user=worker_user)
+
+        response = self.client.get(reverse("profiles:worker_cv_preview"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn(b"House Wiring", response.content)

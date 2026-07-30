@@ -19,6 +19,13 @@ media/
 .pytest_cache/
 .coverage
 htmlcov/
+*.log
+
+# Frontend (Node/Vite) — frontend/.gitignore (from the Vite scaffold)
+# already covers frontend/node_modules and frontend/dist; this only adds
+# what that file doesn't.
+frontend/coverage/
+*.tsbuildinfo
 
 # Editor settings
 .vscode/

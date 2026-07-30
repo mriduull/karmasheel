@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens — docs/FRONTEND_IMPLEMENTATION_PLAN.md §3.9.
+ * Single warm, light theme (outdoor/bright-glare use case). No dark-mode
+ * variant is defined: none is required by FRONTEND_CONTEXT.md or the
+ * design spec, so none is built.
+ */
+:root {
+  --color-bg: #faf8f3;
+  --color-surface: #ffffff;
+  --color-surface-muted: #ede6da;
+
+  --color-text-primary: #1c1917;
+  --color-text-secondary: #57534e;
+
+  --color-brand-primary: #9a3412;
+  --color-brand-primary-hover: #7c2d12;
+  --color-brand-secondary: #115e59;
+
+  --color-success: #15803d;
+  --color-success-bg: #dcfce7;
+  --color-success-text: #166534;
+
+  --color-warning-bg: #fef3c7;
+  --color-warning-text: #92400e;
+
+  --color-danger: #b91c1c;
+  --color-danger-bg: #fee2e2;
+  --color-danger-text: #991b1b;
+
+  --color-neutral-status-bg: #e7e5e4;
+  --color-neutral-status-text: #44403c;
+
+  --color-focus-ring: #2563eb;
+
+  color-scheme: light;
+}
+
+html {
+  /* 16px minimum body text, per the limited-digital-experience guidance
+     in the design spec — never smaller than the browser default. */
+  font-size: 16px;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+/* Focus is always this ring, and only this ring — never reused as a brand
+   color, so keyboard focus is unambiguous everywhere in the app. */
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
