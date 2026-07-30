@@ -1,0 +1,7 @@
+Watching for file changes with StatReloader
+[30/Jul/2026 20:10:38] "GET /api/taxonomy/categories/ HTTP/1.1" 200 533
+[30/Jul/2026 20:10:38,881] - Broken pipe from ('127.0.0.1', 58222)
+[30/Jul/2026 20:12:14] "GET /api/taxonomy/categories/ HTTP/1.1" 200 533
+[30/Jul/2026 20:12:14,213] - Broken pipe from ('127.0.0.1', 52849)
+[30/Jul/2026 20:12:35] "POST /api/auth/login/ HTTP/1.1" 200 489
+[30/Jul/2026 20:12:35,024] - Broken pipe from ('127.0.0.1', 63189)
