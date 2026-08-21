@@ -117,7 +117,7 @@ describe('apiFetch', () => {
       accessToken: 'expired-token',
       user: {
         id: 1,
-        username: 'demo_worker_ramesh',
+        username: 'demo_worker_electrician',
         email: 'x@example.com',
         phone_number: '9811100011',
         role: 'WORKER',

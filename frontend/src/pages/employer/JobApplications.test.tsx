@@ -41,7 +41,7 @@ describe('EmployerJobApplications', () => {
       http.get(`${API_ROOT}/jobs/5/`, () => HttpResponse.json(buildEmployerJobFixture({ id: 5 }))),
       http.get(`${API_ROOT}/jobs/5/applications/`, () =>
         HttpResponse.json([
-          buildApplicationFixture({ id: 1, worker_username: 'demo_worker_ramesh' }),
+          buildApplicationFixture({ id: 1, worker_username: 'demo_worker_electrician' }),
           buildApplicationFixture({ id: 2, worker_username: 'demo_worker_sita' }),
         ]),
       ),
@@ -50,7 +50,7 @@ describe('EmployerJobApplications', () => {
     renderAt('5')
 
     expect(await screen.findByText('House Wiring for New Apartment Block')).toBeInTheDocument()
-    expect(screen.getByText('demo_worker_ramesh')).toBeInTheDocument()
+    expect(screen.getByText('demo_worker_electrician')).toBeInTheDocument()
     expect(screen.getByText('demo_worker_sita')).toBeInTheDocument()
   })
 
@@ -85,7 +85,7 @@ describe('EmployerJobApplications', () => {
     )
 
     renderAt('5')
-    await screen.findByText('demo_worker_ramesh')
+    await screen.findByText('demo_worker_electrician')
 
     expect(screen.getByRole('button', { name: 'Shortlist' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument()
@@ -220,7 +220,7 @@ describe('EmployerJobApplications', () => {
     expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Try again' }))
 
-    expect(await screen.findByText('demo_worker_ramesh')).toBeInTheDocument()
+    expect(await screen.findByText('demo_worker_electrician')).toBeInTheDocument()
   })
 
   it('rates the worker from a COMPLETED application', async () => {
@@ -264,7 +264,7 @@ describe('EmployerJobApplications', () => {
 
     renderAt('5')
 
-    await screen.findByText('demo_worker_ramesh')
+    await screen.findByText('demo_worker_electrician')
     expect(screen.queryByRole('button', { name: 'Rate this worker' })).not.toBeInTheDocument()
   })
 
@@ -303,7 +303,7 @@ describe('EmployerJobApplications', () => {
 
     const { container } = renderAt('5')
     await waitFor(() => {
-      expect(screen.getByText('demo_worker_ramesh')).toBeInTheDocument()
+      expect(screen.getByText('demo_worker_electrician')).toBeInTheDocument()
     })
 
     const results = await axe(container)

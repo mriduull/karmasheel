@@ -664,7 +664,7 @@ class SeedDemoCommandTests(TestCase):
         call_command("seed_demo", stdout=StringIO())
 
         application = Application.objects.get(
-            worker__user__username="demo_worker_ramesh",
+            worker__user__username="demo_worker_electrician",
             job__title="House Wiring for New Apartment Block",
         )
         self.assertEqual(application.status, Application.Status.COMPLETED)
@@ -731,7 +731,7 @@ class SeedDemoRecommendationEndpointTests(APITestCase):
         call_command("seed_demo", stdout=StringIO())
 
     def test_worker_job_recommendations_endpoint_has_demo_data(self):
-        worker_user = User.objects.get(username="demo_worker_ramesh")
+        worker_user = User.objects.get(username="demo_worker_electrician")
         self.client.force_authenticate(user=worker_user)
 
         response = self.client.get(reverse("recommendations:worker_job_recommendations"))
@@ -741,7 +741,7 @@ class SeedDemoRecommendationEndpointTests(APITestCase):
         self.assertIn("reasons", response.data[0])
 
     def test_worker_job_recommendations_are_ordered_by_score_descending(self):
-        worker_user = User.objects.get(username="demo_worker_ramesh")
+        worker_user = User.objects.get(username="demo_worker_electrician")
         self.client.force_authenticate(user=worker_user)
 
         response = self.client.get(reverse("recommendations:worker_job_recommendations"))
@@ -750,11 +750,11 @@ class SeedDemoRecommendationEndpointTests(APITestCase):
         self.assertEqual(scores, sorted(scores, reverse=True))
 
     def test_primary_worker_top_three_recommendations_each_match_a_required_skill(self):
-        """Every job in Ramesh's top three worker-to-job recommendations
+        """Every job in Lead electrician's top three worker-to-job recommendations
         must be a genuinely suitable suggestion, not just a subcategory
         match with a zero-skill-overlap score."""
 
-        worker_user = User.objects.get(username="demo_worker_ramesh")
+        worker_user = User.objects.get(username="demo_worker_electrician")
         self.client.force_authenticate(user=worker_user)
 
         response = self.client.get(reverse("recommendations:worker_job_recommendations"))
@@ -833,7 +833,7 @@ class SeedDemoRecommendationEndpointTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_worker_cv_preview_has_meaningful_demo_content(self):
-        worker_user = User.objects.get(username="demo_worker_ramesh")
+        worker_user = User.objects.get(username="demo_worker_electrician")
         self.client.force_authenticate(user=worker_user)
 
         response = self.client.get(reverse("profiles:worker_cv_preview"))

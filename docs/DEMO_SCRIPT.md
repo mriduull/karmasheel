@@ -15,7 +15,7 @@ Password for **every** account below is `DemoPass123!`.
 | `demo_employer_hospitality` | Employer - VERIFIED (hospitality/events) |
 | `demo_employer_retail` | Employer - VERIFIED (retail/delivery/facility) |
 | `demo_employer_pending` | Employer - PENDING (admin-review demonstration) |
-| `demo_worker_ramesh` | Worker - Electrical skills, strong match |
+| `demo_worker_electrician` | Worker - Electrical skills, strong match |
 | `demo_worker_sita` | Worker - Cleaning skills, strong match |
 | `demo_worker_hari` | Worker - Masonry, partial/near-miss match |
 | `demo_worker_gita` | Worker - Cooking, partial/near-miss match, no location on file |
@@ -24,7 +24,7 @@ Password for **every** account below is `DemoPass123!`.
 | `demo_worker_maya` | Worker - Waitstaff/table service, strong match |
 | `demo_worker_sunita` | Worker - Elderly-care skills, strong match |
 | `demo_worker_deepak` | Worker - Two-wheeler delivery skills, strong match |
-| `demo_worker_suresh` | Worker - Same electrical skills as Ramesh, but far away (distance demo) |
+| `demo_worker_suresh` | Worker - Same electrical skills as Lead electrician, but far away (distance demo) |
 
 ## Recovery note (read first)
 
@@ -94,7 +94,7 @@ a confirmation message and update the underlying record.
 ```bash
 curl -X POST http://127.0.0.1:8000/api/auth/login/ \
   -H "Content-Type: application/json" \
-  -d '{"username": "demo_worker_ramesh", "password": "DemoPass123!"}'
+  -d '{"username": "demo_worker_electrician", "password": "DemoPass123!"}'
 ```
 
 Copy the `access` token from the response, then:
@@ -103,14 +103,14 @@ Copy the `access` token from the response, then:
 TOKEN="<paste access token>"
 curl http://127.0.0.1:8000/api/profiles/worker/me/ -H "Authorization: Bearer $TOKEN"
 curl http://127.0.0.1:8000/api/profiles/worker/me/cv/preview/ -H "Authorization: Bearer $TOKEN"
-curl http://127.0.0.1:8000/api/profiles/worker/me/cv/pdf/ -H "Authorization: Bearer $TOKEN" -o ramesh_cv.pdf
+curl http://127.0.0.1:8000/api/profiles/worker/me/cv/pdf/ -H "Authorization: Bearer $TOKEN" -o electrician_cv.pdf
 ```
 
 **Expected result:** the profile shows 6 years' experience, three
 Electrical skills, `is_available: true`, an expected wage of 1200. The CV
 preview's generated summary reads: *"Worker with 6 years of experience in
 electrical work, skilled in Circuit Breaker Installation, Electrical
-Repair and House Wiring, currently available for work."* `ramesh_cv.pdf`
+Repair and House Wiring, currently available for work."* `electrician_cv.pdf`
 downloads and opens as a one-page PDF CV.
 
 ---
@@ -123,21 +123,21 @@ Public browsing (no auth required):
 curl http://127.0.0.1:8000/api/jobs/browse/
 ```
 
-As `demo_worker_ramesh` (reuse `$TOKEN` from Step 3):
+As `demo_worker_electrician` (reuse `$TOKEN` from Step 3):
 
 ```bash
 curl http://127.0.0.1:8000/api/recommendations/jobs/ -H "Authorization: Bearer $TOKEN"
 ```
 
-**Expected result:** Ramesh gets at least three ranked recommendations.
+**Expected result:** Lead electrician gets at least three ranked recommendations.
 "House Wiring for New Apartment Block" ranks first with `final_score`
 around **98**, `reasons` including "Matches 2 of 2 required skills",
 "Located ~2 km from the job", "Meets the required experience", "Employer
 profile is verified". The next two results are meaningfully different but
 still genuinely suitable - each matches at least one required skill:
-"Electrical Rewiring for Old Bungalow" scores lower because Ramesh's 6
+"Electrical Rewiring for Old Bungalow" scores lower because Lead electrician's 6
 years of experience fall short of the 8 required, and "Switchboard and
-Panel Upgrade for Retail Outlet" scores lowest because Ramesh matches
+Panel Upgrade for Retail Outlet" scores lowest because Lead electrician matches
 only one of its two required skills (House Wiring, but not Switchboard
 Installation) and, like the rewiring job, requires 8 years of experience
 against his 6.
@@ -184,13 +184,13 @@ curl http://127.0.0.1:8000/api/recommendations/jobs/<job_id>/workers/ -H "Author
 ```
 
 **Expected result:** the recommendation endpoint returns at least three
-candidates - `demo_worker_ramesh` ranked first (close by, full skill
+candidates - `demo_worker_electrician` ranked first (close by, full skill
 match), `demo_worker_kamal` and `demo_worker_suresh` ranked lower
 (Kamal is missing a required skill and has less experience; Suresh has
-the same skills and experience as Ramesh but is based in Pokhara, so
+the same skills and experience as Lead electrician but is based in Pokhara, so
 distance alone pushes him down the ranking) - each with a full score
 breakdown. The candidates endpoint shows three applicants in different
-states: Ramesh (`COMPLETED`), Suresh (`SHORTLISTED`), Kamal (`REJECTED`).
+states: Lead electrician (`COMPLETED`), Suresh (`SHORTLISTED`), Kamal (`REJECTED`).
 
 Optionally, also try the other two verified employers:
 `demo_employer_hospitality` owns "Waitstaff for Wedding Reception" (top
@@ -242,20 +242,20 @@ is not a worker-side transition at all.
 
 ## Step 7 - Completed work and ratings
 
-As `demo_worker_ramesh`, show the already-completed engagement and its
+As `demo_worker_electrician`, show the already-completed engagement and its
 ratings:
 
 ```bash
-curl http://127.0.0.1:8000/api/applications/ -H "Authorization: Bearer $RAMESH_TOKEN"
-curl http://127.0.0.1:8000/api/applications/<application_id>/rating/ -H "Authorization: Bearer $RAMESH_TOKEN"
-curl http://127.0.0.1:8000/api/applications/ratings/summary/ -H "Authorization: Bearer $RAMESH_TOKEN"
+curl http://127.0.0.1:8000/api/applications/ -H "Authorization: Bearer $ELECTRICIAN_TOKEN"
+curl http://127.0.0.1:8000/api/applications/<application_id>/rating/ -H "Authorization: Bearer $ELECTRICIAN_TOKEN"
+curl http://127.0.0.1:8000/api/applications/ratings/summary/ -H "Authorization: Bearer $ELECTRICIAN_TOKEN"
 ```
 
 **Expected result:** the application for "House Wiring for New Apartment
 Block" shows `status: "COMPLETED"`; the ratings endpoint returns two
 entries (`WORKER_TO_EMPLOYER` score 5, `EMPLOYER_TO_WORKER` score 5); the
 summary endpoint shows `average_rating: 5.0`, `rating_count: 1` for
-Ramesh. Attempting `POST` a second rating on the same application/direction
+Lead electrician. Attempting `POST` a second rating on the same application/direction
 returns `400 Bad Request` ("You have already rated this application.").
 
 ---

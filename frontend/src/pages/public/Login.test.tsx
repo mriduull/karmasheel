@@ -51,8 +51,8 @@ describe('Login', () => {
       http.get(`${API_ROOT}/auth/me/`, () =>
         HttpResponse.json({
           id: 1,
-          username: 'demo_worker_ramesh',
-          email: 'ramesh@example.com',
+          username: 'demo_worker_electrician',
+          email: 'electrician@example.com',
           phone_number: '9811100011',
           role: 'WORKER',
           is_contact_verified: true,
@@ -62,7 +62,7 @@ describe('Login', () => {
 
     renderLogin()
 
-    await user.type(screen.getByLabelText('Username'), 'demo_worker_ramesh')
+    await user.type(screen.getByLabelText('Username'), 'demo_worker_electrician')
     await user.type(screen.getByLabelText('Password'), 'DemoPass123!')
     await user.click(screen.getByRole('button', { name: 'Log In' }))
 
@@ -111,7 +111,7 @@ describe('Login', () => {
 
     renderLogin()
 
-    await user.type(screen.getByLabelText('Username'), 'demo_worker_ramesh')
+    await user.type(screen.getByLabelText('Username'), 'demo_worker_electrician')
     await user.type(screen.getByLabelText('Password'), 'wrong-password')
     await user.click(screen.getByRole('button', { name: 'Log In' }))
 
@@ -132,7 +132,7 @@ describe('Login', () => {
 
     renderLogin()
 
-    await user.type(screen.getByLabelText('Username'), 'demo_worker_ramesh')
+    await user.type(screen.getByLabelText('Username'), 'demo_worker_electrician')
     await user.type(screen.getByLabelText('Password'), 'DemoPass123!')
     await user.click(screen.getByRole('button', { name: 'Log In' }))
 
@@ -148,7 +148,7 @@ describe('Login', () => {
 
     renderLogin()
 
-    await user.type(screen.getByLabelText('Username'), 'demo_worker_ramesh')
+    await user.type(screen.getByLabelText('Username'), 'demo_worker_electrician')
     await user.type(screen.getByLabelText('Password'), 'DemoPass123!')
     await user.click(screen.getByRole('button', { name: 'Log In' }))
 
@@ -166,8 +166,8 @@ describe('Login', () => {
       http.get(`${API_ROOT}/auth/me/`, () =>
         HttpResponse.json({
           id: 1,
-          username: 'demo_worker_ramesh',
-          email: 'ramesh@example.com',
+          username: 'demo_worker_electrician',
+          email: 'electrician@example.com',
           phone_number: '9811100011',
           role: 'WORKER',
           is_contact_verified: true,
@@ -177,7 +177,7 @@ describe('Login', () => {
 
     renderLogin()
 
-    await user.type(screen.getByLabelText('Username'), 'demo_worker_ramesh')
+    await user.type(screen.getByLabelText('Username'), 'demo_worker_electrician')
     await user.type(screen.getByLabelText('Password'), 'DemoPass123!')
 
     const submitButton = screen.getByRole('button', { name: 'Log In' })

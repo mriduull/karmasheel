@@ -531,7 +531,7 @@ sequence "Account created" confirmation → land on `/login` → nothing is
 auto-authenticated (verify by checking `localStorage`/network tab: no
 `/token/refresh/` or authenticated request fires before an explicit login);
 then log in with the new account and confirm redirect; separately log in
-as `demo_worker_ramesh` / `DemoPass123!` and `demo_employer_verified` /
+as `demo_worker_electrician` / `DemoPass123!` and `demo_employer_verified` /
 `DemoPass123!` and confirm both redirect to their (still-placeholder)
 dashboards; attempt login with a bad password and confirm the plain-language
 `401` message; reload the page after login and confirm the session survives
@@ -620,7 +620,7 @@ test is written once here and reused/extended in F3 for the employer side;
 `WithdrawConfirmDialog` interaction test (cancel vs. confirm).
 
 **Manual verification steps:** browse `/jobs` unauthenticated, then as
-`demo_worker_ramesh` (confirm distance defaults to the worker's stored
+`demo_worker_electrician` (confirm distance defaults to the worker's stored
 coordinates without supplying `latitude`/`longitude` query params);
 open the "Water Tank Installation & Pipe Fitting" (Plumbing) job detail
 directly and confirm it renders correctly with no matching-worker-specific
@@ -831,7 +831,7 @@ sanitization) and PDF download test asserts the filename is read from
 `RequireVerifiedEmployer` 403-fallback test for
 `/employer/jobs/:id/recommendations`.
 
-**Manual verification steps:** as `demo_worker_ramesh`, view
+**Manual verification steps:** as `demo_worker_electrician`, view
 Recommendations (expect a top score around 98 per
 `FRONTEND_CONTEXT.md` §10) and Opportunity Advisory; as `demo_worker_hari`,
 confirm the near-miss Masonry match (~67) surfaces "Tile Installation" as
@@ -839,7 +839,7 @@ a missing-skill suggestion linking back to the correct job; as
 `demo_worker_gita`, confirm "distance unknown" renders correctly (no
 coordinates on file, per seed data); download the CV as PDF and confirm
 the browser save dialog uses the server-provided filename; as
-`demo_worker_ramesh`, submit a rating on the `COMPLETED` application with
+`demo_worker_electrician`, submit a rating on the `COMPLETED` application with
 `demo_employer_verified` and confirm the aggregate summary updates
 immediately; as `demo_employer_verified`, view worker recommendations for
 a job; as `demo_employer_pending`, confirm the same route renders the

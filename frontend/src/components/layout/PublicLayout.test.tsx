@@ -8,8 +8,8 @@ import { PublicLayout } from './PublicLayout'
 
 const WORKER_USER = {
   id: 1,
-  username: 'demo_worker_ramesh',
-  email: 'ramesh@example.com',
+  username: 'demo_worker_electrician',
+  email: 'electrician@example.com',
   phone_number: '9811100011',
   role: 'WORKER' as const,
   is_contact_verified: true,
@@ -84,7 +84,7 @@ describe('PublicLayout navigation', () => {
     setAuthenticatedUser(WORKER_USER)
     renderPublicLayout()
 
-    expect(screen.getByText(/demo_worker_ramesh/)).toBeInTheDocument()
+    expect(screen.getByText(/demo_worker_electrician/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /log out/i })).toBeInTheDocument()
   })
 

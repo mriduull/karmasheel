@@ -11,7 +11,7 @@ status in the application state machine (including one full
 worker-to-job hire), a completed application rated in both directions,
 and one deliberately unmatched skill phrase for admin review.
 
-The original four workers (Ramesh, Sita, Hari, Gita) and five jobs keep
+The original four workers (Lead electrician, Sita, Hari, Gita) and five jobs keep
 their exact original field values so the scores already documented in
 docs/DEMO_SCRIPT.md keep working; everything else is additive.
 
@@ -234,18 +234,18 @@ class Command(BaseCommand):
         construction = "Construction & Repair"
         domestic = "Domestic & Local Services"
 
-        # Ramesh: strong all-round match for the electrical job below -
+        # Lead electrician: strong all-round match for the electrical job below -
         # every required/preferred skill, plenty of experience, close by,
         # verified contact, wage expectation comfortably met.
-        ramesh_user, ramesh_created = self._get_or_update_user(
-            "demo_worker_ramesh",
+        electrician_user, electrician_created = self._get_or_update_user(
+            "demo_worker_electrician",
             phone_number="9811100011",
-            email="demo_worker_ramesh@karmasheel.local",
+            email="demo_worker_electrician@karmasheel.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )
-        self.worker_ramesh, _ = WorkerProfile.objects.update_or_create(
-            user=ramesh_user,
+        self.worker_electrician, _ = WorkerProfile.objects.update_or_create(
+            user=electrician_user,
             defaults={
                 "address": "Koteshwor, Kathmandu",
                 "latitude": Decimal("27.677800"),
@@ -256,7 +256,7 @@ class Command(BaseCommand):
                 "preferred_travel_radius_km": 15,
             },
         )
-        self.worker_ramesh.skills.set([
+        self.worker_electrician.skills.set([
             self._skill("Electrical", "House Wiring", construction),
             self._skill("Electrical", "Circuit Breaker Installation", construction),
             self._skill("Electrical", "Electrical Repair", construction),
@@ -478,10 +478,10 @@ class Command(BaseCommand):
             self._skill("Two-Wheeler Delivery", "Parcel Delivery", driving),
         ])
 
-        # Suresh: the same electrical skills and experience as Ramesh -
+        # Suresh: the same electrical skills and experience as Lead electrician -
         # otherwise an equally strong candidate - but based far away in
         # Pokhara with no stated travel radius, so distance (not skill or
-        # experience) is what pushes him below Ramesh in the rankings.
+        # experience) is what pushes him below Lead electrician in the rankings.
         suresh_user, suresh_created = self._get_or_update_user(
             "demo_worker_suresh",
             phone_number="9811100020",
@@ -508,7 +508,7 @@ class Command(BaseCommand):
         ])
 
         self.summary["workers"] = [
-            (ramesh_user.username, ramesh_created),
+            (electrician_user.username, electrician_created),
             (sita_user.username, sita_created),
             (hari_user.username, hari_created),
             (gita_user.username, gita_created),
@@ -646,7 +646,7 @@ class Command(BaseCommand):
         driving = "Driving & Delivery"
         caregiving = "Caregiving & Personal Support"
 
-        # A second electrical job Ramesh fully matches on skills but only
+        # A second electrical job Lead electrician fully matches on skills but only
         # partially on experience (required_experience_years exceeds his
         # 6 years) and is slightly further away than the wiring job -
         # gives the worker-to-job demo a second, meaningfully-different
@@ -667,7 +667,7 @@ class Command(BaseCommand):
             work_type=JobPost.WorkType.CONTRACT,
         )
 
-        # A third electrical job Ramesh only partially matches - he has
+        # A third electrical job Lead electrician only partially matches - he has
         # one of the two required skills (House Wiring) but not the other
         # (Switchboard Installation), and the required experience exceeds
         # his 6 years - two real, explainable reasons this is a weaker,
@@ -871,10 +871,10 @@ class Command(BaseCommand):
     def _seed_applications_and_ratings(self):
         employer_user = self.verified_employer.user
 
-        # Ramesh: full hire-through-completion, then rated in both
+        # Lead electrician: full hire-through-completion, then rated in both
         # directions.
         completed_app, completed_created = self._advance_application(
-            self.worker_ramesh,
+            self.worker_electrician,
             self.job_wiring,
             steps=[
                 (Application.Status.SHORTLISTED, employer_user),
@@ -885,7 +885,7 @@ class Command(BaseCommand):
 
         worker_rated = self._ensure_rating(
             completed_app,
-            reviewer=self.worker_ramesh.user,
+            reviewer=self.worker_electrician.user,
             score=5,
             review_text="Paid on time and the site was well organized.",
         )
@@ -918,7 +918,7 @@ class Command(BaseCommand):
         )
 
         # House Wiring for New Apartment Block gets two more applicants
-        # besides Ramesh, so the job-to-worker demo job also demonstrates
+        # besides Lead electrician, so the job-to-worker demo job also demonstrates
         # "several applicants" in different states: Suresh is shortlisted
         # despite being far away, Kamal is rejected for lacking the second
         # required skill.
@@ -1040,7 +1040,7 @@ class Command(BaseCommand):
         ))
 
         write("\nDemo scenario pointers:")
-        write("  - Worker-to-job recommendations: log in as demo_worker_ramesh and "
+        write("  - Worker-to-job recommendations: log in as demo_worker_electrician and "
               "GET /api/recommendations/jobs/ - 'House Wiring for New Apartment Block' "
               "ranks first, with two more electrical jobs completing the top three.")
         write("  - Opportunity advisory (near-miss + missing skills): log in as "
@@ -1049,12 +1049,12 @@ class Command(BaseCommand):
         write(f"  - Job-to-worker recommendations: log in as demo_employer_verified "
               f"and GET /api/recommendations/jobs/{self.job_wiring.id}/workers/ - job "
               f"#{self.job_wiring.id} ('{self.job_wiring.title}') has three candidates "
-              f"(Ramesh, Suresh, Kamal) with a clear top pick.")
+              f"(Lead electrician, Suresh, Kamal) with a clear top pick.")
         write(f"  - Application-status walkthrough: job #{self.job_wiring.id} "
               f"('{self.job_wiring.title}') has three applicants in three different "
               f"states (COMPLETED, SHORTLISTED, REJECTED).")
         write(f"  - Completed-job ratings: application #{self.summary['applications'][0][0]} "
-              "(demo_worker_ramesh on the House Wiring job) is COMPLETED and rated in "
+              "(demo_worker_electrician on the House Wiring job) is COMPLETED and rated in "
               "both directions.")
         write("  - Restricted pending employer: log in as demo_employer_pending and "
               "POST /api/jobs/ - returns 403 Forbidden until an admin verifies it.")

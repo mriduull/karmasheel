@@ -25,8 +25,8 @@ import type { CurrentUser } from '@/types/user'
 
 const WORKER_USER: CurrentUser = {
   id: 1,
-  username: 'demo_worker_ramesh',
-  email: 'ramesh@example.com',
+  username: 'demo_worker_electrician',
+  email: 'electrician@example.com',
   phone_number: '9811100011',
   role: 'WORKER',
   is_contact_verified: true,
@@ -94,7 +94,7 @@ describe('router', () => {
   it('renders the real worker dashboard for an authenticated worker', async () => {
     setAuthenticatedUser(WORKER_USER)
     renderAt('/worker')
-    expect(await screen.findByRole('heading', { name: /welcome, demo_worker_ramesh/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /welcome, demo_worker_electrician/i })).toBeInTheDocument()
   })
 
   it.each(['/worker', '/worker/profile', '/worker/applications'])(
@@ -187,7 +187,7 @@ describe('router', () => {
 
     renderAt('/employer/jobs/5/recommendations')
 
-    expect(await screen.findByText('demo_worker_ramesh')).toBeInTheDocument()
+    expect(await screen.findByText('demo_worker_electrician')).toBeInTheDocument()
   })
 
   it('a PENDING employer is blocked from the per-job Recommended Workers page with a plain explanation, not a raw 403', async () => {
@@ -209,7 +209,7 @@ describe('router', () => {
 
     renderAt('/employer/jobs/5/recommendations')
 
-    expect(await screen.findByRole('heading', { name: /welcome, demo_worker_ramesh/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /welcome, demo_worker_electrician/i })).toBeInTheDocument()
   })
 
   it.each(['/worker/recommendations', '/worker/opportunities', '/worker/cv', '/worker/ratings'])(

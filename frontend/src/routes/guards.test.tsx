@@ -13,8 +13,8 @@ import type { CurrentUser } from '@/types/user'
 
 const WORKER_USER: CurrentUser = {
   id: 1,
-  username: 'demo_worker_ramesh',
-  email: 'ramesh@example.com',
+  username: 'demo_worker_electrician',
+  email: 'electrician@example.com',
   phone_number: '9811100011',
   role: 'WORKER',
   is_contact_verified: true,
