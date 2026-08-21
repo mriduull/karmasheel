@@ -66,20 +66,20 @@ export function JobFilterPanel({
 
         <div className="flex flex-col gap-1">
           <span className="text-base font-semibold text-text-primary">Distance</span>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex min-w-0 flex-col gap-2">
             <Button
               type="button"
               variant="secondary"
               onClick={onRequestLocation}
               isLoading={geolocationStatus === 'loading'}
-              className="whitespace-nowrap"
+              className="w-full whitespace-nowrap"
             >
               <LocateFixed size={18} aria-hidden="true" />
               Use my location
             </Button>
             <select
               aria-label="Maximum distance"
-              className="min-h-touch flex-1 rounded-sm border border-text-secondary/30 bg-surface px-3 text-base text-text-primary focus:border-brand-primary disabled:cursor-not-allowed disabled:opacity-60"
+              className="min-h-touch w-full min-w-0 rounded-sm border border-text-secondary/30 bg-surface px-3 text-base text-text-primary focus:border-brand-primary disabled:cursor-not-allowed disabled:opacity-60"
               value={maxDistanceKm ?? ''}
               onChange={(event) =>
                 onMaxDistanceChange(event.target.value ? Number(event.target.value) : null)
