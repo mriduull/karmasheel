@@ -100,6 +100,11 @@ export function ProfilePhotoUpload({ currentPhotoUrl, onUploaded }: ProfilePhoto
             className="block w-full text-sm text-text-primary file:mr-4 file:min-h-touch file:rounded-sm file:border-0 file:bg-surface-muted file:px-4 file:text-base file:font-semibold file:text-text-primary hover:file:bg-text-secondary/10"
           />
           <p className="text-sm text-text-secondary">JPG, PNG, or WebP. Maximum 2 MB.</p>
+          {selectedFile && (
+            <p role="status" className="text-sm font-medium text-warning-text">
+              Preview only — click Upload photo to save it to your profile.
+            </p>
+          )}
         </div>
       </div>
 

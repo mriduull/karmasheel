@@ -33,8 +33,11 @@ export function useGeolocation(): GeolocationState {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLatitude(position.coords.latitude)
-        setLongitude(position.coords.longitude)
+        // WorkerProfile/EmployerProfile store coordinates to six decimal
+        // places. Browser geolocation commonly returns 12–15 places, which
+        // Django correctly rejects instead of silently truncating.
+        setLatitude(Number(position.coords.latitude.toFixed(6)))
+        setLongitude(Number(position.coords.longitude.toFixed(6)))
         setStatus('success')
       },
       (error) => {

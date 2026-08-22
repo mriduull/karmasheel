@@ -18,6 +18,8 @@ interface JobFilterPanelProps {
   onWorkTypeChange: (workType: WorkType | null) => void
   onMaxDistanceChange: (maxDistanceKm: number | null) => void
   geolocationStatus: GeolocationStatus
+  locationSaveStatus: 'idle' | 'saving' | 'saved' | 'error'
+  savesLocationToProfile: boolean
   onRequestLocation: () => void
   onClearFilters: () => void
   hasActiveFilters: boolean
@@ -44,6 +46,8 @@ export function JobFilterPanel({
   onWorkTypeChange,
   onMaxDistanceChange,
   geolocationStatus,
+  locationSaveStatus,
+  savesLocationToProfile,
   onRequestLocation,
   onClearFilters,
   hasActiveFilters,
@@ -96,10 +100,20 @@ export function JobFilterPanel({
           </div>
           {hasLocation && (
             <p role="status" className="text-sm font-medium text-success-text">
-              Location found
+              {locationSaveStatus === 'saving'
+                ? 'Location found — saving to your profile'
+                : locationSaveStatus === 'saved'
+                  ? 'Location saved to your profile'
+                  : 'Location found'}
               {maxDistanceKm !== null
                 ? ` — showing jobs within ${maxDistanceKm} km.`
                 : ' — choose a distance to filter jobs.'}
+            </p>
+          )}
+          {hasLocation && savesLocationToProfile && locationSaveStatus === 'error' && (
+            <p role="alert" className="text-sm font-medium text-danger-text">
+              Jobs are filtered using this location, but it could not be saved to your profile.
+              Try again.
             </p>
           )}
           {geolocationStatus === 'denied' && (

@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { browseJobs, type JobBrowseFilters } from '@/api/endpoints/jobs'
+import { updateWorkerProfile } from '@/api/endpoints/profiles'
 import { ApiError, toBannerMessage } from '@/api/errors'
 import { useGeolocation } from '@/lib/useGeolocation'
+import { useAuthStore } from '@/state/authStore'
+import { WORKER_PROFILE_QUERY_KEY } from '@/hooks/useWorkerProfile'
+import { WORKER_JOB_RECOMMENDATIONS_QUERY_KEY } from '@/hooks/useWorkerJobRecommendations'
+import { OPPORTUNITY_ADVISORY_QUERY_KEY } from '@/hooks/useOpportunityAdvisory'
 import type { WorkType } from '@/types/job'
 import { PageContainer } from '@/components/primitives/PageContainer'
 import { SkeletonCard } from '@/components/primitives/SkeletonCard'
@@ -25,7 +30,12 @@ const DEFAULT_LOCATION_DISTANCE_KM = 10
 export function JobBrowse() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [maxDistanceKm, setMaxDistanceKm] = useState<number | null>(null)
+  const [locationSaveStatus, setLocationSaveStatus] = useState<
+    'idle' | 'saving' | 'saved' | 'error'
+  >('idle')
   const geolocation = useGeolocation()
+  const user = useAuthStore((state) => state.user)
+  const queryClient = useQueryClient()
   const applyDefaultDistanceAfterLocation = useRef(false)
 
   useEffect(() => {
@@ -33,7 +43,45 @@ export function JobBrowse() {
 
     applyDefaultDistanceAfterLocation.current = false
     setMaxDistanceKm((currentDistance) => currentDistance ?? DEFAULT_LOCATION_DISTANCE_KM)
-  }, [geolocation.status])
+
+    if (
+      user?.role !== 'WORKER' ||
+      geolocation.latitude === null ||
+      geolocation.longitude === null
+    ) {
+      setLocationSaveStatus('idle')
+      return
+    }
+
+    let active = true
+    setLocationSaveStatus('saving')
+
+    void updateWorkerProfile({
+      latitude: geolocation.latitude,
+      longitude: geolocation.longitude,
+    })
+      .then(async (updatedProfile) => {
+        queryClient.setQueryData(WORKER_PROFILE_QUERY_KEY, updatedProfile)
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: WORKER_JOB_RECOMMENDATIONS_QUERY_KEY }),
+          queryClient.invalidateQueries({ queryKey: OPPORTUNITY_ADVISORY_QUERY_KEY }),
+        ])
+        if (active) setLocationSaveStatus('saved')
+      })
+      .catch(() => {
+        if (active) setLocationSaveStatus('error')
+      })
+
+    return () => {
+      active = false
+    }
+  }, [
+    geolocation.status,
+    geolocation.latitude,
+    geolocation.longitude,
+    queryClient,
+    user?.role,
+  ])
 
   const categoryParam = searchParams.get('category')
   const subcategoryParam = searchParams.get('subcategory')
@@ -87,6 +135,7 @@ export function JobBrowse() {
 
   const handleRequestLocation = () => {
     applyDefaultDistanceAfterLocation.current = true
+    setLocationSaveStatus('idle')
     geolocation.request()
   }
 
@@ -112,6 +161,8 @@ export function JobBrowse() {
           onWorkTypeChange={(wt) => updateParams({ work_type: wt })}
           onMaxDistanceChange={setMaxDistanceKm}
           geolocationStatus={geolocation.status}
+          locationSaveStatus={locationSaveStatus}
+          savesLocationToProfile={user?.role === 'WORKER'}
           onRequestLocation={handleRequestLocation}
           onClearFilters={handleClearFilters}
           hasActiveFilters={hasActiveFilters}
