@@ -452,7 +452,7 @@ class ReliabilityScoreTests(RecommendationServiceTestsBase):
 
         self.assertGreater(score_after, score_before)
         self.assertEqual(sub_scores["average_rating"], 5.0)
-        self.assertIn("Employer has completed 1 job through Karmasheel.", result.reasons)
+        self.assertIn("Employer has completed 1 job through Workforce Matching.", result.reasons)
         self.assertIn("Employer has an average rating of 5/5 from 1 rating.", result.reasons)
 
 

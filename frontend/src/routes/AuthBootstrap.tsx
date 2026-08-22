@@ -62,7 +62,7 @@ export function AuthBootstrap({ children }: { children: ReactNode }) {
   if (isBootstrapping) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg">
-        <LoadingIndicator label="Loading Workforce Match" />
+        <LoadingIndicator label="Loading Workforce Matching" />
       </div>
     )
   }

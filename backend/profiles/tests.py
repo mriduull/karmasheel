@@ -712,7 +712,7 @@ class WorkerCVAPITests(APITestCase):
         self.assertIn("Worker with 2 years of experience", content)
         self.assertIn("Not rated yet", content)
         self.assertNotIn("Generated on", content)
-        self.assertNotIn("by Karmasheel", content)
+        self.assertNotIn("by Workforce Matching", content)
 
     def test_worker_cv_embeds_profile_photo_when_uploaded(self):
         self.authenticate_as(self.worker, "WorkerPassword123!")

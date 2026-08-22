@@ -1,4 +1,4 @@
-# Taxonomy Source Audit — Production-Quality Skill Taxonomy for Karmasheel
+# Taxonomy Source Audit — Production-Quality Skill Taxonomy for Workforce Matching
 
 Status: **research and design only**. No models, migrations, seed data, or
 API behavior were changed to produce this document. Written by inspecting
@@ -65,7 +65,7 @@ cited.
 
 ## 2. Recommended source hierarchy
 
-No single source covers everything Karmasheel needs, and none should be
+No single source covers everything Workforce Matching needs, and none should be
 imported wholesale. Recommendation — a **three-layer hierarchy**, each
 source used for what it's actually best at:
 
@@ -85,7 +85,7 @@ source used for what it's actually best at:
    abstract or thin, paraphrase concrete phrasing from O\*NET Task/Tools
    statements for the same or nearest O\*NET-SOC occupation (also CC BY
    4.0). Reject both sources' *transversal/soft-skill* layers (ESCO
-   "communicate effectively," O\*NET "Active Listening") — Karmasheel's
+   "communicate effectively," O\*NET "Active Listening") — Workforce Matching's
    skill matching is for hard, verifiable trade skills, not soft
    competencies (see §9).
 
@@ -140,7 +140,7 @@ English/Nepali script on their sites, not a Romanized-Nepali alias table).
   provenance during curation (see §8) even though — per §10 — we are
   **not** adding a `source` field to the schema in this phase.
 
-## 4. Proposed Karmasheel taxonomy structure
+## 4. Proposed Workforce Matching taxonomy structure
 
 Same four models, no schema change required for v1 (see §10). Target
 scale, inside the ranges requested:
@@ -244,7 +244,7 @@ covering the long tail.
    When ESCO or O\*NET publish a new release (ESCO is currently v1.2; new
    minor versions land periodically), re-run the curation review rather
    than auto-syncing — these are occupation standards that change slowly,
-   and Karmasheel's matching is a curated table, not a live sync target.
+   and Workforce Matching's matching is a curated table, not a live sync target.
 5. **CTEVT/NSTB content is read, never scraped/stored in bulk.** Given
    the unresolved license (§3), the practical workflow is: a person
    reads the relevant NOSS/trade list, writes down trade and skill
@@ -273,7 +273,7 @@ covering the long tail.
    Worker," "Team Player," "Good Communication," or similarly generic
    entries — reject ESCO's transversal-skill tier and O\*NET's generic
    Skills domain (Critical Thinking, Active Listening, etc.) from
-   `SkillTag`. Karmasheel's required-skill coverage math (Week 4) needs
+   `SkillTag`. Workforce Matching's required-skill coverage math (Week 4) needs
    specific, checkable hard skills; broad skills would trivially inflate
    every worker's and job's coverage score and make the matching
    meaningless.

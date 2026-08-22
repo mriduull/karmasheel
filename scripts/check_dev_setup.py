@@ -191,7 +191,7 @@ def main() -> int:
 
     check_port_free(result, VITE_DEV_PORT)
 
-    print("Karmasheel local development setup check")
+    print("Workforce Matching local development setup check")
     print("=" * 42)
 
     for message in result.ok:

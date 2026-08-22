@@ -121,7 +121,7 @@ class Command(BaseCommand):
         user, created = self._get_or_update_user(
             "demo_admin",
             phone_number="9811100000",
-            email="demo_admin@karmasheel.local",
+            email="demo_admin@workforce-matching.local",
             role="",
             is_contact_verified=True,
             is_staff=True,
@@ -137,7 +137,7 @@ class Command(BaseCommand):
         verified_user, verified_created = self._get_or_update_user(
             "demo_employer_verified",
             phone_number="9811100001",
-            email="demo_employer_verified@karmasheel.local",
+            email="demo_employer_verified@workforce-matching.local",
             role=User.Role.EMPLOYER,
             is_contact_verified=True,
         )
@@ -156,7 +156,7 @@ class Command(BaseCommand):
         pending_user, pending_created = self._get_or_update_user(
             "demo_employer_pending",
             phone_number="9811100002",
-            email="demo_employer_pending@karmasheel.local",
+            email="demo_employer_pending@workforce-matching.local",
             role=User.Role.EMPLOYER,
             is_contact_verified=False,
         )
@@ -177,7 +177,7 @@ class Command(BaseCommand):
         hospitality_user, hospitality_created = self._get_or_update_user(
             "demo_employer_hospitality",
             phone_number="9811100003",
-            email="demo_employer_hospitality@karmasheel.local",
+            email="demo_employer_hospitality@workforce-matching.local",
             role=User.Role.EMPLOYER,
             is_contact_verified=True,
         )
@@ -198,7 +198,7 @@ class Command(BaseCommand):
         retail_user, retail_created = self._get_or_update_user(
             "demo_employer_retail",
             phone_number="9811100004",
-            email="demo_employer_retail@karmasheel.local",
+            email="demo_employer_retail@workforce-matching.local",
             role=User.Role.EMPLOYER,
             is_contact_verified=True,
         )
@@ -240,7 +240,7 @@ class Command(BaseCommand):
         electrician_user, electrician_created = self._get_or_update_user(
             "demo_worker_electrician",
             phone_number="9811100011",
-            email="demo_worker_electrician@karmasheel.local",
+            email="demo_worker_electrician@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )
@@ -267,7 +267,7 @@ class Command(BaseCommand):
         sita_user, sita_created = self._get_or_update_user(
             "demo_worker_sita",
             phone_number="9811100012",
-            email="demo_worker_sita@karmasheel.local",
+            email="demo_worker_sita@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )
@@ -295,7 +295,7 @@ class Command(BaseCommand):
         hari_user, hari_created = self._get_or_update_user(
             "demo_worker_hari",
             phone_number="9811100013",
-            email="demo_worker_hari@karmasheel.local",
+            email="demo_worker_hari@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=False,
         )
@@ -321,7 +321,7 @@ class Command(BaseCommand):
         gita_user, gita_created = self._get_or_update_user(
             "demo_worker_gita",
             phone_number="9811100014",
-            email="demo_worker_gita@karmasheel.local",
+            email="demo_worker_gita@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=False,
         )
@@ -351,7 +351,7 @@ class Command(BaseCommand):
         bimal_user, bimal_created = self._get_or_update_user(
             "demo_worker_bimal",
             phone_number="9811100015",
-            email="demo_worker_bimal@karmasheel.local",
+            email="demo_worker_bimal@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )
@@ -380,7 +380,7 @@ class Command(BaseCommand):
         kamal_user, kamal_created = self._get_or_update_user(
             "demo_worker_kamal",
             phone_number="9811100016",
-            email="demo_worker_kamal@karmasheel.local",
+            email="demo_worker_kamal@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )
@@ -407,7 +407,7 @@ class Command(BaseCommand):
         maya_user, maya_created = self._get_or_update_user(
             "demo_worker_maya",
             phone_number="9811100017",
-            email="demo_worker_maya@karmasheel.local",
+            email="demo_worker_maya@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )
@@ -432,7 +432,7 @@ class Command(BaseCommand):
         sunita_user, sunita_created = self._get_or_update_user(
             "demo_worker_sunita",
             phone_number="9811100018",
-            email="demo_worker_sunita@karmasheel.local",
+            email="demo_worker_sunita@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )
@@ -457,7 +457,7 @@ class Command(BaseCommand):
         deepak_user, deepak_created = self._get_or_update_user(
             "demo_worker_deepak",
             phone_number="9811100019",
-            email="demo_worker_deepak@karmasheel.local",
+            email="demo_worker_deepak@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )
@@ -485,7 +485,7 @@ class Command(BaseCommand):
         suresh_user, suresh_created = self._get_or_update_user(
             "demo_worker_suresh",
             phone_number="9811100020",
-            email="demo_worker_suresh@karmasheel.local",
+            email="demo_worker_suresh@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )

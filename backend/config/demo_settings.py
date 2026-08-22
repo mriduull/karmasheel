@@ -17,7 +17,7 @@ import os
 # isolated to this settings module and are deliberately non-production.
 os.environ.setdefault(
     "DJANGO_SECRET_KEY",
-    "karmasheel-local-demo-secret-key-never-use-in-production",
+    "workforce-matching-local-demo-secret-key-never-use-in-production",
 )
 os.environ.setdefault("DB_NAME", "unused-by-demo-settings")
 os.environ.setdefault("DB_USER", "unused-by-demo-settings")

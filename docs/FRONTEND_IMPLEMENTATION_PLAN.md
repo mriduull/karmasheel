@@ -1,4 +1,4 @@
-# FRONTEND_IMPLEMENTATION_PLAN — Workforce Match (Karmasheel backend)
+# FRONTEND_IMPLEMENTATION_PLAN — Workforce Matching
 
 Phased implementation plan for the React + TypeScript + Tailwind CSS client,
 produced by cross-checking `docs/FRONTEND_DESIGN_SPEC (1).md` against the
@@ -15,16 +15,11 @@ phase per `CLAUDE.md` rule 15.
 
 ## 0. Naming note
 
-Per explicit instruction, "Karmasheel" is not used as visible frontend
-branding anywhere in this plan or the screens it describes — no approved
-public replacement title exists yet in any repository document (checked
-`README.md`, `docs/IMPLEMENTATION_PLAN.md`, `docs/DEFERRED_SCOPE.md`,
-`docs/DEMO_SCRIPT.md`). The temporary display label used throughout is
-**"Workforce Match."** Repository identifiers — the Django project name,
-`karmasheel_db`, package/app names, git remote, directory names — are
-**unchanged**. Only user-visible strings (page titles, nav wordmark, `<title>`
-tag, i18n catalog) use the temporary label. If an approved public name is
-decided later, it is a single change in the i18n catalog's brand key
+The approved product name is **"Workforce Matching."** Repository identifiers
+use compatible forms where spaces are invalid, such as
+`workforce_matching_db`. User-visible strings (page titles, nav wordmark,
+`<title>` tag, and the i18n catalog) use the full approved product name. If the
+name changes later, it is a single change in the i18n catalog's brand key
 (§7.7), not a structural change.
 
 ---
@@ -94,7 +89,7 @@ corrections were mandated and are applied as follows:
 
 | # | Correction | Spec section affected | Resolution in this plan |
 |---|---|---|---|
-| 1 | No "Karmasheel" branding | §1 Visual identity | "Workforce Match" used as the display label everywhere in UI copy (see §0 above); repo identifiers untouched. |
+| 1 | Consistent product branding | §1 Visual identity | "Workforce Matching" is used as the display label throughout the UI (see §0 above). |
 | 2 | Registration must not auto-login | §5.2 "Success (201): auto-redirect to Login **(or directly attempt login)**" | The "or directly attempt login" branch is removed. Phase F1 implements exactly one path: `201` → confirmation message shown on the same screen → explicit redirect to `/login` (no token is ever requested as part of registration). See §5.2 in Phase F1 below. |
 | 3 | Ratings: aggregate + rate-from-completed-application first; full history reconstruction lower priority | §14/§20 describe "list of individual ratings received" as part of the initial Ratings screen | Phase F4 ships `RatingSummaryCard` (aggregate) and the inline "Rate this engagement" action from each `COMPLETED` application row (already the correct backend-cheap path, since there is no bulk-ratings endpoint — see §1). A full per-application history list is explicitly marked as a stretch item inside F4, not a completion-blocking deliverable, since building it requires one `GET /api/applications/<id>/rating/` call per completed application. |
 | 4 | No employer-wide Applicants screen | §3.4 mobile nav lists a standalone "Applicants" bottom-tab item; §18 route is scoped correctly but the nav implies a global list | No route or screen aggregates applications across jobs, because no endpoint supports it (§1). The mobile bottom tab labeled "Applicants" is corrected to **"My Jobs"** — same entry point as desktop — and the applications screen is only ever reached as `/employer/jobs/:id/applications` from a specific job. See Phase F3 §3.4 correction below. |
@@ -350,7 +345,7 @@ because it already supports interpolation and pluralization (needed for
 copy like "N jobs" / "1 job") and lazy namespace loading, both of which a
 future Nepali/Devanagari catalog will need without a rewrite, per design
 spec §23. Every frontend-owned string (nav labels, buttons, empty/success/
-error wrapper copy, the "Workforce Match" brand string itself) is a key in
+error wrapper copy, the "Workforce Matching" brand string itself) is a key in
 `en.ts`, accessed via `useTranslation()`'s `t()` — never an inline string
 literal in a component.
 

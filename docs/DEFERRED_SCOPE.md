@@ -1,6 +1,6 @@
 # Deferred Scope
 
-Honest accounting of what Karmasheel currently does, what's partial, and
+Honest accounting of what Workforce Matching currently does, what's partial, and
 what has been intentionally left out of the six-week scope described in
 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md). Written during Week 6
 Phase 4 (demo preparation) by inspecting the actual repository state, not

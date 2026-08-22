@@ -22,15 +22,15 @@ from django.urls import include, path
 from django.views.generic import TemplateView
 
 
-admin.site.site_header = "Karmasheel Administration"
-admin.site.site_title = "Karmasheel Administration"
-admin.site.index_title = "Karmasheel Administration"
+admin.site.site_header = "Workforce Matching Administration"
+admin.site.site_title = "Workforce Matching Administration"
+admin.site.index_title = "Workforce Matching Administration"
 
 
 def api_root(request):
     return JsonResponse(
         {
-            "name": "Karmasheel API",
+            "name": "Workforce Matching API",
             "endpoints": {
                 "auth": "/api/auth/",
                 "profiles": "/api/profiles/",

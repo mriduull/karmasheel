@@ -11,7 +11,7 @@
  */
 export const en = {
   brand: {
-    name: 'Workforce Match',
+    name: 'Workforce Matching',
   },
   nav: {
     browseJobs: 'Browse Jobs',
@@ -41,7 +41,7 @@ export const en = {
   common: {
     loading: 'Loading…',
     retry: 'Try again',
-    backHome: 'Back to Workforce Match',
+    backHome: 'Back to Workforce Matching',
   },
   notFound: {
     title: 'Page not found',

@@ -67,7 +67,7 @@ describe('router', () => {
 
   it('renders the public landing page at /', () => {
     renderAt('/')
-    expect(screen.getByRole('link', { name: 'Workforce Match' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Workforce Matching' })).toBeInTheDocument()
     expect(
       screen.getByRole('heading', { level: 1, name: /find honest local work/i }),
     ).toBeInTheDocument()

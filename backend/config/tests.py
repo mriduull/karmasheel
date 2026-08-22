@@ -12,7 +12,7 @@ class FrontendSmokeTests(SimpleTestCase):
         response = self.client.get(reverse("frontend"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Karmasheel")
+        self.assertContains(response, "Workforce Matching")
         self.assertContains(response, 'id="register-form"')
         self.assertContains(response, 'id="login-form"')
         self.assertContains(response, 'id="worker-profile-form"')
@@ -51,5 +51,5 @@ class FrontendSmokeTests(SimpleTestCase):
         response = self.client.get(reverse("api_root"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["name"], "Karmasheel API")
+        self.assertEqual(response.json()["name"], "Workforce Matching API")
         self.assertEqual(response.json()["endpoints"]["job_browse"], "/api/jobs/browse/")

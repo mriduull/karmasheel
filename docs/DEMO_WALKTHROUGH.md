@@ -1,4 +1,4 @@
-# Karmasheel end-to-end demo
+# Workforce Matching end-to-end demo
 
 This walkthrough demonstrates the complete six-week pipeline through the
 Django-served frontend and, separately, through the importable Postman
@@ -108,7 +108,7 @@ present opaque “AI-selected” results.
 
 ## 3. Postman walkthrough
 
-Import [`Karmasheel.postman_collection.json`](Karmasheel.postman_collection.json)
+Import [`Workforce_Matching.postman_collection.json`](Workforce_Matching.postman_collection.json)
 into Postman. The collection contains these variables:
 
 | Variable | Purpose |

@@ -1,8 +1,8 @@
-# Karmasheel Development Instructions
+# Workforce Matching Development Instructions
 
 ## Project
 
-Karmasheel is a Django REST Framework and PostgreSQL workforce-matching
+Workforce Matching is a Django REST Framework and PostgreSQL workforce-matching
 platform for blue-collar and local-service workers.
 
 The Week 1 foundation already exists and must be preserved.

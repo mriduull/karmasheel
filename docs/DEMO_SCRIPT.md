@@ -1,6 +1,6 @@
 # Demo Script
 
-A practical, ~15-20 minute walkthrough of Karmasheel using the dataset built
+A practical, ~15-20 minute walkthrough of Workforce Matching using the dataset built
 by `python manage.py seed_demo`. Every request below can be run with
 `curl`, Postman (see `docs/postman/`), or any HTTP client.
 

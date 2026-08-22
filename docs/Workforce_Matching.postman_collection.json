@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "b18af438-3bcd-4e1f-9bb2-6e6b189fd9cd",
-    "name": "Karmasheel - End-to-End Demo",
+    "name": "Workforce Matching - End-to-End Demo",
     "description": "Importable Week 6 walkthrough for the complete worker and employer pipeline. All credentials are disposable local-demo values. Run against a freshly migrated and seeded database, and complete the documented Django-admin employer verification checkpoint before publishing the job.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },

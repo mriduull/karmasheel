@@ -1,6 +1,6 @@
-# FRONTEND_DESIGN_SPEC — Karmasheel
+# FRONTEND_DESIGN_SPEC — Workforce Matching
 
-Design specification for the Karmasheel React + TypeScript + Tailwind CSS
+Design specification for the Workforce Matching React + TypeScript + Tailwind CSS
 web client. This document is a **design spec, not an implementation** — no
 components are built here. It is written against the backend exactly as
 documented in `FRONTEND_CONTEXT.md` and `DEFERRED_SCOPE.md` (source-of-truth
@@ -51,10 +51,10 @@ explicitly as an **omission**, not worked around.
 
 ## 1. Visual identity and brand personality
 
-**Product name:** Karmasheel ("skilled at work" — a name that signals
+**Product name:** Workforce Matching ("skilled at work" — a name that signals
 competence and dignity of labor, not a gig-economy novelty).
 
-**Brand personality:** Karmasheel should feel like a **trustworthy
+**Brand personality:** Workforce Matching should feel like a **trustworthy
 community notice board that grew up**, not a slick corporate SaaS
 dashboard and not a flashy gig-app. The target users are electricians,
 masons, cooks, cleaners, and similar blue-collar and local-service workers

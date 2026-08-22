@@ -1,6 +1,6 @@
-# Taxonomy Attribution — Karmasheel Standardized Skill Taxonomy v1
+# Taxonomy Attribution — Workforce Matching Standardized Skill Taxonomy v1
 
-This document states, precisely, where the ideas behind Karmasheel's v1
+This document states, precisely, where the ideas behind Workforce Matching's v1
 skill taxonomy (`backend/taxonomy/data/taxonomy_v1.json`) came from, and
 what it does and does not claim. It accompanies
 [`docs/TAXONOMY_SOURCE_AUDIT.md`](TAXONOMY_SOURCE_AUDIT.md), which has the
@@ -9,7 +9,7 @@ document is the shorter, canonical attribution statement.
 
 ## What this taxonomy is
 
-**The Karmasheel taxonomy is a locally curated and adapted project
+**The Workforce Matching taxonomy is a locally curated and adapted project
 dataset**, authored specifically for this platform's blue-collar and
 local-service worker/employer matching use case in Nepal. It is **not** a
 direct export, copy, or complete reproduction of any single official
@@ -33,7 +33,7 @@ sources below.
   essential-skill lists for the closest matching occupation(s) were used
   as a starting reference point for what a complete, practical skill set
   for that trade should look like. Skill *names* in this taxonomy were
-  independently written in Karmasheel's own naming style (concise,
+  independently written in Workforce Matching's own naming style (concise,
   Title-Case English phrases matching the existing Week 2 convention),
   not copy-pasted from ESCO's own skill labels.
 - **O\*NET** (the US Department of Labor's occupational database)
@@ -69,7 +69,7 @@ content later.
 ## English and Romanized Nepali aliases
 
 **All English synonym aliases and all Romanized Nepali aliases in this
-taxonomy were authored locally by the Karmasheel project**, following the
+taxonomy were authored locally by the Workforce Matching project**, following the
 same style as the original Week 2 taxonomy (e.g. "ghar wiring" → "House
 Wiring"). None of the four researched sources provide Nepali-language or
 Romanized-Nepali content — ESCO covers 28 languages, none of them
@@ -127,7 +127,7 @@ Full detail in `docs/TAXONOMY_SOURCE_AUDIT.md` §3; summarized here:
 
 ## Attribution for this document itself
 
-Written as part of Karmasheel's taxonomy v1 implementation, alongside
+Written as part of Workforce Matching's taxonomy v1 implementation, alongside
 `backend/taxonomy/data/taxonomy_v1.json` and the extended
 `python manage.py seed_taxonomy` loader. See
 `docs/TAXONOMY_SOURCE_AUDIT.md` for the full research trail, including

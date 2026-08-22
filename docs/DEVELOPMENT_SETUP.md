@@ -1,6 +1,6 @@
 # Development Setup
 
-Exact, copyable steps to get a full local copy of Karmasheel (Django API +
+Exact, copyable steps to get a full local copy of Workforce Matching (Django API +
 React/Vite frontend) running from a fresh clone. This document is the single
 source of truth for full-stack local setup; `README.md` only links here.
 
@@ -35,7 +35,7 @@ trust the repository (`backend/config/settings.py`, `backend/requirements.txt`
 
 ```bash
 git clone <repository-url>
-cd karmasheel
+cd workforce-matching
 git checkout <development-branch>   # e.g. the branch your team is using
 ```
 
@@ -68,7 +68,7 @@ except starting Vite right now.
 ## Backend setup
 
 All commands below assume you start at the repository root
-(`karmasheel/`).
+(`workforce-matching/`).
 
 ### 1. Create and activate a virtual environment
 
@@ -190,9 +190,9 @@ match the names/password to whatever you put in `.env`, and use your own
 password instead of the placeholder shown:
 
 ```bash
-sudo -u postgres psql -c "CREATE DATABASE karmasheel_db;"
-sudo -u postgres psql -c "CREATE USER karmasheel_user WITH PASSWORD 'your-local-password';"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE karmasheel_db TO karmasheel_user;"
+sudo -u postgres psql -c "CREATE DATABASE workforce_matching_db;"
+sudo -u postgres psql -c "CREATE USER workforce_matching_user WITH PASSWORD 'your-local-password';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE workforce_matching_db TO workforce_matching_user;"
 ```
 
 If your local PostgreSQL install doesn't use the `sudo -u postgres psql`
@@ -317,7 +317,7 @@ Vite starts on `http://localhost:5173`.
 
 | URL | What |
 |---|---|
-| `http://localhost:5173` | Frontend (Workforce Match UI) |
+| `http://localhost:5173` | Frontend (Workforce Matching UI) |
 | `http://127.0.0.1:8000/api/` | Backend API root (see `README.md`'s API base-paths table) |
 | `http://127.0.0.1:8000/admin/` | Django admin |
 
@@ -347,7 +347,7 @@ table here.
 | Frontend shows "Cannot reach the server" | Django isn't running, isn't reachable at the address in `frontend/.env`'s `VITE_API_BASE_URL`, or the request was CORS-blocked (see above). Confirm with `curl http://127.0.0.1:8000/api/taxonomy/categories/` — if that fails, start/fix the backend first. |
 | `django.db.utils.OperationalError: connection to server ... failed` | PostgreSQL isn't running, or `DB_HOST`/`DB_PORT` in `.env` don't match. Confirm with `pg_isready` or `sudo systemctl status postgresql`. |
 | `django.db.utils.OperationalError: password authentication failed` | `DB_USER`/`DB_PASSWORD` in `.env` don't match the database role you created — see [PostgreSQL setup](#postgresql-setup). |
-| `KeyError: 'DJANGO_SECRET_KEY'` (or `DB_NAME`, etc.) on Django startup | Root `.env` is missing, or not actually at the repository root (`backend/config/settings.py` loads it from `BASE_DIR.parent / ".env"`, i.e. `karmasheel/.env`, not `backend/.env`). Run `cp .env.example .env` from the repository root and fill it in. |
+| `KeyError: 'DJANGO_SECRET_KEY'` (or `DB_NAME`, etc.) on Django startup | Root `.env` is missing, or not actually at the repository root (`backend/config/settings.py` loads it from `BASE_DIR.parent / ".env"`, i.e. `workforce-matching/.env`, not `backend/.env`). Run `cp .env.example .env` from the repository root and fill it in. |
 | Frontend behaves oddly / logs `VITE_API_BASE_URL is not set` in the console | `frontend/.env` is missing. Run `cp .env.example .env` inside `frontend/`. |
 | `relation "..." does not exist` / API 500s referencing missing tables | Migrations haven't been applied. Run `python manage.py migrate` from `backend/`. |
 | Taxonomy/job-browse/recommendation endpoints return empty results | The database has no seeded data yet. Run `python manage.py seed_taxonomy` and/or `python manage.py seed_demo` from `backend/` — both are idempotent, safe to re-run. |

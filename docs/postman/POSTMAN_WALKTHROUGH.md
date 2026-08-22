@@ -1,16 +1,16 @@
-# Karmasheel API - Postman Walkthrough
+# Workforce Matching API - Postman Walkthrough
 
 This collection exercises the complete Week 1-5 API surface end to end
-against a locally running Karmasheel backend: public taxonomy browsing,
+against a locally running Workforce Matching backend: public taxonomy browsing,
 worker/employer authentication, profiles (including CV generation),
 jobs, applications (status state machine), ratings, and the explainable
 recommendation engine.
 
 ## Files
 
-- `Karmasheel_API.postman_collection.json` - the collection (10 folders,
+- `Workforce_Matching_API.postman_collection.json` - the collection (10 folders,
   72 requests).
-- `Karmasheel_Local.postman_environment.json` - the environment. All
+- `Workforce_Matching_Local.postman_environment.json` - the environment. All
   credentials in it are clearly-labelled, local-only demo values (e.g.
   `demo_worker_local` / `Local-Only-Demo-Pass-1!`) - never real
   passwords or production data. Change them if you want, but keep them
@@ -25,7 +25,7 @@ recommendation engine.
    python manage.py runserver
    ```
 2. In Postman, import both JSON files (`File > Import`).
-3. Select the **Karmasheel Local** environment in the top-right
+3. Select the **Workforce Matching Local** environment in the top-right
    environment picker.
 4. Confirm `base_url` in the environment matches your server
    (`http://127.0.0.1:8000` by default).

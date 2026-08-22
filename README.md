@@ -1,6 +1,6 @@
-# Karmasheel
+# Workforce Matching
 
-Karmasheel is a Django REST Framework and PostgreSQL workforce-matching
+Workforce Matching is a Django REST Framework and PostgreSQL workforce-matching
 platform connecting blue-collar and local-service workers with employers in
 Nepal, using structured skills, location, availability, experience,
 preferences, and reliability indicators. Recommendations are transparent and
@@ -69,7 +69,7 @@ kept up to date first.
 ## Repository structure
 
 ```
-karmasheel/
+workforce-matching/
 ├── backend/                 # Django project
 │   ├── config/               # Settings, root URLconf, WSGI/ASGI, test_settings
 │   ├── accounts/              # Custom User model, auth endpoints, seed_demo command
@@ -94,7 +94,7 @@ karmasheel/
 ### 1. Clone and create a virtual environment
 
 ```bash
-cd karmasheel
+cd workforce-matching
 python3 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 ```
@@ -126,9 +126,9 @@ cp .env.example .env
 ### 4. Create the PostgreSQL database
 
 ```bash
-sudo -u postgres psql -c "CREATE DATABASE karmasheel_db;"
-sudo -u postgres psql -c "CREATE USER karmasheel_user WITH PASSWORD 'your-postgresql-password';"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE karmasheel_db TO karmasheel_user;"
+sudo -u postgres psql -c "CREATE DATABASE workforce_matching_db;"
+sudo -u postgres psql -c "CREATE USER workforce_matching_user WITH PASSWORD 'your-postgresql-password';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE workforce_matching_db TO workforce_matching_user;"
 ```
 
 Match the database/user names and password to whatever you put in `.env`.
@@ -199,13 +199,13 @@ All endpoints are namespaced under `/api/`:
 
 Located at `docs/postman/`:
 
-- `Karmasheel_API.postman_collection.json` - the full request collection.
-- `Karmasheel_Local.postman_environment.json` - matching environment
+- `Workforce_Matching_API.postman_collection.json` - the full request collection.
+- `Workforce_Matching_Local.postman_environment.json` - matching environment
   (local-only demo credentials).
 - `POSTMAN_WALKTHROUGH.md` - setup, run order, and a fresh-database manual
   verification step (an employer must be verified before it can post jobs).
 
-To run it: import both JSON files into Postman, select the **Karmasheel
+To run it: import both JSON files into Postman, select the **Workforce Matching
 Local** environment, confirm `base_url` matches your running server, then
 follow the run order in `POSTMAN_WALKTHROUGH.md`.
 
@@ -250,7 +250,7 @@ via Postman/curl and the Django admin.
 |---|---|
 | `django.db.utils.OperationalError: connection to server ... failed` | PostgreSQL isn't running, or `DB_HOST`/`DB_PORT` in `.env` don't match. Confirm with `pg_isready` or `sudo systemctl status postgresql`. |
 | `django.db.utils.OperationalError: password authentication failed` | `DB_USER`/`DB_PASSWORD` in `.env` don't match the database role you created. |
-| `KeyError: 'DJANGO_SECRET_KEY'` (or `DB_NAME`, etc.) on startup | `.env` is missing or not in the repository root (`config/settings.py` loads it from `BASE_DIR.parent / ".env"`, i.e. `karmasheel/.env`, not `backend/.env`). |
+| `KeyError: 'DJANGO_SECRET_KEY'` (or `DB_NAME`, etc.) on startup | `.env` is missing or not in the repository root (`config/settings.py` loads it from `BASE_DIR.parent / ".env"`, i.e. `workforce-matching/.env`, not `backend/.env`). |
 | `seed_demo` raises `CommandError: ... refuses to run with DEBUG=False` | Set `DJANGO_DEBUG=True` in `.env` for local development, or pass `--force` if you are certain the database is not production. |
 | WeasyPrint import/PDF errors (`OSError: cannot load library ...`) | Install the system libraries listed under Prerequisites - WeasyPrint needs Pango/Cairo/GDK-Pixbuf, not just the Python package. |
 | Job creation returns `403 Forbidden` for an employer that should be allowed | Only employers with `verification_status = VERIFIED` may create jobs (`IsVerifiedEmployer`). Verify the employer through the Django admin, or run `seed_demo`, which seeds an already-verified employer. |

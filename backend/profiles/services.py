@@ -330,7 +330,7 @@ def _render_pdf_with_browser(html_string):
         return None
 
     try:
-        with tempfile.TemporaryDirectory(prefix="karmasheel-cv-") as temp_dir:
+        with tempfile.TemporaryDirectory(prefix="workforce-matching-cv-") as temp_dir:
             temp_path = Path(temp_dir)
             html_path = temp_path / "cv.html"
             pdf_path = temp_path / "cv.pdf"

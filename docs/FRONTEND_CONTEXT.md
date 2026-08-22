@@ -1,7 +1,7 @@
 # Frontend Context — Handoff Document
 
 Complete handoff for a frontend designer and a frontend coding agent building
-a React + TypeScript + Tailwind CSS client against the existing Karmasheel
+a React + TypeScript + Tailwind CSS client against the existing Workforce Matching
 Django REST API. This document describes **only what the backend actually
 does today**, verified by reading the repository (models, serializers,
 views, URLs, permissions, settings) as of Week 6 Phase 4. It does not
@@ -15,7 +15,7 @@ files were changed to produce this document.
 
 ## 1. Product purpose and target users
 
-Karmasheel is a workforce-matching and opportunity-advisory platform
+Workforce Matching is a workforce-matching and opportunity-advisory platform
 connecting **blue-collar and local-service workers** with **employers** in
 Nepal, using structured skills, location, availability, experience,
 preferences, and reliability indicators — with every match explained in
@@ -349,7 +349,7 @@ them — field names are exact.
 {
   "id": 1,
   "username": "demo_worker_electrician",
-  "email": "demo_worker_electrician@karmasheel.local",
+  "email": "demo_worker_electrician@workforce-matching.local",
   "phone_number": "9811100011",
   "role": "WORKER",
   "is_contact_verified": true
