@@ -58,15 +58,26 @@ describe('PublicLayout navigation', () => {
     expect(screen.queryByRole('link', { name: /register/i })).not.toBeInTheDocument()
   })
 
-  it('shows a role-appropriate return-to-dashboard link for an authenticated Worker instead', () => {
+  it('shows the full Worker navigation for an authenticated Worker instead', () => {
     setAuthenticatedUser(WORKER_USER)
     renderPublicLayout()
 
-    const dashboardLinks = screen.getAllByRole('link', { name: /dashboard/i })
-    expect(dashboardLinks.length).toBeGreaterThan(0)
-    for (const link of dashboardLinks) {
-      expect(link).toHaveAttribute('href', '/worker')
-    }
+    const nav = screen.getByRole('navigation', { name: 'Primary' })
+    const links = nav.querySelectorAll('a')
+    const hrefs = new Set(Array.from(links).map((link) => link.getAttribute('href')))
+
+    expect(hrefs).toEqual(
+      new Set([
+        '/worker',
+        '/jobs',
+        '/worker/applications',
+        '/worker/recommendations',
+        '/worker/opportunities',
+        '/worker/profile',
+        '/worker/cv',
+        '/worker/ratings',
+      ]),
+    )
   })
 
   it('shows a return-to-dashboard link pointing at /employer for an authenticated Employer', () => {
