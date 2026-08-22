@@ -126,34 +126,42 @@ export function Register() {
           onChange={(nextRole) => setValue('role', nextRole, { shouldValidate: true })}
         />
 
-        <TextField
-          label="Username"
-          autoComplete="username"
-          error={errors.username?.message}
-          {...registerField('username')}
-        />
-        <TextField
-          label="Email"
-          type="email"
-          autoComplete="email"
-          hint="Optional"
-          error={errors.email?.message}
-          {...registerField('email')}
-        />
-        <PhoneField
-          label="Phone number"
-          hint="We'll use this to reach you — required"
-          error={errors.phone_number?.message}
-          {...registerField('phone_number')}
-        />
-        <PasswordField
-          label="Password"
-          autoComplete="new-password"
-          error={errors.password?.message}
-          {...registerField('password')}
-        />
-
-        <Button type="submit" variant="primary" isLoading={isSubmitting} className="mt-2">
+        <div className="order-1">
+          <TextField
+            label="Username"
+            autoComplete="section-register nickname"
+            error={errors.username?.message}
+            {...registerField('username')}
+          />
+        </div>
+        <div className="order-4">
+          <PasswordField
+            label="Password"
+            autoComplete="section-register new-password"
+            error={errors.password?.message}
+            {...registerField('password')}
+          />
+        </div>
+        <div className="order-2">
+          <TextField
+            label="Email"
+            type="email"
+            autoComplete="section-register email"
+            hint="Optional"
+            error={errors.email?.message}
+            {...registerField('email')}
+          />
+        </div>
+        <div className="order-3">
+          <PhoneField
+            label="Phone number"
+            autoComplete="section-register tel-national"
+            hint="We'll use this to reach you — required"
+            error={errors.phone_number?.message}
+            {...registerField('phone_number')}
+          />
+        </div>
+        <Button type="submit" variant="primary" isLoading={isSubmitting} className="order-5 mt-2">
           Create account
         </Button>
       </form>

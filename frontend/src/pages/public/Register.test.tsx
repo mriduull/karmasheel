@@ -52,6 +52,37 @@ describe('Register', () => {
     expect(screen.getByRole('radio', { name: 'Employer' })).toHaveAttribute('aria-checked', 'true')
   })
 
+  it('marks registration fields with distinct autocomplete purposes', () => {
+    const { container } = renderRegister()
+
+    expect(screen.getByLabelText('Username')).toHaveAttribute(
+      'autocomplete',
+      'section-register nickname',
+    )
+    expect(screen.getByLabelText('Email')).toHaveAttribute(
+      'autocomplete',
+      'section-register email',
+    )
+    expect(screen.getByLabelText('Phone number')).toHaveAttribute(
+      'autocomplete',
+      'section-register tel-national',
+    )
+    expect(screen.getByLabelText('Password')).toHaveAttribute(
+      'autocomplete',
+      'section-register new-password',
+    )
+
+    const autofillOrder = Array.from(container.querySelectorAll('input')).map((input) =>
+      input.getAttribute('autocomplete'),
+    )
+    expect(autofillOrder.slice(0, 4)).toEqual([
+      'section-register nickname',
+      'section-register new-password',
+      'section-register email',
+      'section-register tel-national',
+    ])
+  })
+
   it('shows client-side validation errors for empty required fields', async () => {
     const user = userEvent.setup()
     renderRegister()
