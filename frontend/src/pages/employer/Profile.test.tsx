@@ -6,8 +6,9 @@ import userEvent from '@testing-library/user-event'
 import { axe } from 'jest-axe'
 import { server } from '@/test/msw/server'
 import { API_ROOT } from '@/test/msw/handlers'
-import { renderWithProviders, resetAuthStore, setAuthenticatedUser } from '@/test/utils'
+import { createTestQueryClient, renderWithProviders, resetAuthStore, setAuthenticatedUser } from '@/test/utils'
 import { buildEmployerProfileFixture } from '@/test/fixtures'
+import { EMPLOYER_PROFILE_QUERY_KEY } from '@/hooks/useEmployerProfile'
 import { EmployerProfile } from './Profile'
 
 const EMPLOYER_USER = {
@@ -39,6 +40,41 @@ describe('EmployerProfile', () => {
     renderWithProviders(<EmployerProfile />)
 
     expect(await screen.findByDisplayValue('Himal Builders')).toBeInTheDocument()
+  })
+
+  it('repopulates business detail fields when fresher profile data arrives after navigation', async () => {
+    const queryClient = createTestQueryClient()
+
+    server.use(
+      http.get(`${API_ROOT}/profiles/employer/me/`, () =>
+        HttpResponse.json(
+          buildEmployerProfileFixture({
+            organization_name: '',
+            address: '',
+            pan_vat_number: '',
+          }),
+        ),
+      ),
+    )
+
+    renderWithProviders(<EmployerProfile />, { queryClient })
+
+    expect(await screen.findByLabelText('Organization name')).toHaveValue('')
+
+    queryClient.setQueryData(
+      EMPLOYER_PROFILE_QUERY_KEY,
+      buildEmployerProfileFixture({
+        organization_name: 'My org',
+        address: 'Buddhanagar, Kathmandu',
+        pan_vat_number: '123456789',
+      }),
+    )
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Organization name')).toHaveValue('My org')
+      expect(screen.getByLabelText('Address')).toHaveValue('Buddhanagar, Kathmandu')
+      expect(screen.getByLabelText('PAN/VAT number')).toHaveValue('123456789')
+    })
   })
 
   it('shows verification status read-only, with no request-verification control', async () => {

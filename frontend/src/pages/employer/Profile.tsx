@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
@@ -72,6 +72,7 @@ function DetailsSection({ profile }: { profile: EmployerProfile }) {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
+    reset,
     setError,
   } = useForm<EmployerDetailsFormValues>({
     resolver: zodResolver(employerDetailsSchema),
@@ -82,6 +83,14 @@ function DetailsSection({ profile }: { profile: EmployerProfile }) {
     },
   })
 
+  useEffect(() => {
+    reset({
+      organization_name: profile.organization_name,
+      address: profile.address,
+      pan_vat_number: profile.pan_vat_number,
+    })
+  }, [profile.address, profile.organization_name, profile.pan_vat_number, reset])
+
   const onSubmit = async (values: EmployerDetailsFormValues) => {
     setFormError(null)
     setIsSaved(false)
@@ -89,6 +98,7 @@ function DetailsSection({ profile }: { profile: EmployerProfile }) {
     try {
       const updated = await updateEmployerProfile(values)
       queryClient.setQueryData(EMPLOYER_PROFILE_QUERY_KEY, updated)
+      await queryClient.invalidateQueries({ queryKey: EMPLOYER_PROFILE_QUERY_KEY })
       setIsSaved(true)
     } catch (error) {
       if (error instanceof ApiError) {

@@ -3,6 +3,7 @@ import tempfile
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.contrib import admin
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -886,6 +887,19 @@ class ProfileAdminTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Everest Builders")
+
+    def test_employer_profile_business_fields_are_editable_from_admin_list(self):
+        model_admin = admin.site._registry[EmployerProfile]
+
+        self.assertEqual(
+            model_admin.list_editable,
+            (
+                "organization_name",
+                "address",
+                "pan_vat_number",
+                "verification_status",
+            ),
+        )
 
     def test_mark_verified_action_sets_valid_status_and_reports_count(self):
         self.client.force_login(self.superuser)

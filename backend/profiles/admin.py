@@ -86,6 +86,13 @@ class EmployerProfileAdmin(admin.ModelAdmin):
 
     list_filter = ("verification_status",)
 
+    list_editable = (
+        "organization_name",
+        "address",
+        "pan_vat_number",
+        "verification_status",
+    )
+
     search_fields = (
         "organization_name",
         "user__username",
