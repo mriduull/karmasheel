@@ -46,3 +46,10 @@ class FrontendSmokeTests(SimpleTestCase):
 
         self.assertEqual(match.view_name, "taxonomy:tree")
         self.assertNotEqual(match.view_name, "frontend")
+
+    def test_api_root_returns_endpoint_index(self):
+        response = self.client.get(reverse("api_root"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["name"], "Karmasheel API")
+        self.assertEqual(response.json()["endpoints"]["job_browse"], "/api/jobs/browse/")

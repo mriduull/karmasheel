@@ -17,6 +17,7 @@ Including another URLconf
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import include, path
 from django.views.generic import TemplateView
 
@@ -24,6 +25,23 @@ from django.views.generic import TemplateView
 admin.site.site_header = "Karmasheel Administration"
 admin.site.site_title = "Karmasheel Administration"
 admin.site.index_title = "Karmasheel Administration"
+
+
+def api_root(request):
+    return JsonResponse(
+        {
+            "name": "Karmasheel API",
+            "endpoints": {
+                "auth": "/api/auth/",
+                "profiles": "/api/profiles/",
+                "taxonomy": "/api/taxonomy/",
+                "jobs": "/api/jobs/",
+                "job_browse": "/api/jobs/browse/",
+                "applications": "/api/applications/",
+                "recommendations": "/api/recommendations/",
+            },
+        }
+    )
 
 
 urlpatterns = [
@@ -34,6 +52,8 @@ urlpatterns = [
     ),
 
     path("admin/", admin.site.urls),
+
+    path("api/", api_root, name="api_root"),
 
     path(
         "api/auth/",
