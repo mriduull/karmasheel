@@ -55,6 +55,7 @@ describe('router', () => {
     resetAuthStore()
     server.use(
       http.get(`${API_ROOT}/taxonomy/tree/`, () => HttpResponse.json([])),
+      http.get(`${API_ROOT}/taxonomy/categories/`, () => HttpResponse.json([])),
       http.get(`${API_ROOT}/jobs/browse/`, () => HttpResponse.json([])),
       http.get(`${API_ROOT}/profiles/worker/me/`, () => HttpResponse.json(buildWorkerProfileFixture())),
       http.get(`${API_ROOT}/applications/`, () => HttpResponse.json([])),
@@ -67,7 +68,7 @@ describe('router', () => {
 
   it('renders the public landing page at /', () => {
     renderAt('/')
-    expect(screen.getByRole('link', { name: 'Workforce Match' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Workforce Matching' })).toBeInTheDocument()
     expect(
       screen.getByRole('heading', { level: 1, name: /find honest local work/i }),
     ).toBeInTheDocument()

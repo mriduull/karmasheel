@@ -1,8 +1,8 @@
-# Karmasheel Implementation Plan
+# Workforce Matching Implementation Plan
 
 ## Project purpose
 
-Karmasheel is a web-based workforce-matching and opportunity-advisory
+Workforce Matching is a web-based workforce-matching and opportunity-advisory
 platform for blue-collar and local-service workers in Nepal.
 
 The system connects workers and employers using structured skills,

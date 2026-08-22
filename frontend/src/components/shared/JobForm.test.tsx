@@ -403,7 +403,10 @@ describe('JobForm', () => {
 
   it('has no automatically-detectable accessibility violations', async () => {
     const { container } = renderWithProviders(<JobForm mode="create" />)
-    await screen.findByLabelText('Category')
+    const categorySelect = await screen.findByLabelText('Category')
+    // The select itself exists before its taxonomy query settles. Wait for
+    // a fetched option so that update cannot race with the axe scan.
+    await within(categorySelect).findByRole('option', { name: 'Construction & Repair' })
 
     const results = await axe(container)
     expect(results).toHaveNoViolations()

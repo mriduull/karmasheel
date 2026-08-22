@@ -2,8 +2,8 @@
     "use strict";
 
     const state = {
-        access: sessionStorage.getItem("karmasheel_access") || "",
-        refresh: sessionStorage.getItem("karmasheel_refresh") || "",
+        access: sessionStorage.getItem("workforce_matching_access") || "",
+        refresh: sessionStorage.getItem("workforce_matching_refresh") || "",
         user: null,
         taxonomy: [],
         publicJobs: [],
@@ -47,11 +47,11 @@
     }
 
     function persistTokens() {
-        if (state.access) sessionStorage.setItem("karmasheel_access", state.access);
-        else sessionStorage.removeItem("karmasheel_access");
+        if (state.access) sessionStorage.setItem("workforce_matching_access", state.access);
+        else sessionStorage.removeItem("workforce_matching_access");
 
-        if (state.refresh) sessionStorage.setItem("karmasheel_refresh", state.refresh);
-        else sessionStorage.removeItem("karmasheel_refresh");
+        if (state.refresh) sessionStorage.setItem("workforce_matching_refresh", state.refresh);
+        else sessionStorage.removeItem("workforce_matching_refresh");
     }
 
     function clearSession() {
@@ -430,7 +430,7 @@
     async function applyToJob(jobId) {
         await request("/api/applications/", {
             method: "POST",
-            body: {job: Number(jobId), worker_note: "Applied through the Karmasheel demo interface."},
+            body: {job: Number(jobId), worker_note: "Applied through the Workforce Matching demo interface."},
         });
         showFlash("Application submitted.");
         await loadWorkerApplications();
@@ -823,7 +823,7 @@
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `karmasheel-cv-${state.user.username}.pdf`;
+        link.download = `workforce_matching-cv-${state.user.username}.pdf`;
         document.body.append(link);
         link.click();
         link.remove();

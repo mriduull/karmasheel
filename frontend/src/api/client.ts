@@ -2,18 +2,32 @@ import { useAuthStore } from '@/state/authStore'
 import { tokenStorage } from './tokenStorage'
 import { ApiError, networkError, parseErrorResponse } from './errors'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string | undefined
+const configuredApiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
+const API_BASE_URL = configuredApiBaseUrl?.replace(/\/+$/, '')
 
 if (!API_BASE_URL) {
-  // Fail loudly in dev/test rather than silently requesting a relative
-  // "/api/..." path that can never reach the backend.
-  // eslint-disable-next-line no-console
-  console.error(
+  throw new Error(
     'VITE_API_BASE_URL is not set. Copy frontend/.env.example to frontend/.env and set it.',
   )
 }
 
-const API_ROOT = `${API_BASE_URL ?? ''}/api`
+try {
+  const apiUrl = new URL(API_BASE_URL)
+  if (
+    !['http:', 'https:'].includes(apiUrl.protocol) ||
+    apiUrl.origin !== API_BASE_URL ||
+    apiUrl.username ||
+    apiUrl.password
+  ) {
+    throw new Error()
+  }
+} catch {
+  throw new Error(
+    'VITE_API_BASE_URL must be an HTTP(S) origin without /api or another path.',
+  )
+}
+
+const API_ROOT = `${API_BASE_URL}/api`
 
 export interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown

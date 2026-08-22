@@ -702,7 +702,7 @@ def _build_reasons_and_warnings(
     if completed_job_count:
         job_word = "job" if completed_job_count == 1 else "jobs"
         reasons.append(
-            f"{reliability_party} has completed {completed_job_count} {job_word} through Karmasheel."
+            f"{reliability_party} has completed {completed_job_count} {job_word} through Workforce Matching."
         )
 
     rating_count = reliability_sub_scores["rating_count"]

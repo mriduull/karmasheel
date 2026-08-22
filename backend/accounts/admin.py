@@ -18,11 +18,11 @@ def mark_contact_unverified(modeladmin, request, queryset):
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
-    """Admin configuration for the custom Karmasheel user model."""
+    """Admin configuration for the custom Workforce Matching user model."""
 
     fieldsets = UserAdmin.fieldsets + (
         (
-            "Karmasheel fields",
+            "Workforce Matching fields",
             {
                 "fields": (
                     "phone_number",
@@ -35,7 +35,7 @@ class CustomUserAdmin(UserAdmin):
 
     add_fieldsets = UserAdmin.add_fieldsets + (
         (
-            "Karmasheel fields",
+            "Workforce Matching fields",
             {
                 "fields": (
                     "phone_number",

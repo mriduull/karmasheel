@@ -15,22 +15,24 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.http import JsonResponse
-from django.urls import include, path
-from django.views.generic import TemplateView
+from django.shortcuts import render
+from django.urls import include, path, re_path
+from django.views.static import serve as serve_media
+
+from .views import health, readiness
 
 
-admin.site.site_header = "Karmasheel Administration"
-admin.site.site_title = "Karmasheel Administration"
-admin.site.index_title = "Karmasheel Administration"
+admin.site.site_header = "Workforce Matching Administration"
+admin.site.site_title = "Workforce Matching Administration"
+admin.site.index_title = "Workforce Matching Administration"
 
 
 def api_root(request):
     return JsonResponse(
         {
-            "name": "Karmasheel API",
+            "name": "Workforce Matching API",
             "endpoints": {
                 "auth": "/api/auth/",
                 "profiles": "/api/profiles/",
@@ -45,14 +47,21 @@ def api_root(request):
     )
 
 
+def service_root(request):
+    """Show the local demo in debug mode and an API index in production."""
+    if settings.DEBUG:
+        return render(request, "frontend/index.html")
+
+    return api_root(request)
+
+
 urlpatterns = [
-    path(
-        "",
-        TemplateView.as_view(template_name="frontend/index.html"),
-        name="frontend",
-    ),
+    path("", service_root, name="frontend"),
 
     path("admin/", admin.site.urls),
+
+    path("api/health/", health, name="health"),
+    path("api/readiness/", readiness, name="readiness"),
 
     path("api/", api_root, name="api_root"),
 
@@ -87,5 +96,12 @@ urlpatterns = [
     ),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+if settings.SERVE_MEDIA:
+    urlpatterns += [
+        re_path(
+            r"^media/(?P<path>.*)$",
+            serve_media,
+            {"document_root": settings.MEDIA_ROOT},
+            name="media",
+        ),
+    ]

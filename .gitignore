@@ -11,7 +11,11 @@ venv/
 node_modules/
 
 # Environment variables and secrets
-.env
+.env*
+!.env.example
+!frontend/.env.example
+!frontend/.env.test
+!frontend/.env.production.example
 
 # Django-generated files
 db.sqlite3

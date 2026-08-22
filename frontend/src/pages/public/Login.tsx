@@ -51,6 +51,11 @@ export function Login() {
       const roleHome = user.role === 'WORKER' ? '/worker' : '/employer'
       navigate(from?.pathname ?? roleHome, { replace: true })
     } catch (error) {
+      // Login can succeed while the follow-up /me request fails. Never
+      // leave a refresh token behind for a session that did not finish
+      // bootstrapping into a known user/role.
+      useAuthStore.getState().logout()
+
       if (error instanceof ApiError) {
         if (error.kind === 'unauthorized') {
           setFormError(INVALID_CREDENTIALS_MESSAGE)
@@ -71,10 +76,15 @@ export function Login() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        autoComplete="off"
+        noValidate
+        className="flex flex-col gap-4"
+      >
         <TextField
           label="Username"
-          autoComplete="username"
+          autoComplete="off"
           error={errors.username?.message}
           {...registerField('username')}
         />

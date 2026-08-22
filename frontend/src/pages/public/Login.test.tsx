@@ -41,6 +41,14 @@ describe('Login', () => {
     vi.restoreAllMocks()
   })
 
+  it('does not request saved email or username suggestions', () => {
+    renderLogin()
+
+    const usernameInput = screen.getByLabelText('Username')
+    expect(usernameInput).toHaveAttribute('autocomplete', 'off')
+    expect(usernameInput.closest('form')).toHaveAttribute('autocomplete', 'off')
+  })
+
   it('logs in and redirects a Worker to /worker, storing tokens via the F0 auth system', async () => {
     const user = userEvent.setup()
 
@@ -119,6 +127,30 @@ describe('Login', () => {
       await screen.findByText("That username or password isn't right. Please try again."),
     ).toBeInTheDocument()
     expect(useAuthStore.getState().accessToken).toBeNull()
+    expect(tokenStorage.getRefreshToken()).toBeNull()
+  })
+
+  it('clears tokens when login succeeds but loading the current user fails', async () => {
+    const user = userEvent.setup()
+
+    server.use(
+      http.post(`${API_ROOT}/auth/login/`, () =>
+        HttpResponse.json({ access: 'temporary-access', refresh: 'temporary-refresh' }),
+      ),
+      http.get(`${API_ROOT}/auth/me/`, () =>
+        HttpResponse.json({ detail: 'Temporary server failure' }, { status: 503 }),
+      ),
+    )
+
+    renderLogin()
+
+    await user.type(screen.getByLabelText('Username'), 'demo_worker_electrician')
+    await user.type(screen.getByLabelText('Password'), 'DemoPass123!')
+    await user.click(screen.getByRole('button', { name: 'Log In' }))
+
+    await screen.findByRole('alert')
+    expect(useAuthStore.getState().accessToken).toBeNull()
+    expect(useAuthStore.getState().user).toBeNull()
     expect(tokenStorage.getRefreshToken()).toBeNull()
   })
 

@@ -23,8 +23,9 @@ import os
 # test-only defaults here keeps test execution independent from local secrets.
 os.environ.setdefault(
     "DJANGO_SECRET_KEY",
-    "karmasheel-test-only-secret-key-never-use-in-production",
+    "workforce-matching-test-only-secret-key-never-use-in-production",
 )
+os.environ["DJANGO_DEBUG"] = "True"
 os.environ.setdefault("DB_NAME", "unused-in-tests")
 os.environ.setdefault("DB_USER", "unused-in-tests")
 os.environ.setdefault("DB_PASSWORD", "unused-in-tests")

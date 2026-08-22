@@ -1,4 +1,5 @@
 from decimal import Decimal
+from io import BytesIO
 import tempfile
 from unittest.mock import patch
 
@@ -9,6 +10,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from PIL import Image
 
 from applications.models import Application
 from applications.services import submit_rating
@@ -20,6 +22,17 @@ from .services import generate_worker_summary, render_worker_cv_pdf
 
 
 User = get_user_model()
+
+
+def make_test_image_upload(name="profile.png", size=(2, 2), image_format="PNG"):
+    buffer = BytesIO()
+    Image.new("RGB", size, color="blue").save(buffer, format=image_format)
+    content_type = {
+        "JPEG": "image/jpeg",
+        "PNG": "image/png",
+        "WEBP": "image/webp",
+    }[image_format]
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type=content_type)
 
 
 class WorkerProfileAPITests(APITestCase):
@@ -189,11 +202,7 @@ class WorkerProfileAPITests(APITestCase):
             response = self.client.patch(
                 self.worker_url,
                 {
-                    "profile_photo": SimpleUploadedFile(
-                        "profile.png",
-                        b"fake image bytes",
-                        content_type="image/png",
-                    )
+                    "profile_photo": make_test_image_upload()
                 },
                 format="multipart",
             )
@@ -217,6 +226,59 @@ class WorkerProfileAPITests(APITestCase):
                     content_type="text/plain",
                 )
             },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("profile_photo", response.data)
+
+    def test_worker_profile_photo_rejects_spoofed_image_content(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+
+        response = self.client.patch(
+            self.worker_url,
+            {
+                "profile_photo": SimpleUploadedFile(
+                    "profile.png",
+                    b"not actually a png",
+                    content_type="image/png",
+                )
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("profile_photo", response.data)
+
+    def test_worker_profile_photo_rejects_mismatched_filename_extension(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+
+        mismatches = (
+            ("profile.png", "JPEG"),
+            ("profile.jpg", "PNG"),
+        )
+        for filename, image_format in mismatches:
+            with self.subTest(filename=filename, image_format=image_format):
+                response = self.client.patch(
+                    self.worker_url,
+                    {
+                        "profile_photo": make_test_image_upload(
+                            name=filename,
+                            image_format=image_format,
+                        )
+                    },
+                    format="multipart",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn("profile_photo", response.data)
+
+    def test_worker_profile_photo_rejects_excessive_dimensions(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+
+        response = self.client.patch(
+            self.worker_url,
+            {"profile_photo": make_test_image_upload(size=(4097, 1))},
             format="multipart",
         )
 
@@ -712,7 +774,7 @@ class WorkerCVAPITests(APITestCase):
         self.assertIn("Worker with 2 years of experience", content)
         self.assertIn("Not rated yet", content)
         self.assertNotIn("Generated on", content)
-        self.assertNotIn("by Karmasheel", content)
+        self.assertNotIn("by Workforce Matching", content)
 
     def test_worker_cv_embeds_profile_photo_when_uploaded(self):
         self.authenticate_as(self.worker, "WorkerPassword123!")

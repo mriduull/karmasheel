@@ -1,6 +1,6 @@
-# Karmasheel
+# Workforce Matching
 
-Karmasheel is a Django REST Framework and PostgreSQL workforce-matching
+Workforce Matching is a Django REST Framework and PostgreSQL workforce-matching
 platform connecting blue-collar and local-service workers with employers in
 Nepal, using structured skills, location, availability, experience,
 preferences, and reliability indicators. Recommendations are transparent and
@@ -15,14 +15,19 @@ frontend, PostgreSQL, seeding, and troubleshooting) see
 condensed backend-only version below still works, but the full guide is
 kept up to date first.
 
+For a Windows demo using the included local SQLite settings, see
+[`setup.md`](setup.md). Production operators should follow
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md); defense-report figures should
+follow [`docs/DEFENSE_SCREENSHOTS.md`](docs/DEFENSE_SCREENSHOTS.md).
+
 ## Implemented features
 
 - **Accounts** - custom `User` model (username + unique phone number),
   JWT authentication (login/refresh/logout with blacklisting), worker/employer
   roles, manual contact verification via the Django admin.
 - **Profiles** - worker and employer profile CRUD; PAN/VAT format validation;
-  auto-generated worker CV (HTML preview and PDF download) built entirely
-  from stored profile fields.
+  validated Worker profile-photo upload; auto-generated Worker CV (HTML
+  preview and PDF download) built entirely from stored profile fields.
 - **Taxonomy** - structured categories, subcategories, and standardized
   skills; English and Romanized-Nepali aliases; a skill-normalization
   service (text preprocessing -> exact name match -> exact alias match ->
@@ -69,7 +74,7 @@ kept up to date first.
 ## Repository structure
 
 ```
-karmasheel/
+workforce-matching/
 ├── backend/                 # Django project
 │   ├── config/               # Settings, root URLconf, WSGI/ASGI, test_settings
 │   ├── accounts/              # Custom User model, auth endpoints, seed_demo command
@@ -94,7 +99,7 @@ karmasheel/
 ### 1. Clone and create a virtual environment
 
 ```bash
-cd karmasheel
+cd workforce-matching
 python3 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 ```
@@ -117,8 +122,13 @@ cp .env.example .env
 |---|---|
 | `DJANGO_SECRET_KEY` | Django's cryptographic secret key. Generate your own (e.g. `python -c "import secrets; print(secrets.token_urlsafe(50))"`) - do not reuse the example value anywhere. |
 | `DJANGO_DEBUG` | `True` for local development. **Must be `False` in production.** `seed_demo` refuses to run when this is `False` (see below). |
+| `DJANGO_ALLOWED_HOSTS` | Comma-separated backend hostnames, without schemes. Required when `DJANGO_DEBUG=False`. |
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | PostgreSQL connection settings. |
+| `DATABASE_URL` | Optional production PostgreSQL URL; takes precedence over the separate `DB_*` variables. |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated list of origins allowed to call the API (e.g. a local frontend dev server). No wildcard is used. |
+| `CSRF_TRUSTED_ORIGINS` | HTTPS backend/admin origins trusted for CSRF-protected form submissions. |
+| `DB_SSL_REQUIRED` | Set `True` when the production PostgreSQL provider requires TLS. |
+| `DJANGO_MEDIA_ROOT`, `DJANGO_SERVE_MEDIA` | Persistent upload path and small-deployment media serving switch. See the deployment guide before enabling. |
 | `SKILL_MATCH_THRESHOLD` | Optional. RapidFuzz confidence (0-100) above which a fuzzy skill match is auto-accepted. Defaults to `85`. |
 | `RECOMMENDATION_MAX_DISTANCE_KM` | Optional. Distance at which the distance score reaches 0. Defaults to `20`. |
 | `RECOMMENDATION_NEAR_MISS_MIN_SCORE` / `_MAX_SCORE` | Optional. Inclusive final-score range treated as a "near miss" by the opportunity advisory. Defaults to `40` / `75`. |
@@ -126,9 +136,9 @@ cp .env.example .env
 ### 4. Create the PostgreSQL database
 
 ```bash
-sudo -u postgres psql -c "CREATE DATABASE karmasheel_db;"
-sudo -u postgres psql -c "CREATE USER karmasheel_user WITH PASSWORD 'your-postgresql-password';"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE karmasheel_db TO karmasheel_user;"
+sudo -u postgres psql -c "CREATE DATABASE workforce_matching_db;"
+sudo -u postgres psql -c "CREATE USER workforce_matching_user WITH PASSWORD 'your-postgresql-password';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE workforce_matching_db TO workforce_matching_user;"
 ```
 
 Match the database/user names and password to whatever you put in `.env`.
@@ -189,23 +199,26 @@ All endpoints are namespaced under `/api/`:
 |---|---|
 | `/api/auth/` | Registration, login, token refresh, logout, `/me/` |
 | `/api/profiles/` | Worker/employer profile CRUD, CV preview/PDF |
-| `/api/taxonomy/` | Categories, subcategories, skills, taxonomy tree |
+| `/api/taxonomy/` | Categories, subcategories, skills, taxonomy tree and bounded job-category inference |
 | `/api/jobs/` | Job CRUD, public browsing, candidate listing |
 | `/api/applications/` | Apply, status transitions, ratings |
 | `/api/recommendations/` | Worker-to-job / job-to-worker recommendations, opportunity advisory |
+| `/api/health/`, `/api/readiness/` | Process liveness and database readiness probes |
 | `/admin/` | Django admin |
 
 ## Postman collection
 
 Located at `docs/postman/`:
 
-- `Karmasheel_API.postman_collection.json` - the full request collection.
-- `Karmasheel_Local.postman_environment.json` - matching environment
+- `Workforce_Matching_API.postman_collection.json` - a curated core-API
+  regression collection (the application test suites remain the authoritative
+  coverage for newer endpoints and UI workflows).
+- `Workforce_Matching_Local.postman_environment.json` - matching environment
   (local-only demo credentials).
 - `POSTMAN_WALKTHROUGH.md` - setup, run order, and a fresh-database manual
   verification step (an employer must be verified before it can post jobs).
 
-To run it: import both JSON files into Postman, select the **Karmasheel
+To run it: import both JSON files into Postman, select the **Workforce Matching
 Local** environment, confirm `base_url` matches your running server, then
 follow the run order in `POSTMAN_WALKTHROUGH.md`.
 
@@ -232,12 +245,35 @@ Or a focused class/method:
 python manage.py test accounts.tests.SeedDemoCommandTests --settings=config.test_settings --keepdb
 ```
 
+Frontend verification:
+
+```bash
+cd frontend
+npm ci
+npm run lint
+npm test
+VITE_API_BASE_URL=http://127.0.0.1:8000 npm run build
+```
+
+## Production deployment
+
+Production support includes Gunicorn, WhiteNoise-managed static files,
+PostgreSQL `DATABASE_URL` support, HTTPS/cookie hardening, strict host/secret
+validation, health/readiness probes, baseline API throttling, structured
+console logs, a `Procfile`, SPA rewrite/security-header files, and CI. The
+exact build/release/start commands and required environment variables are in
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+Deployment-ready configuration is not the same as a provisioned production
+system: database backups, domains/TLS, persistent media, edge rate limiting,
+monitoring, privacy policy, and staging smoke tests remain operator tasks.
+
 ## Known limitations and deferred scope
 
 See [`docs/DEFERRED_SCOPE.md`](docs/DEFERRED_SCOPE.md) for a full breakdown
 of implemented, partially-implemented, and intentionally-deferred features
 (complaints, trusted-worker rehiring, notifications, advanced analytics,
-file uploads, embeddings/NLP, production deployment, and more).
+document uploads, embeddings/NLP, and more).
 
 The `frontend/` directory contains a working React + TypeScript + Vite
 client (see [`docs/DEVELOPMENT_SETUP.md`](docs/DEVELOPMENT_SETUP.md) to run
@@ -250,7 +286,7 @@ via Postman/curl and the Django admin.
 |---|---|
 | `django.db.utils.OperationalError: connection to server ... failed` | PostgreSQL isn't running, or `DB_HOST`/`DB_PORT` in `.env` don't match. Confirm with `pg_isready` or `sudo systemctl status postgresql`. |
 | `django.db.utils.OperationalError: password authentication failed` | `DB_USER`/`DB_PASSWORD` in `.env` don't match the database role you created. |
-| `KeyError: 'DJANGO_SECRET_KEY'` (or `DB_NAME`, etc.) on startup | `.env` is missing or not in the repository root (`config/settings.py` loads it from `BASE_DIR.parent / ".env"`, i.e. `karmasheel/.env`, not `backend/.env`). |
+| `KeyError: 'DJANGO_SECRET_KEY'` (or `DB_NAME`, etc.) on startup | `.env` is missing or not in the repository root (`config/settings.py` loads it from `BASE_DIR.parent / ".env"`, i.e. `workforce-matching/.env`, not `backend/.env`). |
 | `seed_demo` raises `CommandError: ... refuses to run with DEBUG=False` | Set `DJANGO_DEBUG=True` in `.env` for local development, or pass `--force` if you are certain the database is not production. |
 | WeasyPrint import/PDF errors (`OSError: cannot load library ...`) | Install the system libraries listed under Prerequisites - WeasyPrint needs Pango/Cairo/GDK-Pixbuf, not just the Python package. |
 | Job creation returns `403 Forbidden` for an employer that should be allowed | Only employers with `verification_status = VERIFIED` may create jobs (`IsVerifiedEmployer`). Verify the employer through the Django admin, or run `seed_demo`, which seeds an already-verified employer. |
