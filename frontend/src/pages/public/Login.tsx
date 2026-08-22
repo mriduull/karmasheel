@@ -71,10 +71,15 @@ export function Login() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        autoComplete="off"
+        noValidate
+        className="flex flex-col gap-4"
+      >
         <TextField
           label="Username"
-          autoComplete="username"
+          autoComplete="off"
           error={errors.username?.message}
           {...registerField('username')}
         />

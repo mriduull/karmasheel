@@ -41,6 +41,14 @@ describe('Login', () => {
     vi.restoreAllMocks()
   })
 
+  it('does not request saved email or username suggestions', () => {
+    renderLogin()
+
+    const usernameInput = screen.getByLabelText('Username')
+    expect(usernameInput).toHaveAttribute('autocomplete', 'off')
+    expect(usernameInput.closest('form')).toHaveAttribute('autocomplete', 'off')
+  })
+
   it('logs in and redirects a Worker to /worker, storing tokens via the F0 auth system', async () => {
     const user = userEvent.setup()
 
