@@ -36,7 +36,9 @@ export function WorkerDashboard() {
 
   return (
     <PageContainer>
-      <h1 className="text-2xl font-semibold text-text-primary">Welcome, {user?.username}</h1>
+      <h1 className="text-2xl font-semibold text-text-primary">
+        Welcome, <span className="break-all">{user?.username}</span>
+      </h1>
 
       <div className="mt-6">
         {profileQuery.isLoading && <SkeletonCard />}

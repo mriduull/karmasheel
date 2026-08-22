@@ -112,7 +112,7 @@ export function NavShell({ items, brandHref, children }: NavShellProps) {
 
           {user && (
             <div className="hidden shrink-0 items-center gap-3 md:flex">
-              <span className="text-sm text-text-secondary">
+              <span className="max-w-64 truncate text-sm text-text-secondary" title={user.username}>
                 {user.username} · {user.role === 'WORKER' ? 'Worker' : 'Employer'}
               </span>
               <button

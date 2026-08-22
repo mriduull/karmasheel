@@ -27,7 +27,7 @@ export function EmployerDashboard() {
   return (
     <PageContainer>
       <h1 className="text-2xl font-semibold text-text-primary">
-        Welcome, {user?.username}
+        Welcome, <span className="break-all">{user?.username}</span>
         {profileQuery.data?.organization_name ? ` · ${profileQuery.data.organization_name}` : ''}
       </h1>
 

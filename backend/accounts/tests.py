@@ -166,6 +166,29 @@ class RegistrationAPITests(APITestCase):
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
                 self.assertIn("phone_number", response.data)
 
+    def test_registration_rejects_numeric_only_or_too_long_username(self):
+        cases = (
+            ("1234567890", "Username must include at least one letter."),
+            ("workername123456789012345678901", "Username must be 30 characters or fewer."),
+        )
+
+        for index, (username, expected_message) in enumerate(cases, start=1):
+            with self.subTest(username=username):
+                response = self.client.post(
+                    self.register_url,
+                    {
+                        "username": username,
+                        "phone_number": f"981111111{index}",
+                        "password": "SecurePassword123!",
+                        "role": User.Role.WORKER,
+                    },
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn("username", response.data)
+                self.assertIn(expected_message, response.data["username"])
+
 
 class AuthenticationAPITests(APITestCase):
     """Tests for JWT authentication, permissions, and logout."""

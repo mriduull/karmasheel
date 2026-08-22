@@ -94,6 +94,25 @@ describe('Register', () => {
     expect(screen.getByText('Password is required.')).toBeInTheDocument()
   })
 
+  it('rejects numeric-only and too-long usernames before submitting', async () => {
+    const user = userEvent.setup()
+    renderRegister()
+
+    const usernameInput = screen.getByLabelText('Username')
+    await user.type(usernameInput, '1234567890')
+    await user.type(screen.getByLabelText('Phone number'), '9811111111')
+    await user.type(screen.getByLabelText('Password'), 'SecurePassword123!')
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+    expect(await screen.findByText('Username must include at least one letter.')).toBeInTheDocument()
+
+    await user.clear(usernameInput)
+    await user.type(usernameInput, 'workername123456789012345678901')
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+    expect(await screen.findByText('Username must be 30 characters or fewer.')).toBeInTheDocument()
+  })
+
   it('shows a minimum-length error for a too-short (but non-empty) password', async () => {
     const user = userEvent.setup()
     renderRegister()

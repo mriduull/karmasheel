@@ -57,6 +57,19 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         return value
 
+    def validate_username(self, value):
+        if len(value) > 30:
+            raise serializers.ValidationError(
+                "Username must be 30 characters or fewer."
+            )
+
+        if not any(char.isalpha() for char in value):
+            raise serializers.ValidationError(
+                "Username must include at least one letter."
+            )
+
+        return value
+
     @transaction.atomic
     def create(self, validated_data):
         password = validated_data.pop("password")
