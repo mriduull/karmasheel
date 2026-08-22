@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from 'react-router-dom'
@@ -15,7 +15,7 @@ import { Button } from '@/components/primitives/Button'
 import { ErrorBanner } from '@/components/primitives/ErrorBanner'
 import { CategorySelect } from './CategorySelect'
 import { SubcategorySelect } from './SubcategorySelect'
-import { SkillChipInput } from './SkillChipInput'
+import { SkillChipInput, type SkillChipInputHandle } from './SkillChipInput'
 import { UnmatchedTermNotice } from './UnmatchedTermNotice'
 import { JobLocationFields } from './JobLocationFields'
 import { JobFormSection } from './JobFormSection'
@@ -42,6 +42,8 @@ interface JobFormProps {
 export function JobForm({ mode, job }: JobFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const requiredSkillsRef = useRef<SkillChipInputHandle>(null)
+  const preferredSkillsRef = useRef<SkillChipInputHandle>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [requiredSkills, setRequiredSkills] = useState<string[]>(
     () => job?.required_skills.map((skill) => skill.name) ?? [],
@@ -94,6 +96,12 @@ export function JobForm({ mode, job }: JobFormProps) {
       return
     }
 
+    const committedRequiredSkills = requiredSkillsRef.current?.commitDraft() ?? requiredSkills
+    if (committedRequiredSkills === null) return
+
+    const committedPreferredSkills = preferredSkillsRef.current?.commitDraft() ?? preferredSkills
+    if (committedPreferredSkills === null) return
+
     const payload = {
       title: values.title,
       category: Number(values.category),
@@ -114,8 +122,8 @@ export function JobForm({ mode, job }: JobFormProps) {
       application_deadline: values.application_deadline
         ? fromDatetimeLocalInputValue(values.application_deadline)
         : null,
-      required_skills_input: requiredSkills,
-      preferred_skills_input: preferredSkills,
+      required_skills_input: committedRequiredSkills,
+      preferred_skills_input: committedPreferredSkills,
     }
 
     try {
@@ -317,8 +325,18 @@ export function JobForm({ mode, job }: JobFormProps) {
         title="Skills"
         description="Add skills as free text — English or Romanized Nepali both work."
       >
-        <SkillChipInput label="Required skills" value={requiredSkills} onChange={setRequiredSkills} />
-        <SkillChipInput label="Preferred skills" value={preferredSkills} onChange={setPreferredSkills} />
+        <SkillChipInput
+          ref={requiredSkillsRef}
+          label="Required skills"
+          value={requiredSkills}
+          onChange={setRequiredSkills}
+        />
+        <SkillChipInput
+          ref={preferredSkillsRef}
+          label="Preferred skills"
+          value={preferredSkills}
+          onChange={setPreferredSkills}
+        />
       </JobFormSection>
 
       <Button type="submit" variant="primary" isLoading={isSubmitting} className="self-start">
