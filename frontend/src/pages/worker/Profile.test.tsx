@@ -156,6 +156,39 @@ describe('WorkerProfile', () => {
     expect(screen.getByText('cnc machine operation')).toBeInTheDocument()
   })
 
+  it('saves a typed skill draft when the user clicks Save without clicking Add first', async () => {
+    const user = userEvent.setup()
+    let capturedBody: unknown = null
+
+    server.use(
+      http.get(`${API_ROOT}/profiles/worker/me/`, () =>
+        HttpResponse.json(buildWorkerProfileFixture({ skills: [] })),
+      ),
+      http.patch(`${API_ROOT}/profiles/worker/me/`, async ({ request }) => {
+        capturedBody = await request.json()
+        return HttpResponse.json(
+          buildWorkerProfileFixture({
+            skills: [{ id: 2, name: 'House Wiring', subcategory: 'Electrical' }],
+          }),
+        )
+      }),
+    )
+
+    renderWithProviders(<WorkerProfile />)
+
+    const skillInput = await screen.findByLabelText('Your skills')
+    await user.type(skillInput, 'ghar wiring')
+
+    const skillsForm = skillInput.closest('form') as HTMLFormElement
+    await user.click(within(skillsForm).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(capturedBody).toEqual({ skill_input: ['ghar wiring'] })
+    })
+    expect(await screen.findByText('Confirmed standardized skills')).toBeInTheDocument()
+    expect(screen.getAllByText('House Wiring').length).toBeGreaterThan(0)
+  })
+
   it('does not block the form when geolocation permission is denied', async () => {
     const user = userEvent.setup()
     const getCurrentPosition = vi.fn((_success, error) => {

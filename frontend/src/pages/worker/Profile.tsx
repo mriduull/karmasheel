@@ -1,10 +1,12 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { updateWorkerProfile } from '@/api/endpoints/profiles'
 import { ApiError, toBannerMessage, toFieldErrors } from '@/api/errors'
 import { useWorkerProfile, WORKER_PROFILE_QUERY_KEY } from '@/hooks/useWorkerProfile'
+import { WORKER_JOB_RECOMMENDATIONS_QUERY_KEY } from '@/hooks/useWorkerJobRecommendations'
+import { OPPORTUNITY_ADVISORY_QUERY_KEY } from '@/hooks/useOpportunityAdvisory'
 import {
   workerAvailabilitySchema,
   workerBasicsSchema,
@@ -17,7 +19,7 @@ import { TextField } from '@/components/primitives/TextField'
 import { SkeletonCard } from '@/components/primitives/SkeletonCard'
 import { ErrorBanner } from '@/components/primitives/ErrorBanner'
 import { ProfileSection } from '@/components/shared/ProfileSection'
-import { SkillChipInput } from '@/components/shared/SkillChipInput'
+import { SkillChipInput, type SkillChipInputHandle } from '@/components/shared/SkillChipInput'
 import { SkillChipList } from '@/components/shared/SkillChipList'
 import { UnmatchedTermNotice } from '@/components/shared/UnmatchedTermNotice'
 import { CoordinateCapture } from '@/components/shared/CoordinateCapture'
@@ -205,6 +207,7 @@ function LocationSection({ profile }: { profile: WorkerProfile }) {
 
 function SkillsSection({ profile }: { profile: WorkerProfile }) {
   const queryClient = useQueryClient()
+  const skillInputRef = useRef<SkillChipInputHandle>(null)
   const [isSaved, setIsSaved] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -220,11 +223,19 @@ function SkillsSection({ profile }: { profile: WorkerProfile }) {
     event.preventDefault()
     setFormError(null)
     setIsSaved(false)
+
+    const committedSkillInput = skillInputRef.current?.commitDraft() ?? skillInput
+    if (committedSkillInput === null) return
+
     setIsSubmitting(true)
 
     try {
-      const updated = await updateWorkerProfile({ skill_input: skillInput })
+      const updated = await updateWorkerProfile({ skill_input: committedSkillInput })
       queryClient.setQueryData(WORKER_PROFILE_QUERY_KEY, updated)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: WORKER_JOB_RECOMMENDATIONS_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: OPPORTUNITY_ADVISORY_QUERY_KEY }),
+      ])
       setUnmatchedTerms(updated.unmatched_terms)
       setSkillInput(updated.skills.map((skill) => skill.name))
       setIsSaved(true)
@@ -246,7 +257,12 @@ function SkillsSection({ profile }: { profile: WorkerProfile }) {
       isSaved={isSaved}
       error={formError}
     >
-      <SkillChipInput label="Your skills" value={skillInput} onChange={setSkillInput} />
+      <SkillChipInput
+        ref={skillInputRef}
+        label="Your skills"
+        value={skillInput}
+        onChange={setSkillInput}
+      />
 
       {profile.skills.length > 0 && (
         <div>
