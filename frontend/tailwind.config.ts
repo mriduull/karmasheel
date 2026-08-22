@@ -34,13 +34,15 @@ export default {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       fontSize: {
-        xs: ['12px', { lineHeight: '1.5' }],
-        sm: ['14px', { lineHeight: '1.5' }],
-        base: ['16px', { lineHeight: '1.5' }],
-        lg: ['18px', { lineHeight: '1.5' }],
-        xl: ['22px', { lineHeight: '1.3' }],
-        '2xl': ['28px', { lineHeight: '1.3' }],
-        '3xl': ['34px', { lineHeight: '1.3' }],
+        // Slightly larger than Tailwind's defaults so the interface remains
+        // comfortable to read at 100% browser zoom on wide desktop screens.
+        xs: ['13px', { lineHeight: '1.5' }],
+        sm: ['15px', { lineHeight: '1.5' }],
+        base: ['17px', { lineHeight: '1.5' }],
+        lg: ['20px', { lineHeight: '1.5' }],
+        xl: ['24px', { lineHeight: '1.3' }],
+        '2xl': ['30px', { lineHeight: '1.3' }],
+        '3xl': ['38px', { lineHeight: '1.3' }],
       },
       spacing: {
         1: '4px',
