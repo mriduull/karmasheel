@@ -75,7 +75,7 @@ export function JobFilterPanel({
               className="w-full whitespace-nowrap"
             >
               <LocateFixed size={18} aria-hidden="true" />
-              Use my location
+              {hasLocation ? 'Update my location' : 'Use my location'}
             </Button>
             <select
               aria-label="Maximum distance"
@@ -94,9 +94,17 @@ export function JobFilterPanel({
               ))}
             </select>
           </div>
+          {hasLocation && (
+            <p role="status" className="text-sm font-medium text-success-text">
+              Location found
+              {maxDistanceKm !== null
+                ? ` — showing jobs within ${maxDistanceKm} km.`
+                : ' — choose a distance to filter jobs.'}
+            </p>
+          )}
           {geolocationStatus === 'denied' && (
             <p className="text-sm text-text-secondary">
-              Location permission was declined — you can still browse without distance filtering.
+              Location permission is blocked. Allow it in your browser settings, then try again.
             </p>
           )}
           {geolocationStatus === 'error' && (

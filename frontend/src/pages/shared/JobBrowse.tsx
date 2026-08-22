@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { browseJobs, type JobBrowseFilters } from '@/api/endpoints/jobs'
@@ -14,6 +14,7 @@ import { JobCard } from '@/components/shared/JobCard'
 import { JobFilterPanel } from '@/components/shared/JobFilterPanel'
 
 const SKELETON_COUNT = 6
+const DEFAULT_LOCATION_DISTANCE_KM = 10
 
 /**
  * `category`/`subcategory`/`work_type` live in the URL (so a Landing-page
@@ -25,6 +26,14 @@ export function JobBrowse() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [maxDistanceKm, setMaxDistanceKm] = useState<number | null>(null)
   const geolocation = useGeolocation()
+  const applyDefaultDistanceAfterLocation = useRef(false)
+
+  useEffect(() => {
+    if (geolocation.status !== 'success' || !applyDefaultDistanceAfterLocation.current) return
+
+    applyDefaultDistanceAfterLocation.current = false
+    setMaxDistanceKm((currentDistance) => currentDistance ?? DEFAULT_LOCATION_DISTANCE_KM)
+  }, [geolocation.status])
 
   const categoryParam = searchParams.get('category')
   const subcategoryParam = searchParams.get('subcategory')
@@ -76,6 +85,11 @@ export function JobBrowse() {
     setMaxDistanceKm(null)
   }
 
+  const handleRequestLocation = () => {
+    applyDefaultDistanceAfterLocation.current = true
+    geolocation.request()
+  }
+
   const jobs = jobsQuery.data ?? []
 
   return (
@@ -98,7 +112,7 @@ export function JobBrowse() {
           onWorkTypeChange={(wt) => updateParams({ work_type: wt })}
           onMaxDistanceChange={setMaxDistanceKm}
           geolocationStatus={geolocation.status}
-          onRequestLocation={geolocation.request}
+          onRequestLocation={handleRequestLocation}
           onClearFilters={handleClearFilters}
           hasActiveFilters={hasActiveFilters}
         />
