@@ -1,10 +1,14 @@
 from pathlib import Path
+from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.staticfiles import finders
-from django.test import SimpleTestCase
+from django.db import DatabaseError, connections
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import resolve, reverse
 
 
+@override_settings(DEBUG=True)
 class FrontendSmokeTests(SimpleTestCase):
     """Small integration guard for the Week 6 Django-served demo UI."""
 
@@ -53,3 +57,41 @@ class FrontendSmokeTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["name"], "Workforce Matching API")
         self.assertEqual(response.json()["endpoints"]["job_browse"], "/api/jobs/browse/")
+
+    def test_health_endpoint_is_public_and_not_cached(self):
+        response = self.client.get(reverse("health"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok"})
+        self.assertEqual(response.headers["Cache-Control"], "max-age=0, no-cache, no-store, must-revalidate, private")
+
+
+class ProductionServiceRootTests(SimpleTestCase):
+    @override_settings(DEBUG=False)
+    def test_production_root_is_an_api_index_not_the_legacy_frontend(self):
+        response = self.client.get(reverse("frontend"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["name"], "Workforce Matching API")
+
+    def test_cv_filename_header_is_exposed_to_the_cross_origin_frontend(self):
+        self.assertIn("Content-Disposition", settings.CORS_EXPOSE_HEADERS)
+
+
+class ReadinessTests(TestCase):
+    def test_readiness_endpoint_checks_the_database(self):
+        response = self.client.get(reverse("readiness"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ready"})
+
+    def test_readiness_returns_503_when_the_database_is_unavailable(self):
+        with patch.object(
+            connections["default"],
+            "cursor",
+            side_effect=DatabaseError("database unavailable"),
+        ):
+            response = self.client.get(reverse("readiness"))
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json(), {"status": "unavailable"})

@@ -1,5 +1,10 @@
 # FRONTEND_IMPLEMENTATION_PLAN — Workforce Matching
 
+> **Archived plan.** The React frontend described here has now been
+> implemented. Statements about an empty frontend or future phases describe
+> the pre-implementation baseline. Use `frontend/README.md` and the actual
+> source/tests for current behavior.
+
 Phased implementation plan for the React + TypeScript + Tailwind CSS client,
 produced by cross-checking `docs/FRONTEND_DESIGN_SPEC (1).md` against the
 actual repository: `backend/*/urls.py`, `models.py`, `serializers.py`,

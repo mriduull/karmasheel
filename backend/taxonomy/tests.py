@@ -622,6 +622,26 @@ class TaxonomyPublicAPITests(APITestCase):
         self.assertIsNone(response.data["category"])
         self.assertEqual(UnmatchedSkillTerm.objects.count(), before)
 
+    def test_job_taxonomy_inference_rejects_too_many_skill_phrases(self):
+        response = self.client.post(
+            reverse("taxonomy:infer_job_category"),
+            {"required_skills": ["House Wiring"] * 21},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("required_skills", response.data)
+
+    def test_job_taxonomy_inference_rejects_oversized_description(self):
+        response = self.client.post(
+            reverse("taxonomy:infer_job_category"),
+            {"description": "x" * 5001},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("description", response.data)
+
 
 class TaxonomyAdminTests(TestCase):
     """Admin usability and safe unmatched-term review tests."""

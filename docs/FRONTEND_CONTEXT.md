@@ -1,5 +1,10 @@
 # Frontend Context — Handoff Document
 
+> **Historical implementation input.** This handoff predates the completed
+> React frontend and later seed/taxonomy expansion. Use the running code,
+> `README.md`, `DEVELOPMENT_SETUP.md`, and `DEPLOYMENT.md` for current facts.
+> Retained to document design decisions, not as an operational source of truth.
+
 Complete handoff for a frontend designer and a frontend coding agent building
 a React + TypeScript + Tailwind CSS client against the existing Workforce Matching
 Django REST API. This document describes **only what the backend actually

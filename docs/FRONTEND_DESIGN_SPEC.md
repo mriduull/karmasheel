@@ -1,5 +1,9 @@
 # FRONTEND_DESIGN_SPEC — Workforce Matching
 
+> **Historical design specification.** This file records the design target;
+> it is not current setup/deployment documentation. Where it conflicts with
+> the completed UI, API, or seed data, the tested source code wins.
+
 Design specification for the Workforce Matching React + TypeScript + Tailwind CSS
 web client. This document is a **design spec, not an implementation** — no
 components are built here. It is written against the backend exactly as

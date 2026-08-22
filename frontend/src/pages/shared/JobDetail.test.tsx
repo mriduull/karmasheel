@@ -110,6 +110,7 @@ describe('JobDetail', () => {
     setAuthenticatedUser(WORKER_USER)
     server.use(
       http.get(`${API_ROOT}/jobs/5/`, () => HttpResponse.json(buildJobFixture({ id: 5, status: 'CLOSED' }))),
+      http.get(`${API_ROOT}/applications/`, () => HttpResponse.json([])),
     )
 
     renderJobDetail('/jobs/5')

@@ -25,6 +25,7 @@ os.environ.setdefault(
     "DJANGO_SECRET_KEY",
     "workforce-matching-test-only-secret-key-never-use-in-production",
 )
+os.environ["DJANGO_DEBUG"] = "True"
 os.environ.setdefault("DB_NAME", "unused-in-tests")
 os.environ.setdefault("DB_USER", "unused-in-tests")
 os.environ.setdefault("DB_PASSWORD", "unused-in-tests")

@@ -79,8 +79,8 @@ Log in at `http://127.0.0.1:8000/admin/` as `demo_admin` / `DemoPass123!`.
   Operation" through the skill-normalization pipeline. Demonstrate
   **"Resolve using best candidate and create alias"** or **"Reject
   selected unmatched terms"**.
-- Open **Taxonomy > Skill tags** to browse the seeded categories,
-  subcategories, and 20 standardized skills with their English/Romanized-
+- Open **Taxonomy > Skill tags** to browse the seeded 12 categories,
+  53 subcategories, and 330 standardized skills with 436 English/Romanized-
   Nepali aliases (e.g. search "ghar wiring" to find it aliased to
   "House Wiring").
 
@@ -129,18 +129,12 @@ As `demo_worker_electrician` (reuse `$TOKEN` from Step 3):
 curl http://127.0.0.1:8000/api/recommendations/jobs/ -H "Authorization: Bearer $TOKEN"
 ```
 
-**Expected result:** Lead electrician gets at least three ranked recommendations.
-"House Wiring for New Apartment Block" ranks first with `final_score`
-around **98**, `reasons` including "Matches 2 of 2 required skills",
-"Located ~2 km from the job", "Meets the required experience", "Employer
-profile is verified". The next two results are meaningfully different but
-still genuinely suitable - each matches at least one required skill:
-"Electrical Rewiring for Old Bungalow" scores lower because Lead electrician's 6
-years of experience fall short of the 8 required, and "Switchboard and
-Panel Upgrade for Retail Outlet" scores lowest because Lead electrician matches
-only one of its two required skills (House Wiring, but not Switchboard
-Installation) and, like the rewiring job, requires 8 years of experience
-against his 6.
+**Expected result:** Lead electrician gets at least three ranked, actionable
+Electrical recommendations, each matching a required skill. The already
+completed "House Wiring for New Apartment Block" engagement is correctly
+excluded because the Worker cannot apply to the same job twice. Compare the
+full-match school safety/repair job with the weaker old-bungalow and
+switchboard jobs to show experience and missing-skill penalties.
 
 Now log in as `demo_worker_hari` and `demo_worker_gita` in turn and call
 the opportunity advisory endpoint:
@@ -150,11 +144,10 @@ curl http://127.0.0.1:8000/api/recommendations/opportunities/ -H "Authorization:
 curl http://127.0.0.1:8000/api/recommendations/opportunities/ -H "Authorization: Bearer $GITA_TOKEN"
 ```
 
-**Expected result:** for Hari, `near_miss_jobs` contains "Bathroom & Tile
-Renovation" (`final_score` around **67**) and "Floor Tiling and Masonry
-Repair for Guest House" - `missing_skills` lists "Tile Installation" with
-`job_ids` covering both, showing the same missing skill recurring across
-several nearby jobs. For Gita, `near_miss_jobs` contains "Home Cooking for
+**Expected result:** for Hari, his existing Bathroom application is excluded;
+the Floor Tiling guest-house job and Kitchen Wall Tiling job remain actionable
+near misses. `missing_skills` lists "Tile Installation" with `job_ids`
+covering both. For Gita, `near_miss_jobs` contains "Home Cooking for
 Family Event" (`final_score` around **65**) and `missing_skills` lists
 "Kitchen Helper" - her `warnings` also note her location is unavailable,
 since her profile has no coordinates on file (a deliberate cold-start
@@ -264,7 +257,8 @@ returns `400 Bad Request` ("You have already rated this application.").
 
 Close by pointing to [`DEFERRED_SCOPE.md`](DEFERRED_SCOPE.md): everything
 demonstrated above is implemented and tested end to end, but complaints/
-disputes, trusted-worker rehiring, notifications, advanced analytics, file
-uploads, embeddings/NLP, and production deployment are intentionally out
-of scope - see that document for the full, honest breakdown of what's
-implemented, partial, and deferred.
+disputes, trusted-worker rehiring, notifications, advanced analytics,
+document verification, and embeddings/NLP remain out of scope. Profile-photo
+upload and deployment-ready configuration are implemented; provider
+provisioning and operations remain separate. See that document for the full,
+honest breakdown.

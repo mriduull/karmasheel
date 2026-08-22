@@ -6,7 +6,7 @@ os.environ.setdefault(
     "DJANGO_SECRET_KEY",
     "workforce-matching-local-sqlite-secret-key-never-use-in-production",
 )
-os.environ.setdefault("DJANGO_DEBUG", "True")
+os.environ["DJANGO_DEBUG"] = "True"
 os.environ.setdefault("DB_NAME", "unused-by-local-sqlite-settings")
 os.environ.setdefault("DB_USER", "unused-by-local-sqlite-settings")
 os.environ.setdefault("DB_PASSWORD", "unused-by-local-sqlite-settings")

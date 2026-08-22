@@ -689,6 +689,27 @@ class Command(BaseCommand):
             employer=self.employer_retail,
         )
 
+        # The worker already has an application history for the primary
+        # House Wiring job, and recommendation candidates intentionally
+        # exclude jobs that cannot be applied to again. This additional
+        # electrical posting keeps three relevant, actionable results in
+        # the seeded worker recommendation walkthrough.
+        self.job_electrical_maintenance, electrical_maintenance_created = self._job(
+            title="Electrical Safety Inspection and Repair for School",
+            category_name=construction,
+            subcategory_name="Electrical",
+            required=["Circuit Breaker Installation", "Electrical Repair"],
+            preferred=["House Wiring"],
+            description="Inspect classroom circuits, replace unsafe breakers, and repair damaged wiring.",
+            address="Chabahil, Kathmandu",
+            latitude="27.716000",
+            longitude="85.348000",
+            required_experience_years=4,
+            wage_type=JobPost.WageType.DAILY,
+            wage_amount="1200.00",
+            work_type=JobPost.WorkType.CONTRACT,
+        )
+
         # A second masonry job requiring "Tile Installation" alongside
         # the original one, near Hari, so the missing-skill advisory
         # surfaces it as recurring across several near-miss jobs.
@@ -705,6 +726,27 @@ class Command(BaseCommand):
             required_experience_years=2,
             wage_type=JobPost.WageType.DAILY,
             wage_amount="1050.00",
+            work_type=JobPost.WorkType.CONTRACT,
+        )
+
+        # Hari has already applied to the primary bathroom-renovation job,
+        # which is correctly excluded from new recommendations. A third
+        # nearby masonry posting preserves the intended recurring-demand
+        # evidence: Tile Installation is missing across two actionable
+        # near-miss jobs.
+        self.job_masonry3, masonry3_created = self._job(
+            title="Kitchen Wall Tiling and Brickwork Repair",
+            category_name=construction,
+            subcategory_name="Masonry",
+            required=["Brick Laying", "Tile Installation"],
+            preferred=["Plastering"],
+            description="Repair damaged kitchen brickwork and install new wall tiles.",
+            address="Lokanthali, Bhaktapur",
+            latitude="27.674500",
+            longitude="85.376500",
+            required_experience_years=2,
+            wage_type=JobPost.WageType.DAILY,
+            wage_amount="1000.00",
             work_type=JobPost.WorkType.CONTRACT,
         )
 
@@ -784,7 +826,9 @@ class Command(BaseCommand):
             (self.job_plumbing.title, plumbing_created),
             (self.job_wiring2.title, wiring2_created),
             (self.job_switchboard.title, switchboard_created),
+            (self.job_electrical_maintenance.title, electrical_maintenance_created),
             (self.job_masonry2.title, masonry2_created),
+            (self.job_masonry3.title, masonry3_created),
             (self.job_painting.title, painting_created),
             (self.job_waitstaff.title, waitstaff_created),
             (self.job_delivery.title, delivery_created),
@@ -1041,8 +1085,8 @@ class Command(BaseCommand):
 
         write("\nDemo scenario pointers:")
         write("  - Worker-to-job recommendations: log in as demo_worker_electrician and "
-              "GET /api/recommendations/jobs/ - 'House Wiring for New Apartment Block' "
-              "ranks first, with two more electrical jobs completing the top three.")
+              "GET /api/recommendations/jobs/ - three actionable electrical jobs rank "
+              "at the top; the completed House Wiring job is correctly excluded.")
         write("  - Opportunity advisory (near-miss + missing skills): log in as "
               "demo_worker_hari and GET /api/recommendations/opportunities/ - "
               "'Tile Installation' is missing across two nearby masonry jobs.")

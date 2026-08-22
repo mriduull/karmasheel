@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from rest_framework import serializers
+from PIL import Image, UnidentifiedImageError
 
 from taxonomy.models import SkillTag
 from taxonomy.services import normalize_skill_phrases
@@ -79,6 +82,43 @@ class WorkerProfileSerializer(serializers.ModelSerializer):
         content_type = getattr(value, "content_type", "")
         if content_type not in {"image/jpeg", "image/png", "image/webp"}:
             raise serializers.ValidationError("Upload a JPG, PNG, or WebP image.")
+
+        try:
+            image = Image.open(value)
+            image_format = image.format
+            width, height = image.size
+            image.verify()
+        except (UnidentifiedImageError, OSError, SyntaxError, Image.DecompressionBombError):
+            raise serializers.ValidationError("The uploaded file is not a valid image.")
+        finally:
+            value.seek(0)
+
+        format_content_types = {
+            "JPEG": "image/jpeg",
+            "PNG": "image/png",
+            "WEBP": "image/webp",
+        }
+        if format_content_types.get(image_format) != content_type:
+            raise serializers.ValidationError(
+                "The image contents do not match the declared file type."
+            )
+
+        format_extensions = {
+            "JPEG": {".jpg", ".jpeg"},
+            "PNG": {".png"},
+            "WEBP": {".webp"},
+        }
+        if Path(value.name).suffix.lower() not in format_extensions.get(
+            image_format, set()
+        ):
+            raise serializers.ValidationError(
+                "The image contents do not match the filename extension."
+            )
+
+        if width > 4096 or height > 4096 or width * height > 16_000_000:
+            raise serializers.ValidationError(
+                "Profile photo dimensions must not exceed 4096 px or 16 megapixels."
+            )
 
         return value
 

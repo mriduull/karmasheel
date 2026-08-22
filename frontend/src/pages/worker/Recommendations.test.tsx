@@ -156,9 +156,11 @@ describe('WorkerRecommendations', () => {
     )
 
     const { container } = renderWithProviders(<WorkerRecommendations />)
-    await waitFor(() => {
-      expect(screen.getByText('House Wiring for New Apartment Block')).toBeInTheDocument()
-    })
+    await screen.findByText('House Wiring for New Apartment Block')
+    // The recommendation and current-applications queries resolve
+    // independently. Wait for the latter's final UI before running axe so
+    // its state update cannot land during the accessibility scan.
+    await screen.findByRole('button', { name: 'Apply' })
 
     const results = await axe(container)
     expect(results).toHaveNoViolations()

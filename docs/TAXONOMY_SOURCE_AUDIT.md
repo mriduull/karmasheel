@@ -1,5 +1,10 @@
 # Taxonomy Source Audit — Production-Quality Skill Taxonomy for Workforce Matching
 
+> **Historical baseline/superseded counts.** The 2-category/5-subcategory/
+> 20-skill corpus below was the starting point for this research. The current
+> seeded taxonomy contains 12 categories, 53 subcategories, 330 skills, and
+> 436 aliases. Retain this document as provenance and decision history.
+
 Status: **research and design only**. No models, migrations, seed data, or
 API behavior were changed to produce this document. Written by inspecting
 the current repository (`backend/taxonomy/`, `docs/IMPLEMENTATION_PLAN.md`,

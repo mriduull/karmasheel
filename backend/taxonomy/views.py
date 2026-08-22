@@ -9,6 +9,7 @@ from .models import Category, SkillAlias, SkillTag, Subcategory
 from .serializers import (
     CategorySerializer,
     CategoryTreeSerializer,
+    JobTaxonomyInferenceRequestSerializer,
     SkillTagSerializer,
     SubcategorySerializer,
 )
@@ -110,10 +111,14 @@ class JobTaxonomyInferenceView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        required_skills = request.data.get("required_skills") or []
-        preferred_skills = request.data.get("preferred_skills") or []
-        title = request.data.get("title") or ""
-        description = request.data.get("description") or ""
+        request_serializer = JobTaxonomyInferenceRequestSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        request_data = request_serializer.validated_data
+
+        required_skills = request_data["required_skills"]
+        preferred_skills = request_data["preferred_skills"]
+        title = request_data["title"]
+        description = request_data["description"]
 
         scores = {}
         matched_terms = []

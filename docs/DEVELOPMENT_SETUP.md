@@ -111,9 +111,13 @@ the comments inside `.env.example` for what each variable does.
 |---|---|---|
 | `DJANGO_SECRET_KEY` | Yes | Django's cryptographic secret key. Generate your own — do not reuse the placeholder. |
 | `DJANGO_DEBUG` | No (defaults `False`) | `True` for local development. `seed_demo` refuses to run when this is `False`. |
+| `DJANGO_ALLOWED_HOSTS` | Yes outside tests | Comma-separated backend hostnames. The example includes `localhost,127.0.0.1`. |
+| `CSRF_TRUSTED_ORIGINS` | No for local same-origin admin | Required for deployed HTTPS admin origins; see `DEPLOYMENT.md`. |
+| `CV_PDF_ENGINE` | No (defaults `auto`) | `auto`, `weasyprint`, `browser`, or dependency-free `basic`. |
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Yes | PostgreSQL connection settings. |
 | `DB_HOST` | No (defaults `localhost`) | PostgreSQL host. |
 | `DB_PORT` | No (defaults `5432`) | PostgreSQL port. |
+| `DATABASE_URL` | Alternative | Optional PostgreSQL URL that takes precedence over separate `DB_*` values. |
 | `CORS_ALLOWED_ORIGINS` | No (defaults to none allowed) | Comma-separated list of origins allowed to call the API. Must include your frontend dev server's exact origin (scheme + host + port) or the browser will block every request. |
 | `SKILL_MATCH_THRESHOLD` | No (defaults `85`) | RapidFuzz confidence (0–100) for an automatic fuzzy skill match. |
 | `RECOMMENDATION_MAX_DISTANCE_KM` | No (defaults `20`) | Distance at which the recommendation engine's distance score reaches 0. |

@@ -37,7 +37,12 @@ realistic data by `python manage.py seed_demo` (see
   suggestions.
 - Django admin registrations for every model above, with search, filtering,
   and verification/moderation actions.
-- Postman collection covering the full API surface end to end.
+- Postman collections covering the core API workflows end to end.
+- Full React/TypeScript frontend for public, Worker, and Employer workflows,
+  with responsive route/role guards and tested API integration.
+- Validated Worker profile-photo upload and CV photo embedding.
+- Deployment configuration for Gunicorn, WhiteNoise, PostgreSQL URLs,
+  HTTPS hardening, health/readiness probes, CI, and static SPA delivery.
 - `seed_demo`: one idempotent command producing a coherent demo dataset
   covering every feature above.
 
@@ -57,9 +62,16 @@ realistic data by `python manage.py seed_demo` (see
   a nested tree, but there is no free-text search across skill aliases from
   the API (only from the normalization service internally, and from the
   Django admin's search fields).
-- **CORS** is configured with an explicit allow-list (no wildcard), but
-  there is no per-environment configuration beyond the one
-  `CORS_ALLOWED_ORIGINS` environment variable.
+- **Production throttling** has a safe in-process DRF baseline, but limits
+  are per Gunicorn process and reset on restart. A public system still needs
+  authoritative login/register limiting at the hosting edge.
+- **Media storage** supports a persistent local disk for a small
+  single-instance deployment. Multi-instance operation still needs shared
+  object storage/CDN.
+- **Refresh-token storage** is currently browser `localStorage`. Access tokens
+  stay in memory and the static frontend ships a restrictive CSP, but a mature
+  public deployment should move refresh tokens to rotated `Secure`,
+  `HttpOnly`, `SameSite` cookies with the corresponding CSRF design.
 
 ## Intentionally deferred (proposal features not built)
 
@@ -79,33 +91,28 @@ These were never started - listed here so they aren't mistaken for bugs:
   aggregate platform metrics (e.g. fill rates, time-to-hire, category
   demand trends) beyond what Django admin's list/filter views expose
   incidentally.
-- **File uploads.** No profile photos, ID/document uploads, or job-site
-  images. `WorkerProfile`/`EmployerProfile`/`JobPost` have no `FileField`/
-  `ImageField` at all.
+- **Document and job-site uploads.** Worker profile photos are implemented,
+  but there is no ID/certificate/document verification upload or job-site
+  image workflow.
 - **Advanced NLP / embeddings.** By design (see `IMPLEMENTATION_PLAN.md`
   and the project's engineering rules) - skill matching is deliberately
   RapidFuzz + a curated alias table, not a trained model or vector search.
   Recommendations are deliberately a transparent weighted formula, not a
   learned ranking model.
-- **Production deployment.** No Docker/Compose, no WSGI/ASGI server
-  config (Gunicorn/uWSGI + reverse proxy), no CI/CD pipeline, no
-  structured logging or error tracking, no rate limiting/throttling on any
-  endpoint (including auth), no `SECURE_*`/HTTPS hardening, and
-  `ALLOWED_HOSTS` is empty - none of this is wired up, since the project
-  has run exclusively via `manage.py runserver` against a local database.
+- **Provisioned production operations.** The repository is deployment-ready,
+  but no domain/provider is provisioned by source code. External error
+  tracking, uptime alerting, database backup/restore operations, edge/WAF
+  rate limits, and multi-instance object storage remain operator work; see
+  `DEPLOYMENT.md`.
 - **Password reset / forgot-password flow.** Only login, refresh, and
   logout exist; there is no "forgot password" email/token flow.
-- **Minimal HTML frontend.** Listed as optional Week 6 scope in
-  `IMPLEMENTATION_PLAN.md`; the `frontend/` directory exists but is empty.
-  The platform has been demonstrated and tested entirely through the API
-  (Postman/curl) and the Django admin.
 
 ## Future enhancements (beyond the original six-week scope)
 
 - Real contact-verification channel (SMS OTP or email link) to replace the
   manual admin toggle.
-- Pagination and rate limiting once real usage volume justifies the added
-  complexity.
+- Pagination plus shared/edge rate limiting once real usage volume justifies
+  the added operational components.
 - A trusted-worker rehire shortcut built on top of existing `Rating` and
   `Application` history.
 - A notification channel (starting with something as simple as

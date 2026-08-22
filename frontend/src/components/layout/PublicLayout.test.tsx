@@ -2,7 +2,7 @@ import '@/i18n'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { createTestQueryClient, resetAuthStore, setAuthenticatedUser } from '@/test/utils'
 import { PublicLayout } from './PublicLayout'
 
@@ -103,8 +103,7 @@ describe('PublicLayout navigation', () => {
     renderPublicLayout()
     expect(screen.getAllByRole('link', { name: /browse jobs/i }).length).toBeGreaterThan(0)
 
-    setAuthenticatedUser(WORKER_USER)
-    renderPublicLayout()
+    act(() => setAuthenticatedUser(WORKER_USER))
     expect(screen.getAllByRole('link', { name: /browse jobs/i }).length).toBeGreaterThan(0)
   })
 })

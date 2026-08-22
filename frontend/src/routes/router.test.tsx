@@ -55,6 +55,7 @@ describe('router', () => {
     resetAuthStore()
     server.use(
       http.get(`${API_ROOT}/taxonomy/tree/`, () => HttpResponse.json([])),
+      http.get(`${API_ROOT}/taxonomy/categories/`, () => HttpResponse.json([])),
       http.get(`${API_ROOT}/jobs/browse/`, () => HttpResponse.json([])),
       http.get(`${API_ROOT}/profiles/worker/me/`, () => HttpResponse.json(buildWorkerProfileFixture())),
       http.get(`${API_ROOT}/applications/`, () => HttpResponse.json([])),

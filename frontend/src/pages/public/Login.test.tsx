@@ -130,6 +130,30 @@ describe('Login', () => {
     expect(tokenStorage.getRefreshToken()).toBeNull()
   })
 
+  it('clears tokens when login succeeds but loading the current user fails', async () => {
+    const user = userEvent.setup()
+
+    server.use(
+      http.post(`${API_ROOT}/auth/login/`, () =>
+        HttpResponse.json({ access: 'temporary-access', refresh: 'temporary-refresh' }),
+      ),
+      http.get(`${API_ROOT}/auth/me/`, () =>
+        HttpResponse.json({ detail: 'Temporary server failure' }, { status: 503 }),
+      ),
+    )
+
+    renderLogin()
+
+    await user.type(screen.getByLabelText('Username'), 'demo_worker_electrician')
+    await user.type(screen.getByLabelText('Password'), 'DemoPass123!')
+    await user.click(screen.getByRole('button', { name: 'Log In' }))
+
+    await screen.findByRole('alert')
+    expect(useAuthStore.getState().accessToken).toBeNull()
+    expect(useAuthStore.getState().user).toBeNull()
+    expect(tokenStorage.getRefreshToken()).toBeNull()
+  })
+
   it('distinguishes an unreachable-server error from an authentication error', async () => {
     // A fetch failure while the browser reports being online (jsdom's
     // default) is a stopped/unreachable backend, not the user being

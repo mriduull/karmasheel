@@ -15,14 +15,19 @@ frontend, PostgreSQL, seeding, and troubleshooting) see
 condensed backend-only version below still works, but the full guide is
 kept up to date first.
 
+For a Windows demo using the included local SQLite settings, see
+[`setup.md`](setup.md). Production operators should follow
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md); defense-report figures should
+follow [`docs/DEFENSE_SCREENSHOTS.md`](docs/DEFENSE_SCREENSHOTS.md).
+
 ## Implemented features
 
 - **Accounts** - custom `User` model (username + unique phone number),
   JWT authentication (login/refresh/logout with blacklisting), worker/employer
   roles, manual contact verification via the Django admin.
 - **Profiles** - worker and employer profile CRUD; PAN/VAT format validation;
-  auto-generated worker CV (HTML preview and PDF download) built entirely
-  from stored profile fields.
+  validated Worker profile-photo upload; auto-generated Worker CV (HTML
+  preview and PDF download) built entirely from stored profile fields.
 - **Taxonomy** - structured categories, subcategories, and standardized
   skills; English and Romanized-Nepali aliases; a skill-normalization
   service (text preprocessing -> exact name match -> exact alias match ->
@@ -117,8 +122,13 @@ cp .env.example .env
 |---|---|
 | `DJANGO_SECRET_KEY` | Django's cryptographic secret key. Generate your own (e.g. `python -c "import secrets; print(secrets.token_urlsafe(50))"`) - do not reuse the example value anywhere. |
 | `DJANGO_DEBUG` | `True` for local development. **Must be `False` in production.** `seed_demo` refuses to run when this is `False` (see below). |
+| `DJANGO_ALLOWED_HOSTS` | Comma-separated backend hostnames, without schemes. Required when `DJANGO_DEBUG=False`. |
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | PostgreSQL connection settings. |
+| `DATABASE_URL` | Optional production PostgreSQL URL; takes precedence over the separate `DB_*` variables. |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated list of origins allowed to call the API (e.g. a local frontend dev server). No wildcard is used. |
+| `CSRF_TRUSTED_ORIGINS` | HTTPS backend/admin origins trusted for CSRF-protected form submissions. |
+| `DB_SSL_REQUIRED` | Set `True` when the production PostgreSQL provider requires TLS. |
+| `DJANGO_MEDIA_ROOT`, `DJANGO_SERVE_MEDIA` | Persistent upload path and small-deployment media serving switch. See the deployment guide before enabling. |
 | `SKILL_MATCH_THRESHOLD` | Optional. RapidFuzz confidence (0-100) above which a fuzzy skill match is auto-accepted. Defaults to `85`. |
 | `RECOMMENDATION_MAX_DISTANCE_KM` | Optional. Distance at which the distance score reaches 0. Defaults to `20`. |
 | `RECOMMENDATION_NEAR_MISS_MIN_SCORE` / `_MAX_SCORE` | Optional. Inclusive final-score range treated as a "near miss" by the opportunity advisory. Defaults to `40` / `75`. |
@@ -189,17 +199,20 @@ All endpoints are namespaced under `/api/`:
 |---|---|
 | `/api/auth/` | Registration, login, token refresh, logout, `/me/` |
 | `/api/profiles/` | Worker/employer profile CRUD, CV preview/PDF |
-| `/api/taxonomy/` | Categories, subcategories, skills, taxonomy tree |
+| `/api/taxonomy/` | Categories, subcategories, skills, taxonomy tree and bounded job-category inference |
 | `/api/jobs/` | Job CRUD, public browsing, candidate listing |
 | `/api/applications/` | Apply, status transitions, ratings |
 | `/api/recommendations/` | Worker-to-job / job-to-worker recommendations, opportunity advisory |
+| `/api/health/`, `/api/readiness/` | Process liveness and database readiness probes |
 | `/admin/` | Django admin |
 
 ## Postman collection
 
 Located at `docs/postman/`:
 
-- `Workforce_Matching_API.postman_collection.json` - the full request collection.
+- `Workforce_Matching_API.postman_collection.json` - a curated core-API
+  regression collection (the application test suites remain the authoritative
+  coverage for newer endpoints and UI workflows).
 - `Workforce_Matching_Local.postman_environment.json` - matching environment
   (local-only demo credentials).
 - `POSTMAN_WALKTHROUGH.md` - setup, run order, and a fresh-database manual
@@ -232,12 +245,35 @@ Or a focused class/method:
 python manage.py test accounts.tests.SeedDemoCommandTests --settings=config.test_settings --keepdb
 ```
 
+Frontend verification:
+
+```bash
+cd frontend
+npm ci
+npm run lint
+npm test
+VITE_API_BASE_URL=http://127.0.0.1:8000 npm run build
+```
+
+## Production deployment
+
+Production support includes Gunicorn, WhiteNoise-managed static files,
+PostgreSQL `DATABASE_URL` support, HTTPS/cookie hardening, strict host/secret
+validation, health/readiness probes, baseline API throttling, structured
+console logs, a `Procfile`, SPA rewrite/security-header files, and CI. The
+exact build/release/start commands and required environment variables are in
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+Deployment-ready configuration is not the same as a provisioned production
+system: database backups, domains/TLS, persistent media, edge rate limiting,
+monitoring, privacy policy, and staging smoke tests remain operator tasks.
+
 ## Known limitations and deferred scope
 
 See [`docs/DEFERRED_SCOPE.md`](docs/DEFERRED_SCOPE.md) for a full breakdown
 of implemented, partially-implemented, and intentionally-deferred features
 (complaints, trusted-worker rehiring, notifications, advanced analytics,
-file uploads, embeddings/NLP, production deployment, and more).
+document uploads, embeddings/NLP, and more).
 
 The `frontend/` directory contains a working React + TypeScript + Vite
 client (see [`docs/DEVELOPMENT_SETUP.md`](docs/DEVELOPMENT_SETUP.md) to run

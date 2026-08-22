@@ -156,17 +156,24 @@ would just duplicate this Postman collection.
 
 ## Cleanup
 
-This walkthrough creates `demo_`-prefixed users, one job post, two
-applications, and two ratings. To remove them after a local run:
+This walkthrough creates four specifically named local users, one job post,
+two applications, and two ratings. To remove only those walkthrough records
+after a local run:
 
 ```
 python manage.py shell -c "
 from django.contrib.auth import get_user_model
 User = get_user_model()
-User.objects.filter(username__startswith='demo_').delete()
+walkthrough_users = [
+    'demo_worker_local',
+    'demo_worker_two_local',
+    'demo_employer_local',
+    'demo_employer_unverified_local',
+]
+User.objects.filter(username__in=walkthrough_users).delete()
 "
 ```
 
 Deleting these users cascades to their profiles, job posts,
-applications, and ratings. This does not touch any other data in your
-development database.
+applications, and ratings. Do not use a broad `demo_` prefix deletion: it
+would also remove the reusable `seed_demo` defense accounts.
