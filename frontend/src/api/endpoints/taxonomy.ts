@@ -1,6 +1,12 @@
 import { apiFetch } from '@/api/client'
 import type { ApiList } from '@/types/api'
-import type { Category, CategoryTree, Subcategory } from '@/types/taxonomy'
+import type {
+  Category,
+  CategoryTree,
+  JobTaxonomyInferenceRequest,
+  JobTaxonomyInferenceResult,
+  Subcategory,
+} from '@/types/taxonomy'
 
 /** GET /api/taxonomy/categories/ — public, bare array, alphabetical. */
 export function fetchCategories(): Promise<ApiList<Category>> {
@@ -18,4 +24,13 @@ export function fetchSubcategories(categoryId?: number): Promise<ApiList<Subcate
  * (categories -> subcategories -> active skills), not a single object. */
 export function fetchTaxonomyTree(): Promise<ApiList<CategoryTree>> {
   return apiFetch<ApiList<CategoryTree>>('/taxonomy/tree/')
+}
+
+export function inferJobTaxonomy(
+  payload: JobTaxonomyInferenceRequest,
+): Promise<JobTaxonomyInferenceResult> {
+  return apiFetch<JobTaxonomyInferenceResult>('/taxonomy/infer-job-category/', {
+    method: 'POST',
+    body: payload,
+  })
 }

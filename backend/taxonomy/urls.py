@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     CategoryListView,
+    JobTaxonomyInferenceView,
     SkillTagListView,
     SubcategoryListView,
     TaxonomyTreeView,
@@ -14,4 +15,5 @@ urlpatterns = [
     path("subcategories/", SubcategoryListView.as_view(), name="subcategories"),
     path("skills/", SkillTagListView.as_view(), name="skills"),
     path("tree/", TaxonomyTreeView.as_view(), name="tree"),
+    path("infer-job-category/", JobTaxonomyInferenceView.as_view(), name="infer_job_category"),
 ]

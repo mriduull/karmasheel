@@ -2,14 +2,17 @@ from django.db.models import Prefetch
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from .models import Category, SkillTag, Subcategory
+from .models import Category, SkillAlias, SkillTag, Subcategory
 from .serializers import (
     CategorySerializer,
     CategoryTreeSerializer,
     SkillTagSerializer,
     SubcategorySerializer,
 )
+from .services import normalize_skill_phrase, preprocess_skill_phrase
 
 
 def _parse_int_query_param(request, name):
@@ -92,4 +95,95 @@ class TaxonomyTreeView(generics.ListAPIView):
         ).prefetch_related(Prefetch("skills", queryset=skills_queryset))
         return Category.objects.order_by("name").prefetch_related(
             Prefetch("subcategories", queryset=subcategories_queryset)
+        )
+
+
+class JobTaxonomyInferenceView(APIView):
+    """Infer the best category/subcategory from job text and skill phrases.
+
+    This is side-effect free: unlike profile/job saves, unmatched phrases are
+    never recorded for admin review here. Explicit skill chips are weighted
+    more heavily than title/description text because they are cleaner intent
+    signals from the employer.
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        required_skills = request.data.get("required_skills") or []
+        preferred_skills = request.data.get("preferred_skills") or []
+        title = request.data.get("title") or ""
+        description = request.data.get("description") or ""
+
+        scores = {}
+        matched_terms = []
+
+        def add_score(skill, weight, term, source, confidence):
+            subcategory = skill.subcategory
+            scores[subcategory.id] = scores.get(subcategory.id, 0) + weight
+            matched_terms.append(
+                {
+                    "term": term,
+                    "source": source,
+                    "skill_id": skill.id,
+                    "skill_name": skill.name,
+                    "subcategory": subcategory.id,
+                    "subcategory_name": subcategory.name,
+                    "category": subcategory.category_id,
+                    "category_name": subcategory.category.name,
+                    "confidence": confidence,
+                }
+            )
+
+        for phrase in required_skills:
+            result = normalize_skill_phrase(phrase, record_unmatched=False)
+            if result.skill is not None:
+                add_score(result.skill, 3, phrase, "required_skill", result.confidence)
+
+        for phrase in preferred_skills:
+            result = normalize_skill_phrase(phrase, record_unmatched=False)
+            if result.skill is not None:
+                add_score(result.skill, 2, phrase, "preferred_skill", result.confidence)
+
+        normalized_text = preprocess_skill_phrase(f"{title} {description}")
+        if normalized_text:
+            skills = SkillTag.objects.filter(is_active=True).select_related("subcategory__category")
+            for skill in skills:
+                normalized_name = preprocess_skill_phrase(skill.name)
+                if normalized_name and normalized_name in normalized_text:
+                    add_score(skill, 1, skill.name, "job_text", 100.0)
+
+            aliases = SkillAlias.objects.filter(skill__is_active=True).select_related(
+                "skill__subcategory__category"
+            )
+            for alias in aliases:
+                normalized_alias = preprocess_skill_phrase(alias.phrase)
+                if normalized_alias and normalized_alias in normalized_text:
+                    add_score(alias.skill, 1, alias.phrase, "job_text", 100.0)
+
+        if not scores:
+            return Response(
+                {
+                    "category": None,
+                    "category_name": None,
+                    "subcategory": None,
+                    "subcategory_name": None,
+                    "matched_terms": [],
+                    "confidence": 0,
+                }
+            )
+
+        best_subcategory_id = max(scores, key=scores.get)
+        best_subcategory = Subcategory.objects.select_related("category").get(pk=best_subcategory_id)
+        total_score = sum(scores.values())
+
+        return Response(
+            {
+                "category": best_subcategory.category_id,
+                "category_name": best_subcategory.category.name,
+                "subcategory": best_subcategory.id,
+                "subcategory_name": best_subcategory.name,
+                "matched_terms": matched_terms,
+                "confidence": round((scores[best_subcategory_id] / total_score) * 100, 2),
+            }
         )

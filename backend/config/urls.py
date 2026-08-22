@@ -35,6 +35,7 @@ def api_root(request):
                 "auth": "/api/auth/",
                 "profiles": "/api/profiles/",
                 "taxonomy": "/api/taxonomy/",
+                "taxonomy_infer_job_category": "/api/taxonomy/infer-job-category/",
                 "jobs": "/api/jobs/",
                 "job_browse": "/api/jobs/browse/",
                 "applications": "/api/applications/",

@@ -31,6 +31,47 @@ function mockTaxonomy() {
         : SUBCATEGORY_FIXTURES
       return HttpResponse.json(filtered)
     }),
+    http.post(`${API_ROOT}/taxonomy/infer-job-category/`, async ({ request }) => {
+      const body = (await request.json()) as {
+        required_skills?: string[]
+        preferred_skills?: string[]
+      }
+      const terms = [...(body.required_skills ?? []), ...(body.preferred_skills ?? [])].map((term) =>
+        term.toLowerCase(),
+      )
+
+      if (terms.includes('ghar wiring') || terms.includes('house wiring')) {
+        return HttpResponse.json({
+          category: 1,
+          category_name: 'Construction & Repair',
+          subcategory: 1,
+          subcategory_name: 'Electrical',
+          matched_terms: [
+            {
+              term: 'ghar wiring',
+              source: 'required_skill',
+              skill_id: 2,
+              skill_name: 'House Wiring',
+              subcategory: 1,
+              subcategory_name: 'Electrical',
+              category: 1,
+              category_name: 'Construction & Repair',
+              confidence: 100,
+            },
+          ],
+          confidence: 100,
+        })
+      }
+
+      return HttpResponse.json({
+        category: null,
+        category_name: null,
+        subcategory: null,
+        subcategory_name: null,
+        matched_terms: [],
+        confidence: 0,
+      })
+    }),
   )
 }
 
@@ -99,6 +140,29 @@ describe('JobForm', () => {
 
       await user.selectOptions(screen.getByLabelText('Category'), '2')
       expect(screen.getByLabelText('Subcategory')).toHaveValue('')
+    })
+
+    it('auto-selects category and subcategory from employer-entered skills', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<JobForm mode="create" />)
+
+      const categorySelect = await screen.findByLabelText('Category')
+      await within(categorySelect).findByRole('option', { name: 'Domestic & Local Services' })
+      await user.selectOptions(categorySelect, '2')
+
+      const subcategorySelect = screen.getByLabelText('Subcategory')
+      await within(subcategorySelect).findByRole('option', { name: 'Cleaning' })
+      await user.selectOptions(subcategorySelect, '3')
+
+      const requiredSkillInput = screen.getByLabelText('Required skills')
+      await user.type(requiredSkillInput, 'Ghar wiring')
+      await user.click(within(requiredSkillInput.closest('div') as HTMLElement).getByRole('button', { name: 'Add' }))
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Category')).toHaveValue('1')
+        expect(screen.getByLabelText('Subcategory')).toHaveValue('1')
+      })
+      expect(screen.getByText(/auto-selected electrical based on house wiring/i)).toBeInTheDocument()
     })
 
     it('rejects an application deadline in the past on create', async () => {

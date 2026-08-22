@@ -31,3 +31,31 @@ export interface CategoryTree {
   name: string
   subcategories: SubcategoryTree[]
 }
+
+export interface JobTaxonomyInferenceRequest {
+  title: string
+  description: string
+  required_skills: string[]
+  preferred_skills: string[]
+}
+
+export interface JobTaxonomyMatchedTerm {
+  term: string
+  source: 'required_skill' | 'preferred_skill' | 'job_text'
+  skill_id: number
+  skill_name: string
+  subcategory: number
+  subcategory_name: string
+  category: number
+  category_name: string
+  confidence: number
+}
+
+export interface JobTaxonomyInferenceResult {
+  category: number | null
+  category_name: string | null
+  subcategory: number | null
+  subcategory_name: string | null
+  matched_terms: JobTaxonomyMatchedTerm[]
+  confidence: number
+}

@@ -1,15 +1,17 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createJob, updateJob } from '@/api/endpoints/jobs'
+import { inferJobTaxonomy } from '@/api/endpoints/taxonomy'
 import { ApiError, toBannerMessage, toFieldErrors } from '@/api/errors'
 import { MY_JOBS_QUERY_KEY } from '@/hooks/useMyJobs'
 import { ownerJobQueryKey } from '@/hooks/useOwnerJob'
 import { jobFormSchema, isDeadlineInPast, type JobFormValues } from '@/validation/job'
 import { formatWageTypeLabel, formatWorkType, fromDatetimeLocalInputValue, toDatetimeLocalInputValue } from '@/lib/formatters'
 import type { EmployerJobPost, WageType, WorkType } from '@/types/job'
+import type { JobTaxonomyInferenceRequest } from '@/types/taxonomy'
 import { TextField } from '@/components/primitives/TextField'
 import { Button } from '@/components/primitives/Button'
 import { ErrorBanner } from '@/components/primitives/ErrorBanner'
@@ -54,6 +56,7 @@ export function JobForm({ mode, job }: JobFormProps) {
   const [savedJob, setSavedJob] = useState<EmployerJobPost | null>(null)
   const [unmatchedRequired, setUnmatchedRequired] = useState<string[]>([])
   const [unmatchedPreferred, setUnmatchedPreferred] = useState<string[]>([])
+  const [inferenceInput, setInferenceInput] = useState<JobTaxonomyInferenceRequest | null>(null)
 
   const {
     register,
@@ -87,6 +90,64 @@ export function JobForm({ mode, job }: JobFormProps) {
 
   const categoryValue = watch('category')
   const subcategoryValue = watch('subcategory')
+  const titleValue = watch('title')
+  const descriptionValue = watch('description')
+
+  useEffect(() => {
+    const hasInferenceSignal =
+      titleValue.trim() ||
+      descriptionValue.trim() ||
+      requiredSkills.length > 0 ||
+      preferredSkills.length > 0
+
+    if (!hasInferenceSignal) {
+      setInferenceInput(null)
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      setInferenceInput({
+        title: titleValue,
+        description: descriptionValue,
+        required_skills: requiredSkills,
+        preferred_skills: preferredSkills,
+      })
+    }, 350)
+
+    return () => window.clearTimeout(timeout)
+  }, [descriptionValue, preferredSkills, requiredSkills, titleValue])
+
+  const inferenceQuery = useQuery({
+    queryKey: ['taxonomy', 'infer-job-category', inferenceInput],
+    queryFn: () => inferJobTaxonomy(inferenceInput as JobTaxonomyInferenceRequest),
+    enabled: inferenceInput !== null,
+  })
+
+  const inference = inferenceQuery.data
+
+  useEffect(() => {
+    if (!inference?.category || !inference.subcategory) return
+
+    const hasExplicitSkillMatch = inference.matched_terms.some(
+      (term) => term.source === 'required_skill' || term.source === 'preferred_skill',
+    )
+
+    if (!hasExplicitSkillMatch) return
+
+    if (categoryValue !== String(inference.category)) {
+      setValue('category', String(inference.category), { shouldValidate: true })
+    }
+
+    if (subcategoryValue !== String(inference.subcategory)) {
+      setValue('subcategory', String(inference.subcategory), { shouldValidate: true })
+    }
+  }, [categoryValue, inference, setValue, subcategoryValue])
+
+  const inferredSkillNames =
+    inference?.matched_terms
+      .filter((term) => term.subcategory === inference.subcategory)
+      .map((term) => term.skill_name)
+      .filter((name, index, names) => names.indexOf(name) === index) ?? []
 
   const onSubmit = async (values: JobFormValues) => {
     setFormError(null)
@@ -233,6 +294,12 @@ export function JobForm({ mode, job }: JobFormProps) {
           value={subcategoryValue ? Number(subcategoryValue) : null}
           onChange={(id) => setValue('subcategory', id ? String(id) : '', { shouldValidate: true })}
         />
+        {inference?.subcategory && subcategoryValue === String(inference.subcategory) && (
+          <p className="text-sm font-medium text-success-text">
+            Auto-selected {inference.subcategory_name}
+            {inferredSkillNames.length > 0 ? ` based on ${inferredSkillNames.join(', ')}.` : '.'}
+          </p>
+        )}
         {errors.subcategory && (
           <p role="alert" className="text-sm font-medium text-danger-text">
             {errors.subcategory.message}

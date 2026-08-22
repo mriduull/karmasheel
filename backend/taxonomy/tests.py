@@ -588,6 +588,40 @@ class TaxonomyPublicAPITests(APITestCase):
             response = self.client.get(reverse(url_name))
             self.assertNotIn("totally weird term", json.dumps(response.data))
 
+    def test_job_taxonomy_inference_uses_skill_aliases(self):
+        response = self.client.post(
+            reverse("taxonomy:infer_job_category"),
+            {
+                "title": "Event helper, electrician",
+                "description": "A worker who can install fans and do wire installations",
+                "required_skills": ["ghar wiring"],
+                "preferred_skills": [],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["category"], self.cat_construction.id)
+        self.assertEqual(response.data["subcategory"], self.sub_electrical.id)
+        self.assertEqual(response.data["subcategory_name"], "Electrical")
+        self.assertEqual(response.data["matched_terms"][0]["skill_name"], "House Wiring")
+
+    def test_job_taxonomy_inference_is_side_effect_free_for_unknown_terms(self):
+        before = UnmatchedSkillTerm.objects.count()
+
+        response = self.client.post(
+            reverse("taxonomy:infer_job_category"),
+            {
+                "required_skills": ["not a known skill"],
+                "preferred_skills": [],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["category"])
+        self.assertEqual(UnmatchedSkillTerm.objects.count(), before)
+
 
 class TaxonomyAdminTests(TestCase):
     """Admin usability and safe unmatched-term review tests."""
