@@ -9,6 +9,8 @@ import type { SkillTagSummary } from './skill'
 export interface WorkerProfile {
   id: number
   address: string
+  profile_photo: string | null
+  profile_photo_url: string | null
   latitude: string | null
   longitude: string | null
   experience_years: number
@@ -36,6 +38,7 @@ export interface WorkerProfile {
  */
 export interface WorkerProfileUpdatePayload {
   address?: string
+  profile_photo?: File | null
   latitude?: number | null
   longitude?: number | null
   experience_years?: number

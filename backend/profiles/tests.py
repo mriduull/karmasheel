@@ -1,7 +1,9 @@
 from decimal import Decimal
+import tempfile
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
@@ -178,6 +180,47 @@ class WorkerProfileAPITests(APITestCase):
         self.assertFalse(self.worker_profile.is_available)
         self.assertEqual(self.worker_profile.expected_wage, Decimal("1500.00"))
         self.assertEqual(self.worker_profile.preferred_travel_radius_km, 15)
+
+    def test_worker_can_upload_profile_photo(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+
+        with tempfile.TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            response = self.client.patch(
+                self.worker_url,
+                {
+                    "profile_photo": SimpleUploadedFile(
+                        "profile.png",
+                        b"fake image bytes",
+                        content_type="image/png",
+                    )
+                },
+                format="multipart",
+            )
+
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertIn("profile_photo_url", response.data)
+            self.assertIn("/media/worker_profile_photos/", response.data["profile_photo_url"])
+
+            self.worker_profile.refresh_from_db()
+            self.assertTrue(self.worker_profile.profile_photo.name)
+
+    def test_worker_profile_photo_rejects_non_image_upload(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+
+        response = self.client.patch(
+            self.worker_url,
+            {
+                "profile_photo": SimpleUploadedFile(
+                    "profile.txt",
+                    b"not an image",
+                    content_type="text/plain",
+                )
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("profile_photo", response.data)
 
     def test_worker_can_set_skills_via_skill_input_exact_match(self):
         self.authenticate_as(self.worker, "WorkerPassword123!")
@@ -667,6 +710,27 @@ class WorkerCVAPITests(APITestCase):
         self.assertIn(self.worker.username, content)
         self.assertIn("Worker with 2 years of experience", content)
         self.assertIn("Not rated yet", content)
+        self.assertNotIn("Generated on", content)
+        self.assertNotIn("by Karmasheel", content)
+
+    def test_worker_cv_embeds_profile_photo_when_uploaded(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+
+        with tempfile.TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            self.worker_profile.profile_photo.save(
+                "profile.png",
+                SimpleUploadedFile(
+                    "profile.png",
+                    b"fake image bytes",
+                    content_type="image/png",
+                ),
+            )
+
+            response = self.client.get(self.preview_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('class="profile-photo"', response.content.decode())
+        self.assertIn("data:image/png;base64,", response.content.decode())
 
     def test_worker_cv_displays_received_average_rating(self):
         category = Category.objects.create(name="CV Services")

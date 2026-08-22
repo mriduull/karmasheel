@@ -167,6 +167,9 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 # CV PDF renderer. ``auto`` prefers WeasyPrint on Unix-like deployment
 # environments and a locally installed Chromium browser on Windows, then
 # falls back to a dependency-free basic PDF if neither renderer is available.

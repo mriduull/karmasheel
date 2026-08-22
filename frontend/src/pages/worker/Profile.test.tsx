@@ -23,6 +23,8 @@ describe('WorkerProfile', () => {
   beforeEach(() => {
     resetAuthStore()
     setAuthenticatedUser(WORKER_USER)
+    URL.createObjectURL = vi.fn(() => 'blob:profile-photo') as unknown as typeof URL.createObjectURL
+    URL.revokeObjectURL = vi.fn() as unknown as typeof URL.revokeObjectURL
   })
 
   afterEach(() => {
@@ -154,6 +156,38 @@ describe('WorkerProfile', () => {
     })
     expect(await screen.findByText(/we couldn't confidently match/i)).toBeInTheDocument()
     expect(screen.getByText('cnc machine operation')).toBeInTheDocument()
+  })
+
+  it('uploads a profile photo as multipart form data', async () => {
+    const user = userEvent.setup()
+    let capturedBody = ''
+
+    server.use(
+      http.get(`${API_ROOT}/profiles/worker/me/`, () => HttpResponse.json(buildWorkerProfileFixture())),
+      http.patch(`${API_ROOT}/profiles/worker/me/`, async ({ request }) => {
+        capturedBody = await request.text()
+        return HttpResponse.json(
+          buildWorkerProfileFixture({
+            profile_photo: '/media/worker_profile_photos/profile.png',
+            profile_photo_url: 'http://testserver/media/worker_profile_photos/profile.png',
+          }),
+        )
+      }),
+    )
+
+    renderWithProviders(<WorkerProfile />)
+
+    const input = await screen.findByLabelText('Profile photo')
+    await user.upload(input, new File(['image bytes'], 'profile.png', { type: 'image/png' }))
+
+    const form = input.closest('form') as HTMLFormElement
+    await user.click(within(form).getByRole('button', { name: /upload photo/i }))
+
+    await waitFor(() => {
+      expect(capturedBody).toContain('name="profile_photo"')
+      expect(capturedBody).toContain('Content-Type: image/png')
+    })
+    expect(within(form).getByText('Saved')).toBeInTheDocument()
   })
 
   it('saves a typed skill draft when the user clicks Save without clicking Add first', async () => {

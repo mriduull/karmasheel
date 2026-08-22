@@ -21,6 +21,26 @@
         margin-bottom: 0;
     }
 
+    .header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+    }
+
+    .identity {
+        min-width: 0;
+    }
+
+    .profile-photo {
+        width: 92px;
+        height: 92px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 1px solid #cccccc;
+        flex: 0 0 auto;
+    }
+
     .subtitle {
         color: #555555;
         margin-top: 2px;
@@ -86,16 +106,18 @@
         color: #8a5a1c;
     }
 
-    footer {
-        margin-top: 24px;
-        color: #999999;
-        font-size: 10px;
-    }
 </style>
 </head>
 <body>
-    <h1>{{ full_name }}</h1>
-    <div class="subtitle">{{ address|default:"Location not provided" }}</div>
+    <div class="header">
+        <div class="identity">
+            <h1>{{ full_name }}</h1>
+            <div class="subtitle">{{ address|default:"Location not provided" }}</div>
+        </div>
+        {% if profile_photo_data_uri %}
+        <img class="profile-photo" src="{{ profile_photo_data_uri }}" alt="">
+        {% endif %}
+    </div>
 
     <div class="section">
         <h2>Professional Summary</h2>
@@ -171,7 +193,5 @@
             {% endif %}
         </table>
     </div>
-
-    <footer>Generated on {{ generated_at|date:"Y-m-d" }} by Karmasheel.</footer>
 </body>
 </html>

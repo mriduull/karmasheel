@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
+from django.core.validators import FileExtensionValidator, MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 
 
@@ -27,6 +27,13 @@ class WorkerProfile(models.Model):
     address = models.CharField(
         max_length=255,
         blank=True,
+    )
+
+    profile_photo = models.FileField(
+        upload_to="worker_profile_photos/",
+        null=True,
+        blank=True,
+        validators=[FileExtensionValidator(["jpg", "jpeg", "png", "webp"])],
     )
 
     latitude = models.DecimalField(

@@ -1,11 +1,12 @@
 import '@/i18n'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { server } from '@/test/msw/server'
 import { API_ROOT } from '@/test/msw/handlers'
 import { renderWithProviders, resetAuthStore, setAuthenticatedUser } from '@/test/utils'
+import { buildWorkerProfileFixture } from '@/test/fixtures'
 import { WorkerCV } from './CV'
 
 const WORKER_USER = {
@@ -25,6 +26,9 @@ describe('WorkerCV', () => {
   beforeEach(() => {
     resetAuthStore()
     setAuthenticatedUser(WORKER_USER)
+    server.use(
+      http.get(`${API_ROOT}/profiles/worker/me/`, () => HttpResponse.json(buildWorkerProfileFixture())),
+    )
 
     createObjectURLSpy = vi.fn(() => 'blob:mock-url')
     revokeObjectURLSpy = vi.fn()
@@ -81,6 +85,42 @@ describe('WorkerCV', () => {
     await vi.waitFor(() => expect(anchorClickSpy).toHaveBeenCalled())
     expect(createObjectURLSpy).toHaveBeenCalled()
     expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:mock-url')
+  })
+
+  it('uploads a profile photo from the CV page and refreshes the preview', async () => {
+    const user = userEvent.setup()
+    let previewCallCount = 0
+    let capturedBody = ''
+
+    server.use(
+      http.get(`${API_ROOT}/profiles/worker/me/cv/preview/`, () => {
+        previewCallCount += 1
+        return HttpResponse.text(`<html><body><h1>CV ${previewCallCount}</h1></body></html>`, {
+          headers: { 'Content-Type': 'text/html' },
+        })
+      }),
+      http.patch(`${API_ROOT}/profiles/worker/me/`, async ({ request }) => {
+        capturedBody = await request.text()
+        return HttpResponse.json(
+          buildWorkerProfileFixture({
+            profile_photo: '/media/worker_profile_photos/profile.png',
+            profile_photo_url: 'http://testserver/media/worker_profile_photos/profile.png',
+          }),
+        )
+      }),
+    )
+
+    renderWithProviders(<WorkerCV />)
+
+    const input = await screen.findByLabelText('Profile photo')
+    await user.upload(input, new File(['image bytes'], 'profile.png', { type: 'image/png' }))
+    await user.click(screen.getByRole('button', { name: /upload photo/i }))
+
+    await waitFor(() => {
+      expect(capturedBody).toContain('name="profile_photo"')
+      expect(capturedBody).toContain('Content-Type: image/png')
+      expect(previewCallCount).toBeGreaterThan(1)
+    })
   })
 
   it('shows a download-only error without hiding an already-successful preview', async () => {

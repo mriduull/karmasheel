@@ -13,6 +13,8 @@ starting.  A small standards-compliant PDF fallback keeps the CV download
 usable in those environments while WeasyPrint remains the preferred renderer.
 """
 
+import base64
+import mimetypes
 import os
 import shutil
 import subprocess
@@ -23,12 +25,28 @@ from pathlib import Path
 
 from django.conf import settings
 from django.template.loader import render_to_string
-from django.utils import timezone
 
 MAX_SUMMARY_SKILLS = 6
 _NOT_CHECKED = object()
 _weasyprint_available = _NOT_CHECKED
 _browser_executable = _NOT_CHECKED
+
+
+def _profile_photo_data_uri(worker_profile):
+    if not worker_profile.profile_photo:
+        return None
+
+    try:
+        with worker_profile.profile_photo.open("rb") as photo:
+            encoded = base64.b64encode(photo.read()).decode("ascii")
+    except OSError:
+        return None
+
+    content_type = (
+        mimetypes.guess_type(worker_profile.profile_photo.name)[0]
+        or "image/jpeg"
+    )
+    return f"data:{content_type};base64,{encoded}"
 
 
 def _join_with_and(items):
@@ -121,6 +139,7 @@ def build_worker_cv_context(worker_profile):
         "phone_number": user.phone_number,
         "is_contact_verified": user.is_contact_verified,
         "address": worker_profile.address,
+        "profile_photo_data_uri": _profile_photo_data_uri(worker_profile),
         "professional_summary": generate_worker_summary(worker_profile),
         "skills": skills,
         "experience_years": worker_profile.experience_years,
@@ -129,7 +148,6 @@ def build_worker_cv_context(worker_profile):
         "preferred_travel_radius_km": worker_profile.preferred_travel_radius_km,
         "average_rating": average_rating,
         "rating_count": rating_count,
-        "generated_at": timezone.now(),
     }
 
 
@@ -181,8 +199,6 @@ def _build_fallback_pdf(context):
             if context["preferred_travel_radius_km"] is not None
             else "Preferred travel radius: Not specified"
         ),
-        "",
-        f"Generated: {context['generated_at']:%Y-%m-%d %H:%M %Z}",
     ]
 
     wrapped_lines = []

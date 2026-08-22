@@ -23,6 +23,7 @@ import { SkillChipInput, type SkillChipInputHandle } from '@/components/shared/S
 import { SkillChipList } from '@/components/shared/SkillChipList'
 import { UnmatchedTermNotice } from '@/components/shared/UnmatchedTermNotice'
 import { CoordinateCapture } from '@/components/shared/CoordinateCapture'
+import { ProfilePhotoUpload } from '@/components/shared/ProfilePhotoUpload'
 
 /**
  * Four independently-PATCHable sections, matching the design spec's
@@ -62,6 +63,7 @@ export function WorkerProfile() {
 
       {profileQuery.isSuccess && (
         <div className="flex flex-col gap-6">
+          <PhotoSection profile={profileQuery.data} />
           <BasicsSection profile={profileQuery.data} />
           <LocationSection profile={profileQuery.data} />
           <SkillsSection profile={profileQuery.data} />
@@ -69,6 +71,18 @@ export function WorkerProfile() {
         </div>
       )}
     </PageContainer>
+  )
+}
+
+function PhotoSection({ profile }: { profile: WorkerProfile }) {
+  return (
+    <section className="rounded-md border border-text-secondary/10 bg-surface p-4 shadow-card sm:p-6">
+      <h2 className="text-lg font-semibold text-text-primary">Profile photo</h2>
+      <p className="mt-1 text-sm text-text-secondary">Shown on your profile and generated CV.</p>
+      <div className="mt-4">
+        <ProfilePhotoUpload currentPhotoUrl={profile.profile_photo_url} />
+      </div>
+    </section>
   )
 }
 

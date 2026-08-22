@@ -19,6 +19,12 @@ export function updateWorkerProfile(payload: WorkerProfileUpdatePayload): Promis
   return apiFetch<WorkerProfile>('/profiles/worker/me/', { method: 'PATCH', body: payload })
 }
 
+export function updateWorkerProfilePhoto(file: File): Promise<WorkerProfile> {
+  const formData = new FormData()
+  formData.set('profile_photo', file, file.name)
+  return apiFetch<WorkerProfile>('/profiles/worker/me/', { method: 'PATCH', body: formData })
+}
+
 /** GET /api/profiles/worker/me/cv/preview/ — an HTML document
  * (`Content-Type: text/html`), generated entirely from the worker's own
  * stored profile data (profiles/views.py:WorkerCVPreviewView). `apiFetch`

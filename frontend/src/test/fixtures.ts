@@ -76,6 +76,8 @@ export function buildWorkerProfileFixture(overrides: Partial<WorkerProfile> = {}
   return {
     id: 3,
     address: 'Koteshwor, Kathmandu',
+    profile_photo: null,
+    profile_photo_url: null,
     latitude: '27.677800',
     longitude: '85.348800',
     experience_years: 6,

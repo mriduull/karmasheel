@@ -100,9 +100,10 @@ async function parseSuccessResponse<T>(response: Response): Promise<T> {
  */
 export async function apiFetchRaw(path: string, options: RequestOptions = {}): Promise<Response> {
   const { body, isPublic, _isRetry, headers, ...rest } = options
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
 
   const finalHeaders = new Headers(headers)
-  if (body !== undefined && !finalHeaders.has('Content-Type')) {
+  if (body !== undefined && !isFormData && !finalHeaders.has('Content-Type')) {
     finalHeaders.set('Content-Type', 'application/json')
   }
   if (!isPublic) {
@@ -117,7 +118,7 @@ export async function apiFetchRaw(path: string, options: RequestOptions = {}): P
     response = await fetch(`${API_ROOT}${path}`, {
       ...rest,
       headers: finalHeaders,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body !== undefined ? (isFormData ? body : JSON.stringify(body)) : undefined,
     })
   } catch {
     throw networkError()

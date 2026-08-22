@@ -27,6 +27,7 @@ class WorkerProfileSerializer(serializers.ModelSerializer):
     """
 
     skills = SkillTagSummarySerializer(many=True, read_only=True)
+    profile_photo_url = serializers.SerializerMethodField()
 
     skill_input = serializers.ListField(
         child=serializers.CharField(max_length=150),
@@ -41,6 +42,8 @@ class WorkerProfileSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "address",
+            "profile_photo",
+            "profile_photo_url",
             "latitude",
             "longitude",
             "experience_years",
@@ -53,10 +56,31 @@ class WorkerProfileSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("id", "skills", "unmatched_terms", "created_at", "updated_at")
+        read_only_fields = ("id", "profile_photo_url", "skills", "unmatched_terms", "created_at", "updated_at")
+
+    def get_profile_photo_url(self, instance):
+        if not instance.profile_photo:
+            return None
+
+        request = self.context.get("request")
+        url = instance.profile_photo.url
+        return request.build_absolute_uri(url) if request else url
 
     def get_unmatched_terms(self, instance):
         return getattr(self, "_unmatched_terms", [])
+
+    def validate_profile_photo(self, value):
+        if value is None:
+            return value
+
+        if value.size > 2 * 1024 * 1024:
+            raise serializers.ValidationError("Profile photo must be 2 MB or smaller.")
+
+        content_type = getattr(value, "content_type", "")
+        if content_type not in {"image/jpeg", "image/png", "image/webp"}:
+            raise serializers.ValidationError("Upload a JPG, PNG, or WebP image.")
+
+        return value
 
     def _apply_skill_input(self, instance, skill_input):
         request = self.context.get("request")
