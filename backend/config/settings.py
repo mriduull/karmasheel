@@ -13,10 +13,36 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 
+import dj_database_url
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR.parent / ".env")
+
+
+def env_bool(name, default=False):
+    """Read a strict boolean environment variable."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+
+    raise ImproperlyConfigured(
+        f"{name} must be one of: true, false, 1, 0, yes, no, on, off."
+    )
+
+
+def env_list(name):
+    """Read a comma-separated environment variable, omitting blanks."""
+    return [item.strip() for item in os.getenv(name, "").split(",") if item.strip()]
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -25,8 +51,18 @@ load_dotenv(BASE_DIR.parent / ".env")
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
-ALLOWED_HOSTS = []
+DEBUG = env_bool("DJANGO_DEBUG", False)
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")
+
+if not DEBUG:
+    if len(SECRET_KEY) < 50 or SECRET_KEY == "your-django-secret-key":
+        raise ImproperlyConfigured(
+            "DJANGO_SECRET_KEY must be a unique production secret of at least 50 characters."
+        )
+    if not ALLOWED_HOSTS:
+        raise ImproperlyConfigured(
+            "DJANGO_ALLOWED_HOSTS must list at least one hostname when DJANGO_DEBUG=False."
+        )
 
 # CORS (django-cors-headers)
 # Comma-separated list of origins allowed to make cross-origin requests
@@ -34,11 +70,10 @@ ALLOWED_HOSTS = []
 # CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 # Deliberately does NOT use CORS_ALLOW_ALL_ORIGINS: only origins
 # explicitly listed in the environment are permitted.
-CORS_ALLOWED_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
-    if origin.strip()
-]
+CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS")
+CORS_URLS_REGEX = r"^/api/.*$"
+CORS_EXPOSE_HEADERS = ["Content-Disposition"]
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
 
 
 # Application definition
@@ -91,6 +126,11 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+if not DEBUG:
+    # WhiteNoise serves collected static assets (including Django admin)
+    # directly from production. User-uploaded media remains separate.
+    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
+
 ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
@@ -114,16 +154,34 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ["DB_NAME"],
-        "USER": os.environ["DB_USER"],
-        "PASSWORD": os.environ["DB_PASSWORD"],
-        "HOST": os.getenv("DB_HOST", "localhost"),
-        "PORT": os.getenv("DB_PORT", "5432"),
+database_url = os.getenv("DATABASE_URL", "").strip()
+database_conn_max_age = int(os.getenv("DB_CONN_MAX_AGE", "0" if DEBUG else "60"))
+database_ssl_required = env_bool("DB_SSL_REQUIRED", False)
+
+if database_url:
+    DATABASES = {
+        "default": dj_database_url.parse(
+            database_url,
+            conn_max_age=database_conn_max_age,
+            conn_health_checks=True,
+            ssl_require=database_ssl_required,
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ["DB_NAME"],
+            "USER": os.environ["DB_USER"],
+            "PASSWORD": os.environ["DB_PASSWORD"],
+            "HOST": os.getenv("DB_HOST", "localhost"),
+            "PORT": os.getenv("DB_PORT", "5432"),
+            "CONN_MAX_AGE": database_conn_max_age,
+            "CONN_HEALTH_CHECKS": True,
+        }
+    }
+    if database_ssl_required:
+        DATABASES["default"]["OPTIONS"] = {"sslmode": "require"}
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -159,7 +217,98 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": (
+            "django.contrib.staticfiles.storage.StaticFilesStorage"
+            if DEBUG
+            else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        ),
+    },
+}
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = Path(os.getenv("DJANGO_MEDIA_ROOT", str(BASE_DIR / "media"))).resolve()
+# Safe for a small, single-instance defense deployment when MEDIA_ROOT is on
+# persistent storage. At larger scale, serve uploads from object storage/CDN.
+SERVE_MEDIA = env_bool("DJANGO_SERVE_MEDIA", DEBUG)
+
+
+# HTTPS and browser security. A deployment behind a TLS-terminating proxy must
+# forward X-Forwarded-Proto; otherwise secure redirects can loop.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", not DEBUG)
+SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", not DEBUG)
+CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", not DEBUG)
+SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "0" if DEBUG else "3600"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", False)
+SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", False)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+X_FRAME_OPTIONS = "DENY"
+
+
+# Baseline API throttling for production. This is defense in depth; a public
+# deployment should also rate-limit login/register at its edge proxy.
+if not DEBUG and env_bool("DJANGO_API_THROTTLING", True):
+    REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = (
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    )
+    REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
+        "anon": os.getenv("API_ANON_RATE", "60/min"),
+        "user": os.getenv("API_USER_RATE", "600/min"),
+    }
+
+
+LOG_LEVEL = os.getenv("DJANGO_LOG_LEVEL", "INFO").upper()
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "{asctime} {levelname} {name}: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": LOG_LEVEL,
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        "django.server": {
+            "handlers": ["console"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+    },
+}
+
+# CV PDF renderer. ``auto`` prefers WeasyPrint on Unix-like deployment
+# environments and a locally installed Chromium browser on Windows, then
+# falls back to the portable styled ReportLab renderer.
+CV_PDF_ENGINE = os.getenv("CV_PDF_ENGINE", "auto").strip().lower()
+if CV_PDF_ENGINE not in {"auto", "basic", "browser", "weasyprint"}:
+    raise ImproperlyConfigured(
+        "CV_PDF_ENGINE must be one of: auto, basic, browser, weasyprint."
+    )
 
 
 # Skill-normalization service (Week 2)

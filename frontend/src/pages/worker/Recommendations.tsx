@@ -42,11 +42,11 @@ export function WorkerRecommendations() {
 
         {recommendationsQuery.isSuccess && recommendationsQuery.data.length === 0 && (
           <EmptyState
-            title="No matches yet"
-            description="Try broadening your availability or adding more skills to your profile."
+            title="No recommended jobs right now"
+            description="We couldn't find an active job matching your skills, availability, and travel preferences. Browse all jobs or check back later."
             action={
-              <Link to="/worker/profile">
-                <Button variant="primary">Complete your profile</Button>
+              <Link to="/jobs">
+                <Button variant="primary">Browse Jobs</Button>
               </Link>
             }
           />

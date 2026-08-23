@@ -14,17 +14,56 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from django.conf import settings
 from django.contrib import admin
-from django.urls import include, path
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.urls import include, path, re_path
+from django.views.static import serve as serve_media
+
+from .views import health, readiness
 
 
-admin.site.site_header = "Karmasheel Administration"
-admin.site.site_title = "Karmasheel Administration"
-admin.site.index_title = "Karmasheel Administration"
+admin.site.site_header = "Workforce Matching Administration"
+admin.site.site_title = "Workforce Matching Administration"
+admin.site.index_title = "Workforce Matching Administration"
+
+
+def api_root(request):
+    return JsonResponse(
+        {
+            "name": "Workforce Matching API",
+            "endpoints": {
+                "auth": "/api/auth/",
+                "profiles": "/api/profiles/",
+                "taxonomy": "/api/taxonomy/",
+                "taxonomy_infer_job_category": "/api/taxonomy/infer-job-category/",
+                "jobs": "/api/jobs/",
+                "job_browse": "/api/jobs/browse/",
+                "applications": "/api/applications/",
+                "recommendations": "/api/recommendations/",
+            },
+        }
+    )
+
+
+def service_root(request):
+    """Show the local demo in debug mode and an API index in production."""
+    if settings.DEBUG:
+        return render(request, "frontend/index.html")
+
+    return api_root(request)
 
 
 urlpatterns = [
+    path("", service_root, name="frontend"),
+
     path("admin/", admin.site.urls),
+
+    path("api/health/", health, name="health"),
+    path("api/readiness/", readiness, name="readiness"),
+
+    path("api/", api_root, name="api_root"),
 
     path(
         "api/auth/",
@@ -56,3 +95,13 @@ urlpatterns = [
         include("recommendations.urls"),
     ),
 ]
+
+if settings.SERVE_MEDIA:
+    urlpatterns += [
+        re_path(
+            r"^media/(?P<path>.*)$",
+            serve_media,
+            {"document_root": settings.MEDIA_ROOT},
+            name="media",
+        ),
+    ]

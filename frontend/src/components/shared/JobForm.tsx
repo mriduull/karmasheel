@@ -1,26 +1,25 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createJob, updateJob } from '@/api/endpoints/jobs'
+import { inferJobTaxonomy } from '@/api/endpoints/taxonomy'
 import { ApiError, toBannerMessage, toFieldErrors } from '@/api/errors'
 import { MY_JOBS_QUERY_KEY } from '@/hooks/useMyJobs'
 import { ownerJobQueryKey } from '@/hooks/useOwnerJob'
-import { useEmployerProfile } from '@/hooks/useEmployerProfile'
-import { jobFormSchema, isDeadlineInPast, isValidJobLocation, type JobFormValues } from '@/validation/job'
+import { jobFormSchema, isDeadlineInPast, type JobFormValues } from '@/validation/job'
 import { formatWageTypeLabel, formatWorkType, fromDatetimeLocalInputValue, toDatetimeLocalInputValue } from '@/lib/formatters'
-import { locationValueFromProfile } from '@/lib/locationValue'
 import type { EmployerJobPost, WageType, WorkType } from '@/types/job'
-import type { LocationValue } from '@/types/location'
+import type { JobTaxonomyInferenceRequest } from '@/types/taxonomy'
 import { TextField } from '@/components/primitives/TextField'
 import { Button } from '@/components/primitives/Button'
 import { ErrorBanner } from '@/components/primitives/ErrorBanner'
 import { CategorySelect } from './CategorySelect'
 import { SubcategorySelect } from './SubcategorySelect'
-import { SkillChipInput } from './SkillChipInput'
+import { SkillChipInput, type SkillChipInputHandle } from './SkillChipInput'
 import { UnmatchedTermNotice } from './UnmatchedTermNotice'
-import { LocationPicker } from './LocationPicker'
+import { JobLocationFields } from './JobLocationFields'
 import { JobFormSection } from './JobFormSection'
 
 const WAGE_TYPES: WageType[] = ['HOURLY', 'DAILY', 'MONTHLY', 'FIXED']
@@ -45,7 +44,8 @@ interface JobFormProps {
 export function JobForm({ mode, job }: JobFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const employerProfileQuery = useEmployerProfile()
+  const requiredSkillsRef = useRef<SkillChipInputHandle>(null)
+  const preferredSkillsRef = useRef<SkillChipInputHandle>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [requiredSkills, setRequiredSkills] = useState<string[]>(
     () => job?.required_skills.map((skill) => skill.name) ?? [],
@@ -53,11 +53,10 @@ export function JobForm({ mode, job }: JobFormProps) {
   const [preferredSkills, setPreferredSkills] = useState<string[]>(
     () => job?.preferred_skills.map((skill) => skill.name) ?? [],
   )
-  const [location, setLocation] = useState<LocationValue | null>(() => (job ? locationValueFromProfile(job) : null))
-  const [locationError, setLocationError] = useState<string | null>(null)
   const [savedJob, setSavedJob] = useState<EmployerJobPost | null>(null)
   const [unmatchedRequired, setUnmatchedRequired] = useState<string[]>([])
   const [unmatchedPreferred, setUnmatchedPreferred] = useState<string[]>([])
+  const [inferenceInput, setInferenceInput] = useState<JobTaxonomyInferenceRequest | null>(null)
 
   const {
     register,
@@ -73,6 +72,9 @@ export function JobForm({ mode, job }: JobFormProps) {
       description: job?.description ?? '',
       category: job ? String(job.category) : '',
       subcategory: job ? String(job.subcategory) : '',
+      address: job?.address ?? '',
+      latitude: job?.latitude ?? '',
+      longitude: job?.longitude ?? '',
       wage_type: job?.wage_type ?? 'DAILY',
       wage_amount: job?.wage_amount ?? '',
       work_type: job?.work_type ?? 'ONE_TIME',
@@ -88,29 +90,87 @@ export function JobForm({ mode, job }: JobFormProps) {
 
   const categoryValue = watch('category')
   const subcategoryValue = watch('subcategory')
+  const titleValue = watch('title')
+  const descriptionValue = watch('description')
+
+  useEffect(() => {
+    const hasInferenceSignal =
+      titleValue.trim() ||
+      descriptionValue.trim() ||
+      requiredSkills.length > 0 ||
+      preferredSkills.length > 0
+
+    if (!hasInferenceSignal) {
+      setInferenceInput(null)
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      setInferenceInput({
+        title: titleValue,
+        description: descriptionValue,
+        required_skills: requiredSkills,
+        preferred_skills: preferredSkills,
+      })
+    }, 350)
+
+    return () => window.clearTimeout(timeout)
+  }, [descriptionValue, preferredSkills, requiredSkills, titleValue])
+
+  const inferenceQuery = useQuery({
+    queryKey: ['taxonomy', 'infer-job-category', inferenceInput],
+    queryFn: () => inferJobTaxonomy(inferenceInput as JobTaxonomyInferenceRequest),
+    enabled: inferenceInput !== null,
+  })
+
+  const inference = inferenceQuery.data
+
+  useEffect(() => {
+    if (!inference?.category || !inference.subcategory) return
+
+    const hasExplicitSkillMatch = inference.matched_terms.some(
+      (term) => term.source === 'required_skill' || term.source === 'preferred_skill',
+    )
+
+    if (!hasExplicitSkillMatch) return
+
+    if (categoryValue !== String(inference.category)) {
+      setValue('category', String(inference.category), { shouldValidate: true })
+    }
+
+    if (subcategoryValue !== String(inference.subcategory)) {
+      setValue('subcategory', String(inference.subcategory), { shouldValidate: true })
+    }
+  }, [categoryValue, inference, setValue, subcategoryValue])
+
+  const inferredSkillNames =
+    inference?.matched_terms
+      .filter((term) => term.subcategory === inference.subcategory)
+      .map((term) => term.skill_name)
+      .filter((name, index, names) => names.indexOf(name) === index) ?? []
 
   const onSubmit = async (values: JobFormValues) => {
     setFormError(null)
-    setLocationError(null)
 
     if (mode === 'create' && isDeadlineInPast(values.application_deadline)) {
       setError('application_deadline', { message: 'Application deadline cannot be in the past.' })
       return
     }
 
-    if (!isValidJobLocation(location)) {
-      setLocationError('Select a location for this job — search, use your current location, or tap the map.')
-      return
-    }
+    const committedRequiredSkills = requiredSkillsRef.current?.commitDraft() ?? requiredSkills
+    if (committedRequiredSkills === null) return
+
+    const committedPreferredSkills = preferredSkillsRef.current?.commitDraft() ?? preferredSkills
+    if (committedPreferredSkills === null) return
 
     const payload = {
       title: values.title,
       category: Number(values.category),
       subcategory: Number(values.subcategory),
       description: values.description,
-      address: location!.address,
-      latitude: location!.latitude,
-      longitude: location!.longitude,
+      address: values.address,
+      latitude: Number(values.latitude),
+      longitude: Number(values.longitude),
       required_experience_years: Number(values.required_experience_years),
       wage_type: values.wage_type,
       wage_amount: Number(values.wage_amount),
@@ -123,8 +183,8 @@ export function JobForm({ mode, job }: JobFormProps) {
       application_deadline: values.application_deadline
         ? fromDatetimeLocalInputValue(values.application_deadline)
         : null,
-      required_skills_input: requiredSkills,
-      preferred_skills_input: preferredSkills,
+      required_skills_input: committedRequiredSkills,
+      preferred_skills_input: committedPreferredSkills,
     }
 
     try {
@@ -154,12 +214,9 @@ export function JobForm({ mode, job }: JobFormProps) {
         const fieldErrors = toFieldErrors(error)
         if (fieldErrors) {
           const knownFields = new Set(Object.keys(jobFormSchema.shape))
-          const locationFields = new Set(['address', 'latitude', 'longitude'])
           for (const [field, message] of Object.entries(fieldErrors)) {
             if (knownFields.has(field)) {
               setError(field as keyof JobFormValues, { type: 'server', message })
-            } else if (locationFields.has(field)) {
-              setLocationError(message)
             } else {
               setFormError(message)
             }
@@ -190,19 +247,7 @@ export function JobForm({ mode, job }: JobFormProps) {
   }
 
   return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault()
-        // Location is validated independently of react-hook-form/zod (it
-        // isn't a registered field — see validation/job.ts) so its error
-        // shows up alongside every other field's error on the same
-        // submit attempt, not only once the rest of the form is valid.
-        setLocationError(isValidJobLocation(location) ? null : 'Select a location for this job — search, use your current location, or tap the map.')
-        void handleSubmit(onSubmit)(event)
-      }}
-      noValidate
-      className="flex flex-col gap-6"
-    >
+    <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-6">
       {mode === 'create' && (
         <p className="text-sm text-text-secondary">
           This job will be visible to workers immediately once you publish it — there is no draft
@@ -249,6 +294,12 @@ export function JobForm({ mode, job }: JobFormProps) {
           value={subcategoryValue ? Number(subcategoryValue) : null}
           onChange={(id) => setValue('subcategory', id ? String(id) : '', { shouldValidate: true })}
         />
+        {inference?.subcategory && subcategoryValue === String(inference.subcategory) && (
+          <p className="text-sm font-medium text-success-text">
+            Auto-selected {inference.subcategory_name}
+            {inferredSkillNames.length > 0 ? ` based on ${inferredSkillNames.join(', ')}.` : '.'}
+          </p>
+        )}
         {errors.subcategory && (
           <p role="alert" className="text-sm font-medium text-danger-text">
             {errors.subcategory.message}
@@ -257,35 +308,7 @@ export function JobForm({ mode, job }: JobFormProps) {
       </JobFormSection>
 
       <JobFormSection title="Location">
-        {employerProfileQuery.data?.latitude != null && employerProfileQuery.data?.longitude != null && (
-          <Button
-            type="button"
-            variant="secondary"
-            className="self-start"
-            onClick={() => {
-              const profile = employerProfileQuery.data!
-              setLocation({
-                address: profile.address,
-                latitude: Number(profile.latitude),
-                longitude: Number(profile.longitude),
-                placeId: null,
-              })
-              setLocationError(null)
-            }}
-          >
-            Use employer profile location
-          </Button>
-        )}
-        <LocationPicker
-          value={location}
-          onChange={(next) => {
-            setLocation(next)
-            if (next) setLocationError(null)
-          }}
-          label="Actual workplace location"
-          description="Where the work will actually happen — this can be different from your business address."
-          error={locationError ?? undefined}
-        />
+        <JobLocationFields register={register} errors={errors} setValue={setValue} />
       </JobFormSection>
 
       <JobFormSection title="Work terms">
@@ -369,8 +392,18 @@ export function JobForm({ mode, job }: JobFormProps) {
         title="Skills"
         description="Add skills as free text — English or Romanized Nepali both work."
       >
-        <SkillChipInput label="Required skills" value={requiredSkills} onChange={setRequiredSkills} />
-        <SkillChipInput label="Preferred skills" value={preferredSkills} onChange={setPreferredSkills} />
+        <SkillChipInput
+          ref={requiredSkillsRef}
+          label="Required skills"
+          value={requiredSkills}
+          onChange={setRequiredSkills}
+        />
+        <SkillChipInput
+          ref={preferredSkillsRef}
+          label="Preferred skills"
+          value={preferredSkills}
+          onChange={setPreferredSkills}
+        />
       </JobFormSection>
 
       <Button type="submit" variant="primary" isLoading={isSubmitting} className="self-start">

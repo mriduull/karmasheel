@@ -38,13 +38,13 @@ describe('EmployerCandidates', () => {
     server.use(
       http.get(`${API_ROOT}/jobs/5/`, () => HttpResponse.json(buildEmployerJobFixture({ id: 5 }))),
       http.get(`${API_ROOT}/jobs/5/candidates/`, () =>
-        HttpResponse.json([buildWorkerCandidateFixture({ username: 'demo_worker_ramesh' })]),
+        HttpResponse.json([buildWorkerCandidateFixture({ username: 'demo_worker_electrician' })]),
       ),
     )
 
     renderAt('5')
 
-    expect(await screen.findByText('demo_worker_ramesh')).toBeInTheDocument()
+    expect(await screen.findByText('demo_worker_electrician')).toBeInTheDocument()
     expect(screen.queryByText(/out of 100 match/i)).not.toBeInTheDocument()
   })
 

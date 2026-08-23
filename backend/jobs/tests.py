@@ -1,13 +1,23 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from applications.models import Application
+from applications.services import submit_rating
 from profiles.models import EmployerProfile, WorkerProfile
-from taxonomy.models import Category, SkillAlias, SkillTag, Subcategory
+from taxonomy.models import (
+    Category,
+    SkillAlias,
+    SkillTag,
+    Subcategory,
+    UnmatchedSkillTerm,
+)
 
 from .models import JobPost
 from .services import haversine_distance_km
@@ -182,6 +192,54 @@ class JobPostCreationTests(JobPostAPITestsBase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("subcategory", response.data)
 
+    def test_job_rejects_skill_from_another_subcategory(self):
+        plumbing_skill = SkillTag.objects.create(
+            subcategory=self.other_subcategory,
+            name="Pipe Fitting",
+        )
+        self.authenticate_as(
+            self.verified_employer_user, "EmployerPassword123!"
+        )
+        payload = {
+            **self.valid_payload,
+            "required_skills_input": [
+                plumbing_skill.name,
+                "totally unknown rejected-request skill",
+            ],
+        }
+
+        response = self.client.post(
+            self.list_create_url, payload, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("required_skills_input", response.data)
+        self.assertEqual(JobPost.objects.count(), 0)
+        self.assertFalse(
+            UnmatchedSkillTerm.objects.filter(
+                normalized_term="totally unknown rejected request skill"
+            ).exists()
+        )
+
+    def test_job_rejects_past_application_deadline_on_create(self):
+        self.authenticate_as(
+            self.verified_employer_user, "EmployerPassword123!"
+        )
+        payload = {
+            **self.valid_payload,
+            "application_deadline": (
+                timezone.now() - timedelta(minutes=1)
+            ).isoformat(),
+        }
+
+        response = self.client.post(
+            self.list_create_url, payload, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("application_deadline", response.data)
+        self.assertEqual(JobPost.objects.count(), 0)
+
 
 class JobPostListDetailTests(JobPostAPITestsBase):
     def setUp(self):
@@ -217,6 +275,70 @@ class JobPostListDetailTests(JobPostAPITestsBase):
         self.own_job.refresh_from_db()
         self.assertNotEqual(self.own_job.title, "Hijacked")
 
+    def test_owner_can_delete_job(self):
+        job_id = self.own_job.id
+        self.authenticate_as(
+            self.verified_employer_user, "EmployerPassword123!"
+        )
+
+        response = self.client.delete(self.detail_url(self.own_job))
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(JobPost.objects.filter(pk=job_id).exists())
+
+    def test_owner_cannot_delete_job_with_application_and_rating_history(self):
+        application = Application.objects.create(
+            worker=self.worker_profile,
+            job=self.own_job,
+            status=Application.Status.COMPLETED,
+        )
+        rating = submit_rating(
+            application,
+            reviewer=self.verified_employer_user,
+            score=5,
+        )
+        self.authenticate_as(
+            self.verified_employer_user,
+            "EmployerPassword123!",
+        )
+
+        response = self.client.delete(self.detail_url(self.own_job))
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn("application history", response.data["detail"])
+        self.assertTrue(JobPost.objects.filter(pk=self.own_job.pk).exists())
+        self.assertTrue(Application.objects.filter(pk=application.pk).exists())
+        self.assertTrue(type(rating).objects.filter(pk=rating.pk).exists())
+
+    def test_non_owner_employer_cannot_delete_job(self):
+        self.authenticate_as(
+            self.unverified_employer_user, "EmployerPassword123!"
+        )
+
+        response = self.client.delete(self.detail_url(self.own_job))
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(JobPost.objects.filter(pk=self.own_job.pk).exists())
+
+    def test_delete_missing_job_returns_404(self):
+        missing_url = self.detail_url(self.own_job)
+        self.own_job.delete()
+        self.authenticate_as(
+            self.verified_employer_user, "EmployerPassword123!"
+        )
+
+        response = self.client.delete(missing_url)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_worker_cannot_delete_job(self):
+        self.authenticate_as(self.worker_user, "WorkerPassword123!")
+
+        response = self.client.delete(self.detail_url(self.own_job))
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(JobPost.objects.filter(pk=self.own_job.pk).exists())
+
     def test_owner_can_close_job(self):
         self.authenticate_as(self.verified_employer_user, "EmployerPassword123!")
         response = self.client.patch(
@@ -237,6 +359,40 @@ class JobPostListDetailTests(JobPostAPITestsBase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_application_deadline_cannot_be_patched_into_the_past(self):
+        self.authenticate_as(
+            self.verified_employer_user, "EmployerPassword123!"
+        )
+        response = self.client.patch(
+            self.detail_url(self.own_job),
+            {
+                "application_deadline": (
+                    timezone.now() - timedelta(minutes=1)
+                ).isoformat()
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("application_deadline", response.data)
+
+    def test_subcategory_change_requires_replacement_skills(self):
+        self.own_job.required_skills.add(self.skill)
+        self.authenticate_as(
+            self.verified_employer_user, "EmployerPassword123!"
+        )
+
+        response = self.client.patch(
+            self.detail_url(self.own_job),
+            {
+                "subcategory": self.other_subcategory.id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("required_skills_input", response.data)
 
     def test_worker_can_retrieve_active_job_detail(self):
         self.authenticate_as(self.worker_user, "WorkerPassword123!")
@@ -410,7 +566,70 @@ class JobCandidatesFilterTests(JobPostAPITestsBase):
         self.assertNotIn(self.wrong_skill_worker.id, worker_ids)
         self.assertNotIn(self.far_worker.id, worker_ids)
 
+    def test_candidate_response_does_not_expose_precise_worker_location(self):
+        self.worker_profile.address = "Exact private home address"
+        self.worker_profile.save(update_fields=["address"])
+        self.authenticate_as(
+            self.verified_employer_user,
+            "EmployerPassword123!",
+        )
+
+        response = self.client.get(self.candidates_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        candidate = next(
+            item for item in response.data if item["id"] == self.worker_profile.id
+        )
+        self.assertNotIn("address", candidate)
+        self.assertNotIn("latitude", candidate)
+        self.assertNotIn("longitude", candidate)
+        self.assertNotIn("Exact private home address", str(candidate))
+
+    def test_owner_loses_candidate_access_when_verification_is_revoked(self):
+        self.verified_employer.verification_status = (
+            EmployerProfile.VerificationStatus.REJECTED
+        )
+        self.verified_employer.save(update_fields=["verification_status"])
+        self.authenticate_as(
+            self.verified_employer_user,
+            "EmployerPassword123!",
+        )
+
+        response = self.client.get(self.candidates_url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_explicit_distance_filter_excludes_worker_without_coordinates(self):
+        no_location_user = User.objects.create_user(
+            username="worker-without-location",
+            phone_number="9800000007",
+            password="WorkerPassword123!",
+            role=User.Role.WORKER,
+        )
+        no_location_worker = WorkerProfile.objects.create(
+            user=no_location_user,
+            is_available=True,
+        )
+        no_location_worker.skills.add(self.skill)
+        self.authenticate_as(
+            self.verified_employer_user, "EmployerPassword123!"
+        )
+
+        response = self.client.get(
+            self.candidates_url, {"max_distance_km": 20}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        worker_ids = {worker["id"] for worker in response.data}
+        self.assertNotIn(no_location_worker.id, worker_ids)
+
     def test_non_owner_employer_cannot_view_candidates(self):
+        # Keep this account verified so the request reaches the ownership
+        # check rather than failing the endpoint-wide verification boundary.
+        self.unverified_employer.verification_status = (
+            EmployerProfile.VerificationStatus.VERIFIED
+        )
+        self.unverified_employer.save(update_fields=["verification_status"])
         self.authenticate_as(self.unverified_employer_user, "EmployerPassword123!")
         response = self.client.get(self.candidates_url)
 
@@ -488,6 +707,12 @@ class PublicJobAccessTests(JobPostAPITestsBase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.active_job.refresh_from_db()
         self.assertNotEqual(self.active_job.title, "Hijacked")
+
+    def test_anonymous_cannot_delete_job(self):
+        response = self.client.delete(self.detail_url(self.active_job))
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertTrue(JobPost.objects.filter(pk=self.active_job.pk).exists())
 
     def test_anonymous_cannot_view_employer_owned_job_list(self):
         response = self.client.get(self.list_create_url)
@@ -568,6 +793,13 @@ class PublicJobAccessTests(JobPostAPITestsBase):
         job_ids = {job["id"] for job in response.data}
         self.assertIn(far_job.id, job_ids)
 
+    def test_public_browse_rejects_distance_without_an_origin(self):
+        response = self.client.get(
+            self.browse_url, {"max_distance_km": 20}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_public_browse_rejects_latitude_without_longitude(self):
         response = self.client.get(self.browse_url, {"latitude": "27.7"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -575,6 +807,37 @@ class PublicJobAccessTests(JobPostAPITestsBase):
     def test_public_browse_rejects_out_of_range_latitude(self):
         response = self.client.get(self.browse_url, {"latitude": "200", "longitude": "85.3"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_public_browse_rejects_non_integer_taxonomy_filters(self):
+        for parameter in ("category", "subcategory"):
+            with self.subTest(parameter=parameter):
+                response = self.client.get(
+                    self.browse_url, {parameter: "not-an-integer"}
+                )
+                self.assertEqual(
+                    response.status_code, status.HTTP_400_BAD_REQUEST
+                )
+
+    def test_public_browse_rejects_invalid_work_type(self):
+        response = self.client.get(
+            self.browse_url, {"work_type": "NOT_A_WORK_TYPE"}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_public_browse_rejects_non_finite_numbers(self):
+        for parameter in ("latitude", "longitude", "max_distance_km"):
+            with self.subTest(parameter=parameter):
+                query = {
+                    "latitude": "27.7",
+                    "longitude": "85.3",
+                    "max_distance_km": "20",
+                }
+                query[parameter] = "nan"
+                response = self.client.get(self.browse_url, query)
+                self.assertEqual(
+                    response.status_code, status.HTTP_400_BAD_REQUEST
+                )
 
     def test_authenticated_worker_browse_behavior_unchanged(self):
         self.worker_profile.latitude = Decimal("27.700000")

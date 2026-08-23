@@ -11,7 +11,7 @@ status in the application state machine (including one full
 worker-to-job hire), a completed application rated in both directions,
 and one deliberately unmatched skill phrase for admin review.
 
-The original four workers (Ramesh, Sita, Hari, Gita) and five jobs keep
+The original four workers (Lead electrician, Sita, Hari, Gita) and five jobs keep
 their exact original field values so the scores already documented in
 docs/DEMO_SCRIPT.md keep working; everything else is additive.
 
@@ -121,7 +121,7 @@ class Command(BaseCommand):
         user, created = self._get_or_update_user(
             "demo_admin",
             phone_number="9811100000",
-            email="demo_admin@karmasheel.local",
+            email="demo_admin@workforce-matching.local",
             role="",
             is_contact_verified=True,
             is_staff=True,
@@ -137,7 +137,7 @@ class Command(BaseCommand):
         verified_user, verified_created = self._get_or_update_user(
             "demo_employer_verified",
             phone_number="9811100001",
-            email="demo_employer_verified@karmasheel.local",
+            email="demo_employer_verified@workforce-matching.local",
             role=User.Role.EMPLOYER,
             is_contact_verified=True,
         )
@@ -156,7 +156,7 @@ class Command(BaseCommand):
         pending_user, pending_created = self._get_or_update_user(
             "demo_employer_pending",
             phone_number="9811100002",
-            email="demo_employer_pending@karmasheel.local",
+            email="demo_employer_pending@workforce-matching.local",
             role=User.Role.EMPLOYER,
             is_contact_verified=False,
         )
@@ -177,7 +177,7 @@ class Command(BaseCommand):
         hospitality_user, hospitality_created = self._get_or_update_user(
             "demo_employer_hospitality",
             phone_number="9811100003",
-            email="demo_employer_hospitality@karmasheel.local",
+            email="demo_employer_hospitality@workforce-matching.local",
             role=User.Role.EMPLOYER,
             is_contact_verified=True,
         )
@@ -198,7 +198,7 @@ class Command(BaseCommand):
         retail_user, retail_created = self._get_or_update_user(
             "demo_employer_retail",
             phone_number="9811100004",
-            email="demo_employer_retail@karmasheel.local",
+            email="demo_employer_retail@workforce-matching.local",
             role=User.Role.EMPLOYER,
             is_contact_verified=True,
         )
@@ -234,18 +234,18 @@ class Command(BaseCommand):
         construction = "Construction & Repair"
         domestic = "Domestic & Local Services"
 
-        # Ramesh: strong all-round match for the electrical job below -
+        # Lead electrician: strong all-round match for the electrical job below -
         # every required/preferred skill, plenty of experience, close by,
         # verified contact, wage expectation comfortably met.
-        ramesh_user, ramesh_created = self._get_or_update_user(
-            "demo_worker_ramesh",
+        electrician_user, electrician_created = self._get_or_update_user(
+            "demo_worker_electrician",
             phone_number="9811100011",
-            email="demo_worker_ramesh@karmasheel.local",
+            email="demo_worker_electrician@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )
-        self.worker_ramesh, _ = WorkerProfile.objects.update_or_create(
-            user=ramesh_user,
+        self.worker_electrician, _ = WorkerProfile.objects.update_or_create(
+            user=electrician_user,
             defaults={
                 "address": "Koteshwor, Kathmandu",
                 "latitude": Decimal("27.677800"),
@@ -256,7 +256,7 @@ class Command(BaseCommand):
                 "preferred_travel_radius_km": 15,
             },
         )
-        self.worker_ramesh.skills.set([
+        self.worker_electrician.skills.set([
             self._skill("Electrical", "House Wiring", construction),
             self._skill("Electrical", "Circuit Breaker Installation", construction),
             self._skill("Electrical", "Electrical Repair", construction),
@@ -267,7 +267,7 @@ class Command(BaseCommand):
         sita_user, sita_created = self._get_or_update_user(
             "demo_worker_sita",
             phone_number="9811100012",
-            email="demo_worker_sita@karmasheel.local",
+            email="demo_worker_sita@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )
@@ -295,7 +295,7 @@ class Command(BaseCommand):
         hari_user, hari_created = self._get_or_update_user(
             "demo_worker_hari",
             phone_number="9811100013",
-            email="demo_worker_hari@karmasheel.local",
+            email="demo_worker_hari@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=False,
         )
@@ -321,7 +321,7 @@ class Command(BaseCommand):
         gita_user, gita_created = self._get_or_update_user(
             "demo_worker_gita",
             phone_number="9811100014",
-            email="demo_worker_gita@karmasheel.local",
+            email="demo_worker_gita@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=False,
         )
@@ -351,7 +351,7 @@ class Command(BaseCommand):
         bimal_user, bimal_created = self._get_or_update_user(
             "demo_worker_bimal",
             phone_number="9811100015",
-            email="demo_worker_bimal@karmasheel.local",
+            email="demo_worker_bimal@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )
@@ -380,7 +380,7 @@ class Command(BaseCommand):
         kamal_user, kamal_created = self._get_or_update_user(
             "demo_worker_kamal",
             phone_number="9811100016",
-            email="demo_worker_kamal@karmasheel.local",
+            email="demo_worker_kamal@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )
@@ -407,7 +407,7 @@ class Command(BaseCommand):
         maya_user, maya_created = self._get_or_update_user(
             "demo_worker_maya",
             phone_number="9811100017",
-            email="demo_worker_maya@karmasheel.local",
+            email="demo_worker_maya@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )
@@ -432,7 +432,7 @@ class Command(BaseCommand):
         sunita_user, sunita_created = self._get_or_update_user(
             "demo_worker_sunita",
             phone_number="9811100018",
-            email="demo_worker_sunita@karmasheel.local",
+            email="demo_worker_sunita@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )
@@ -457,7 +457,7 @@ class Command(BaseCommand):
         deepak_user, deepak_created = self._get_or_update_user(
             "demo_worker_deepak",
             phone_number="9811100019",
-            email="demo_worker_deepak@karmasheel.local",
+            email="demo_worker_deepak@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )
@@ -478,14 +478,14 @@ class Command(BaseCommand):
             self._skill("Two-Wheeler Delivery", "Parcel Delivery", driving),
         ])
 
-        # Suresh: the same electrical skills and experience as Ramesh -
+        # Suresh: the same electrical skills and experience as Lead electrician -
         # otherwise an equally strong candidate - but based far away in
         # Pokhara with no stated travel radius, so distance (not skill or
-        # experience) is what pushes him below Ramesh in the rankings.
+        # experience) is what pushes him below Lead electrician in the rankings.
         suresh_user, suresh_created = self._get_or_update_user(
             "demo_worker_suresh",
             phone_number="9811100020",
-            email="demo_worker_suresh@karmasheel.local",
+            email="demo_worker_suresh@workforce-matching.local",
             role=User.Role.WORKER,
             is_contact_verified=True,
         )
@@ -508,7 +508,7 @@ class Command(BaseCommand):
         ])
 
         self.summary["workers"] = [
-            (ramesh_user.username, ramesh_created),
+            (electrician_user.username, electrician_created),
             (sita_user.username, sita_created),
             (hari_user.username, hari_created),
             (gita_user.username, gita_created),
@@ -646,7 +646,7 @@ class Command(BaseCommand):
         driving = "Driving & Delivery"
         caregiving = "Caregiving & Personal Support"
 
-        # A second electrical job Ramesh fully matches on skills but only
+        # A second electrical job Lead electrician fully matches on skills but only
         # partially on experience (required_experience_years exceeds his
         # 6 years) and is slightly further away than the wiring job -
         # gives the worker-to-job demo a second, meaningfully-different
@@ -667,7 +667,7 @@ class Command(BaseCommand):
             work_type=JobPost.WorkType.CONTRACT,
         )
 
-        # A third electrical job Ramesh only partially matches - he has
+        # A third electrical job Lead electrician only partially matches - he has
         # one of the two required skills (House Wiring) but not the other
         # (Switchboard Installation), and the required experience exceeds
         # his 6 years - two real, explainable reasons this is a weaker,
@@ -689,6 +689,27 @@ class Command(BaseCommand):
             employer=self.employer_retail,
         )
 
+        # The worker already has an application history for the primary
+        # House Wiring job, and recommendation candidates intentionally
+        # exclude jobs that cannot be applied to again. This additional
+        # electrical posting keeps three relevant, actionable results in
+        # the seeded worker recommendation walkthrough.
+        self.job_electrical_maintenance, electrical_maintenance_created = self._job(
+            title="Electrical Safety Inspection and Repair for School",
+            category_name=construction,
+            subcategory_name="Electrical",
+            required=["Circuit Breaker Installation", "Electrical Repair"],
+            preferred=["House Wiring"],
+            description="Inspect classroom circuits, replace unsafe breakers, and repair damaged wiring.",
+            address="Chabahil, Kathmandu",
+            latitude="27.716000",
+            longitude="85.348000",
+            required_experience_years=4,
+            wage_type=JobPost.WageType.DAILY,
+            wage_amount="1200.00",
+            work_type=JobPost.WorkType.CONTRACT,
+        )
+
         # A second masonry job requiring "Tile Installation" alongside
         # the original one, near Hari, so the missing-skill advisory
         # surfaces it as recurring across several near-miss jobs.
@@ -705,6 +726,27 @@ class Command(BaseCommand):
             required_experience_years=2,
             wage_type=JobPost.WageType.DAILY,
             wage_amount="1050.00",
+            work_type=JobPost.WorkType.CONTRACT,
+        )
+
+        # Hari has already applied to the primary bathroom-renovation job,
+        # which is correctly excluded from new recommendations. A third
+        # nearby masonry posting preserves the intended recurring-demand
+        # evidence: Tile Installation is missing across two actionable
+        # near-miss jobs.
+        self.job_masonry3, masonry3_created = self._job(
+            title="Kitchen Wall Tiling and Brickwork Repair",
+            category_name=construction,
+            subcategory_name="Masonry",
+            required=["Brick Laying", "Tile Installation"],
+            preferred=["Plastering"],
+            description="Repair damaged kitchen brickwork and install new wall tiles.",
+            address="Lokanthali, Bhaktapur",
+            latitude="27.674500",
+            longitude="85.376500",
+            required_experience_years=2,
+            wage_type=JobPost.WageType.DAILY,
+            wage_amount="1000.00",
             work_type=JobPost.WorkType.CONTRACT,
         )
 
@@ -784,7 +826,9 @@ class Command(BaseCommand):
             (self.job_plumbing.title, plumbing_created),
             (self.job_wiring2.title, wiring2_created),
             (self.job_switchboard.title, switchboard_created),
+            (self.job_electrical_maintenance.title, electrical_maintenance_created),
             (self.job_masonry2.title, masonry2_created),
+            (self.job_masonry3.title, masonry3_created),
             (self.job_painting.title, painting_created),
             (self.job_waitstaff.title, waitstaff_created),
             (self.job_delivery.title, delivery_created),
@@ -871,10 +915,10 @@ class Command(BaseCommand):
     def _seed_applications_and_ratings(self):
         employer_user = self.verified_employer.user
 
-        # Ramesh: full hire-through-completion, then rated in both
+        # Lead electrician: full hire-through-completion, then rated in both
         # directions.
         completed_app, completed_created = self._advance_application(
-            self.worker_ramesh,
+            self.worker_electrician,
             self.job_wiring,
             steps=[
                 (Application.Status.SHORTLISTED, employer_user),
@@ -885,7 +929,7 @@ class Command(BaseCommand):
 
         worker_rated = self._ensure_rating(
             completed_app,
-            reviewer=self.worker_ramesh.user,
+            reviewer=self.worker_electrician.user,
             score=5,
             review_text="Paid on time and the site was well organized.",
         )
@@ -918,7 +962,7 @@ class Command(BaseCommand):
         )
 
         # House Wiring for New Apartment Block gets two more applicants
-        # besides Ramesh, so the job-to-worker demo job also demonstrates
+        # besides Lead electrician, so the job-to-worker demo job also demonstrates
         # "several applicants" in different states: Suresh is shortlisted
         # despite being far away, Kamal is rejected for lacking the second
         # required skill.
@@ -1040,21 +1084,21 @@ class Command(BaseCommand):
         ))
 
         write("\nDemo scenario pointers:")
-        write("  - Worker-to-job recommendations: log in as demo_worker_ramesh and "
-              "GET /api/recommendations/jobs/ - 'House Wiring for New Apartment Block' "
-              "ranks first, with two more electrical jobs completing the top three.")
+        write("  - Worker-to-job recommendations: log in as demo_worker_electrician and "
+              "GET /api/recommendations/jobs/ - three actionable electrical jobs rank "
+              "at the top; the completed House Wiring job is correctly excluded.")
         write("  - Opportunity advisory (near-miss + missing skills): log in as "
               "demo_worker_hari and GET /api/recommendations/opportunities/ - "
               "'Tile Installation' is missing across two nearby masonry jobs.")
         write(f"  - Job-to-worker recommendations: log in as demo_employer_verified "
               f"and GET /api/recommendations/jobs/{self.job_wiring.id}/workers/ - job "
               f"#{self.job_wiring.id} ('{self.job_wiring.title}') has three candidates "
-              f"(Ramesh, Suresh, Kamal) with a clear top pick.")
+              f"(Lead electrician, Suresh, Kamal) with a clear top pick.")
         write(f"  - Application-status walkthrough: job #{self.job_wiring.id} "
               f"('{self.job_wiring.title}') has three applicants in three different "
               f"states (COMPLETED, SHORTLISTED, REJECTED).")
         write(f"  - Completed-job ratings: application #{self.summary['applications'][0][0]} "
-              "(demo_worker_ramesh on the House Wiring job) is COMPLETED and rated in "
+              "(demo_worker_electrician on the House Wiring job) is COMPLETED and rated in "
               "both directions.")
         write("  - Restricted pending employer: log in as demo_employer_pending and "
               "POST /api/jobs/ - returns 403 Forbidden until an admin verifies it.")

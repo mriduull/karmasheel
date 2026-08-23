@@ -52,6 +52,37 @@ describe('Register', () => {
     expect(screen.getByRole('radio', { name: 'Employer' })).toHaveAttribute('aria-checked', 'true')
   })
 
+  it('marks registration fields with distinct autocomplete purposes', () => {
+    const { container } = renderRegister()
+
+    expect(screen.getByLabelText('Username')).toHaveAttribute(
+      'autocomplete',
+      'section-register nickname',
+    )
+    expect(screen.getByLabelText('Email')).toHaveAttribute(
+      'autocomplete',
+      'section-register email',
+    )
+    expect(screen.getByLabelText('Phone number')).toHaveAttribute(
+      'autocomplete',
+      'section-register tel-national',
+    )
+    expect(screen.getByLabelText('Password')).toHaveAttribute(
+      'autocomplete',
+      'section-register new-password',
+    )
+
+    const autofillOrder = Array.from(container.querySelectorAll('input')).map((input) =>
+      input.getAttribute('autocomplete'),
+    )
+    expect(autofillOrder.slice(0, 4)).toEqual([
+      'section-register nickname',
+      'section-register new-password',
+      'section-register email',
+      'section-register tel-national',
+    ])
+  })
+
   it('shows client-side validation errors for empty required fields', async () => {
     const user = userEvent.setup()
     renderRegister()
@@ -61,6 +92,25 @@ describe('Register', () => {
     expect(await screen.findByText('Username is required.')).toBeInTheDocument()
     expect(screen.getByText('Phone number is required.')).toBeInTheDocument()
     expect(screen.getByText('Password is required.')).toBeInTheDocument()
+  })
+
+  it('rejects numeric-only and too-long usernames before submitting', async () => {
+    const user = userEvent.setup()
+    renderRegister()
+
+    const usernameInput = screen.getByLabelText('Username')
+    await user.type(usernameInput, '1234567890')
+    await user.type(screen.getByLabelText('Phone number'), '9811111111')
+    await user.type(screen.getByLabelText('Password'), 'SecurePassword123!')
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+    expect(await screen.findByText('Username must include at least one letter.')).toBeInTheDocument()
+
+    await user.clear(usernameInput)
+    await user.type(usernameInput, 'workername123456789012345678901')
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+    expect(await screen.findByText('Username must be 30 characters or fewer.')).toBeInTheDocument()
   })
 
   it('shows a minimum-length error for a too-short (but non-empty) password', async () => {

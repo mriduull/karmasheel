@@ -42,7 +42,7 @@ describe('EmployerRecommendations', () => {
       http.get(`${API_ROOT}/jobs/5/applications/`, () => HttpResponse.json([])),
       http.get(`${API_ROOT}/recommendations/jobs/5/workers/`, () =>
         HttpResponse.json([
-          buildWorkerRecommendationFixture({ final_score: 97.79, worker: { id: 3, username: 'demo_worker_ramesh' } }),
+          buildWorkerRecommendationFixture({ final_score: 97.79, worker: { id: 3, username: 'demo_worker_electrician' } }),
           buildWorkerRecommendationFixture({ final_score: 75.25, worker: { id: 9, username: 'demo_worker_suresh' } }),
           buildWorkerRecommendationFixture({ final_score: 74.62, worker: { id: 6, username: 'demo_worker_kamal' } }),
         ]),
@@ -51,7 +51,7 @@ describe('EmployerRecommendations', () => {
 
     renderAt('5')
 
-    expect(await screen.findByText('demo_worker_ramesh')).toBeInTheDocument()
+    expect(await screen.findByText('demo_worker_electrician')).toBeInTheDocument()
     expect(screen.getByText('demo_worker_suresh')).toBeInTheDocument()
     expect(screen.getByText('demo_worker_kamal')).toBeInTheDocument()
 
@@ -72,7 +72,7 @@ describe('EmployerRecommendations', () => {
     const user = userEvent.setup()
     renderAt('5')
 
-    await screen.findByText('demo_worker_ramesh')
+    await screen.findByText('demo_worker_electrician')
     await user.click(screen.getByRole('button', { name: /why this match/i }))
 
     expect(await screen.findByText(/matches 2 of 2 required skills/i)).toBeInTheDocument()
@@ -83,10 +83,10 @@ describe('EmployerRecommendations', () => {
     server.use(
       http.get(`${API_ROOT}/jobs/5/`, () => HttpResponse.json(buildEmployerJobFixture({ id: 5 }))),
       http.get(`${API_ROOT}/jobs/5/applications/`, () =>
-        HttpResponse.json([buildApplicationFixture({ worker_username: 'demo_worker_ramesh', status: 'SHORTLISTED' })]),
+        HttpResponse.json([buildApplicationFixture({ worker_username: 'demo_worker_electrician', status: 'SHORTLISTED' })]),
       ),
       http.get(`${API_ROOT}/recommendations/jobs/5/workers/`, () =>
-        HttpResponse.json([buildWorkerRecommendationFixture({ worker: { username: 'demo_worker_ramesh' } })]),
+        HttpResponse.json([buildWorkerRecommendationFixture({ worker: { username: 'demo_worker_electrician' } })]),
       ),
     )
 
@@ -133,7 +133,7 @@ describe('EmployerRecommendations', () => {
 
     const { container } = renderAt('5')
     await waitFor(() => {
-      expect(screen.getByText('demo_worker_ramesh')).toBeInTheDocument()
+      expect(screen.getByText('demo_worker_electrician')).toBeInTheDocument()
     })
 
     const results = await axe(container)

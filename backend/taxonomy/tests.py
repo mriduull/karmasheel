@@ -118,6 +118,39 @@ class NormalizeSkillPhraseTests(TestCase):
         self.assertEqual(result.skill, self.skill)
         self.assertEqual(result.method, "exact_name")
 
+    def test_exact_standardized_name_match_preprocesses_punctuation(self):
+        punctuated_skill = SkillTag.objects.create(
+            subcategory=self.subcategory,
+            name="Cash-On-Delivery Handling",
+        )
+
+        result = normalize_skill_phrase("Cash-On-Delivery Handling")
+
+        self.assertEqual(result.skill, punctuated_skill)
+        self.assertEqual(result.method, "exact_name")
+        self.assertEqual(result.confidence, 100.0)
+
+    def test_preprocessed_canonical_name_collision_uses_canonical_preference(self):
+        other_subcategory = Subcategory.objects.create(
+            category=self.category,
+            name="Delivery",
+        )
+        less_established = SkillTag.objects.create(
+            subcategory=other_subcategory,
+            name="Cash On Delivery Handling",
+        )
+        preferred = SkillTag.objects.create(
+            subcategory=self.subcategory,
+            name="Cash-On-Delivery Handling",
+        )
+        SkillAlias.objects.create(skill=preferred, phrase="cod handling")
+
+        result = normalize_skill_phrase("Cash On Delivery Handling")
+
+        self.assertEqual(result.skill, preferred)
+        self.assertNotEqual(result.skill, less_established)
+        self.assertEqual(result.method, "exact_name")
+
     def test_exact_alias_match_romanized_nepali(self):
         """'ghar wiring' must resolve to 'House Wiring' (Week 2 demo requirement)."""
 
@@ -138,6 +171,18 @@ class NormalizeSkillPhraseTests(TestCase):
 
         self.assertEqual(result.skill, self.skill)
         self.assertEqual(result.method, "exact_alias")
+
+    def test_exact_alias_match_preprocesses_punctuation(self):
+        SkillAlias.objects.create(
+            skill=self.skill,
+            phrase="residential-house-wiring",
+        )
+
+        result = normalize_skill_phrase("residential house wiring")
+
+        self.assertEqual(result.skill, self.skill)
+        self.assertEqual(result.method, "exact_alias")
+        self.assertEqual(result.confidence, 100.0)
 
     def test_fuzzy_match_above_threshold(self):
         # One character off from the standardized name; should be caught by
@@ -588,11 +633,63 @@ class TaxonomyPublicAPITests(APITestCase):
             response = self.client.get(reverse(url_name))
             self.assertNotIn("totally weird term", json.dumps(response.data))
 
+    def test_job_taxonomy_inference_uses_skill_aliases(self):
+        response = self.client.post(
+            reverse("taxonomy:infer_job_category"),
+            {
+                "title": "Event helper, electrician",
+                "description": "A worker who can install fans and do wire installations",
+                "required_skills": ["ghar wiring"],
+                "preferred_skills": [],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["category"], self.cat_construction.id)
+        self.assertEqual(response.data["subcategory"], self.sub_electrical.id)
+        self.assertEqual(response.data["subcategory_name"], "Electrical")
+        self.assertEqual(response.data["matched_terms"][0]["skill_name"], "House Wiring")
+
+    def test_job_taxonomy_inference_is_side_effect_free_for_unknown_terms(self):
+        before = UnmatchedSkillTerm.objects.count()
+
+        response = self.client.post(
+            reverse("taxonomy:infer_job_category"),
+            {
+                "required_skills": ["not a known skill"],
+                "preferred_skills": [],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["category"])
+        self.assertEqual(UnmatchedSkillTerm.objects.count(), before)
+
+    def test_job_taxonomy_inference_rejects_too_many_skill_phrases(self):
+        response = self.client.post(
+            reverse("taxonomy:infer_job_category"),
+            {"required_skills": ["House Wiring"] * 21},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("required_skills", response.data)
+
+    def test_job_taxonomy_inference_rejects_oversized_description(self):
+        response = self.client.post(
+            reverse("taxonomy:infer_job_category"),
+            {"description": "x" * 5001},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("description", response.data)
+
 
 class TaxonomyAdminTests(TestCase):
-    """Week 6 admin usability tests for the taxonomy app. Does not modify
-    the existing resolve/reject UnmatchedSkillTerm behaviour - only
-    verifies it still works as-is."""
+    """Admin usability and safe unmatched-term review tests."""
 
     def setUp(self):
         self.superuser = User.objects.create_superuser(
@@ -679,6 +776,36 @@ class TaxonomyAdminTests(TestCase):
             SkillAlias.objects.filter(phrase="fan lagaune", skill=self.other_skill).exists()
         )
 
+    def test_resolve_action_does_not_misreport_conflicting_existing_alias(self):
+        SkillAlias.objects.create(
+            phrase=self.unmatched_term.normalized_term,
+            skill=self.skill,
+        )
+        self.client.force_login(self.superuser)
+
+        response = self.client.post(
+            reverse("admin:taxonomy_unmatchedskillterm_changelist"),
+            {
+                "action": "resolve_using_best_candidate",
+                "_selected_action": [str(self.unmatched_term.pk)],
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Skipped 1 alias conflict")
+        self.unmatched_term.refresh_from_db()
+        self.assertEqual(
+            self.unmatched_term.status, UnmatchedSkillTerm.Status.PENDING
+        )
+        self.assertIsNone(self.unmatched_term.resolved_skill)
+        self.assertEqual(
+            SkillAlias.objects.get(
+                phrase=self.unmatched_term.normalized_term
+            ).skill,
+            self.skill,
+        )
+
     def test_reject_unmatched_terms_action_only_uses_an_existing_status_value(self):
         self.client.force_login(self.superuser)
 
@@ -694,6 +821,29 @@ class TaxonomyAdminTests(TestCase):
         self.unmatched_term.refresh_from_db()
         self.assertIn(self.unmatched_term.status, UnmatchedSkillTerm.Status.values)
         self.assertEqual(self.unmatched_term.status, UnmatchedSkillTerm.Status.REJECTED)
+
+    def test_reject_action_does_not_rewrite_resolved_term(self):
+        self.unmatched_term.status = UnmatchedSkillTerm.Status.RESOLVED
+        self.unmatched_term.resolved_skill = self.other_skill
+        self.unmatched_term.save(
+            update_fields=["status", "resolved_skill", "updated_at"]
+        )
+        self.client.force_login(self.superuser)
+
+        self.client.post(
+            reverse("admin:taxonomy_unmatchedskillterm_changelist"),
+            {
+                "action": "reject_unmatched_terms",
+                "_selected_action": [str(self.unmatched_term.pk)],
+            },
+            follow=True,
+        )
+
+        self.unmatched_term.refresh_from_db()
+        self.assertEqual(
+            self.unmatched_term.status, UnmatchedSkillTerm.Status.RESOLVED
+        )
+        self.assertEqual(self.unmatched_term.resolved_skill, self.other_skill)
 
     def test_non_staff_user_cannot_access_taxonomy_admin(self):
         worker = User.objects.create_user(
@@ -992,6 +1142,14 @@ class SeedTaxonomyV1CommandTests(TestCase):
         self.assertIsNotNone(result.skill)
         self.assertEqual(result.skill.name, "House Wiring")
         self.assertEqual(result.method, "exact_alias")
+
+    def test_punctuated_seeded_canonical_name_is_an_exact_match(self):
+        result = normalize_skill_phrase("Cash-On-Delivery Handling")
+
+        self.assertIsNotNone(result.skill)
+        self.assertEqual(result.skill.name, "Cash-On-Delivery Handling")
+        self.assertEqual(result.method, "exact_name")
+        self.assertEqual(result.confidence, 100.0)
 
     def test_new_v1_alias_resolves_to_its_intended_skill(self):
         result = normalize_skill_phrase("budhesakal herchah")

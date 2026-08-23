@@ -18,6 +18,8 @@ interface JobFilterPanelProps {
   onWorkTypeChange: (workType: WorkType | null) => void
   onMaxDistanceChange: (maxDistanceKm: number | null) => void
   geolocationStatus: GeolocationStatus
+  locationSaveStatus: 'idle' | 'saving' | 'saved' | 'error'
+  savesLocationToProfile: boolean
   onRequestLocation: () => void
   onClearFilters: () => void
   hasActiveFilters: boolean
@@ -44,6 +46,8 @@ export function JobFilterPanel({
   onWorkTypeChange,
   onMaxDistanceChange,
   geolocationStatus,
+  locationSaveStatus,
+  savesLocationToProfile,
   onRequestLocation,
   onClearFilters,
   hasActiveFilters,
@@ -66,20 +70,20 @@ export function JobFilterPanel({
 
         <div className="flex flex-col gap-1">
           <span className="text-base font-semibold text-text-primary">Distance</span>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex min-w-0 flex-col gap-2">
             <Button
               type="button"
               variant="secondary"
               onClick={onRequestLocation}
               isLoading={geolocationStatus === 'loading'}
-              className="whitespace-nowrap"
+              className="w-full whitespace-nowrap"
             >
               <LocateFixed size={18} aria-hidden="true" />
-              Use my location
+              {hasLocation ? 'Update my location' : 'Use my location'}
             </Button>
             <select
               aria-label="Maximum distance"
-              className="min-h-touch flex-1 rounded-sm border border-text-secondary/30 bg-surface px-3 text-base text-text-primary focus:border-brand-primary disabled:cursor-not-allowed disabled:opacity-60"
+              className="min-h-touch w-full min-w-0 rounded-sm border border-text-secondary/30 bg-surface px-3 text-base text-text-primary focus:border-brand-primary disabled:cursor-not-allowed disabled:opacity-60"
               value={maxDistanceKm ?? ''}
               onChange={(event) =>
                 onMaxDistanceChange(event.target.value ? Number(event.target.value) : null)
@@ -94,9 +98,27 @@ export function JobFilterPanel({
               ))}
             </select>
           </div>
+          {hasLocation && (
+            <p role="status" className="text-sm font-medium text-success-text">
+              {locationSaveStatus === 'saving'
+                ? 'Location found — saving to your profile'
+                : locationSaveStatus === 'saved'
+                  ? 'Location saved to your profile'
+                  : 'Location found'}
+              {maxDistanceKm !== null
+                ? ` — showing jobs within ${maxDistanceKm} km.`
+                : ' — choose a distance to filter jobs.'}
+            </p>
+          )}
+          {hasLocation && savesLocationToProfile && locationSaveStatus === 'error' && (
+            <p role="alert" className="text-sm font-medium text-danger-text">
+              Jobs are filtered using this location, but it could not be saved to your profile.
+              Try again.
+            </p>
+          )}
           {geolocationStatus === 'denied' && (
             <p className="text-sm text-text-secondary">
-              Location permission was declined — you can still browse without distance filtering.
+              Location permission is blocked. Allow it in your browser settings, then try again.
             </p>
           )}
           {geolocationStatus === 'error' && (

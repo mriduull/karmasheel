@@ -12,10 +12,13 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 /** Django's default `UnicodeUsernameValidator`, inherited unmodified by
  * this project's custom User model (accounts/models.py). */
 const USERNAME_PATTERN = /^[\w.@+-]+$/
+const USERNAME_HAS_LETTER_PATTERN = /[A-Za-z]/
+const MAX_USERNAME_LENGTH = 30
 
 /**
  * Mirrors `accounts/serializers.py:RegisterSerializer` exactly:
- * - `username`: required, Django's default max_length 150 + UnicodeUsernameValidator.
+ * - `username`: required, 30 characters max, at least one letter, plus
+ *   Django's default UnicodeUsernameValidator-compatible character set.
  * - `email`: OPTIONAL — `AbstractUser.email` has `blank=True`, so DRF marks
  *   it `required=False`. Format is still checked client-side if provided.
  * - `phone_number`: required, max_length 10, NO format/digits validator
@@ -32,8 +35,9 @@ const USERNAME_PATTERN = /^[\w.@+-]+$/
  */
 export const registerSchema = z.object({
   username: nonEmptyString('Username')
-    .max(150, 'Must be at most 150 characters.')
-    .regex(USERNAME_PATTERN, 'Letters, digits, and @/./+/-/_ only.'),
+    .max(MAX_USERNAME_LENGTH, 'Username must be 30 characters or fewer.')
+    .regex(USERNAME_PATTERN, 'Letters, digits, and @/./+/-/_ only.')
+    .regex(USERNAME_HAS_LETTER_PATTERN, 'Username must include at least one letter.'),
   email: z
     .string()
     .trim()

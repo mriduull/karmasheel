@@ -11,8 +11,8 @@ import { WorkerDashboard } from './Dashboard'
 
 const WORKER_USER = {
   id: 1,
-  username: 'demo_worker_ramesh',
-  email: 'ramesh@example.com',
+  username: 'demo_worker_electrician',
+  email: 'electrician@example.com',
   phone_number: '9811100011',
   role: 'WORKER' as const,
   is_contact_verified: true,
@@ -32,7 +32,7 @@ describe('WorkerDashboard', () => {
 
     renderWithProviders(<WorkerDashboard />)
 
-    expect(screen.getByRole('heading', { name: /welcome, demo_worker_ramesh/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /welcome, demo_worker_electrician/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /complete \/ edit profile/i })).toHaveAttribute(
       'href',
       '/worker/profile',

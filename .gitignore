@@ -7,8 +7,15 @@ __pycache__/
 .venv/
 venv/
 
+# Node.js dependencies
+node_modules/
+
 # Environment variables and secrets
-.env
+.env*
+!.env.example
+!frontend/.env.example
+!frontend/.env.test
+!frontend/.env.production.example
 
 # Django-generated files
 db.sqlite3
@@ -19,6 +26,7 @@ media/
 .pytest_cache/
 .coverage
 htmlcov/
+*.log
 
 # Frontend (Node/Vite) — frontend/.gitignore (from the Vite scaffold)
 # already covers frontend/node_modules and frontend/dist; this only adds

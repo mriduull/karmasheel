@@ -76,6 +76,8 @@ export function buildWorkerProfileFixture(overrides: Partial<WorkerProfile> = {}
   return {
     id: 3,
     address: 'Koteshwor, Kathmandu',
+    profile_photo: null,
+    profile_photo_url: null,
     latitude: '27.677800',
     longitude: '85.348800',
     experience_years: 6,
@@ -83,6 +85,7 @@ export function buildWorkerProfileFixture(overrides: Partial<WorkerProfile> = {}
     expected_wage: '1200.00',
     preferred_travel_radius_km: 15,
     skills: [{ id: 2, name: 'House Wiring', subcategory: 'Electrical' }],
+    skill_matches: [],
     unmatched_terms: [],
     created_at: '2026-07-22T12:00:00Z',
     updated_at: '2026-07-22T12:00:00Z',
@@ -228,7 +231,7 @@ export function buildWorkerRecommendationFixture(
     }),
     worker: {
       id: 3,
-      username: 'demo_worker_ramesh',
+      username: 'demo_worker_electrician',
       address: 'Koteshwor, Kathmandu',
       experience_years: 6,
       is_available: true,
@@ -282,7 +285,7 @@ export function buildOpportunityAdvisoryFixture(
 export function buildWorkerCandidateFixture(overrides: Partial<WorkerCandidate> = {}): WorkerCandidate {
   return {
     id: 3,
-    username: 'demo_worker_ramesh',
+    username: 'demo_worker_electrician',
     address: 'Koteshwor, Kathmandu',
     latitude: '27.677800',
     longitude: '85.348800',
@@ -300,7 +303,7 @@ export function buildRatingFixture(overrides: Partial<Rating> = {}): Rating {
     id: 12,
     application: 8,
     direction: 'WORKER_TO_EMPLOYER',
-    reviewer_username: 'demo_worker_ramesh',
+    reviewer_username: 'demo_worker_electrician',
     reviewed_username: 'demo_employer_verified',
     score: 5,
     review_text: 'Paid on time and the site was well organized.',
@@ -322,7 +325,7 @@ export function buildApplicationFixture(overrides: Partial<Application> = {}): A
     id: 8,
     job: 5,
     job_title: 'House Wiring for New Apartment Block',
-    worker_username: 'demo_worker_ramesh',
+    worker_username: 'demo_worker_electrician',
     status: 'APPLIED',
     worker_note: '',
     employer_note: '',

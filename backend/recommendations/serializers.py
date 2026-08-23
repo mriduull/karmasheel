@@ -40,11 +40,12 @@ class RecommendedJobSerializer(serializers.Serializer):
 
 class RecommendedWorkerSerializer(serializers.Serializer):
     """Restricted worker summary for an employer's candidate view - no
-    phone number or other private contact details."""
+    phone number, exact address, coordinates, or other private contact
+    details. Proximity is represented by the recommendation's top-level
+    ``distance_km`` field."""
 
     id = serializers.IntegerField()
     username = serializers.CharField(source="user.username")
-    address = serializers.CharField()
     experience_years = serializers.IntegerField()
     is_available = serializers.BooleanField()
     expected_wage = serializers.DecimalField(max_digits=10, decimal_places=2, allow_null=True)
@@ -95,6 +96,7 @@ class MissingSkillAdvisorySerializer(serializers.Serializer):
     skill = SkillTagSummarySerializer()
     missing_frequency = serializers.IntegerField()
     required_frequency = serializers.IntegerField()
+    reason = serializers.CharField()
     job_ids = serializers.ListField(child=serializers.IntegerField())
 
 

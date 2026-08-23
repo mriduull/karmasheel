@@ -3,6 +3,25 @@ from rest_framework import serializers
 from .models import Category, SkillTag, Subcategory
 
 
+class JobTaxonomyInferenceRequestSerializer(serializers.Serializer):
+    """Bound public inference input before running taxonomy-wide matching."""
+
+    title = serializers.CharField(max_length=150, allow_blank=True, default="")
+    description = serializers.CharField(max_length=5000, allow_blank=True, default="")
+    required_skills = serializers.ListField(
+        child=serializers.CharField(max_length=150),
+        max_length=20,
+        allow_empty=True,
+        default=list,
+    )
+    preferred_skills = serializers.ListField(
+        child=serializers.CharField(max_length=150),
+        max_length=20,
+        allow_empty=True,
+        default=list,
+    )
+
+
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category

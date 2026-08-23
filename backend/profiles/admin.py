@@ -8,6 +8,7 @@ class WorkerProfileAdmin(admin.ModelAdmin):
     list_display = (
         "user",
         "address",
+        "profile_photo",
         "is_available",
         "experience_years",
         "expected_wage",
@@ -36,6 +37,7 @@ class WorkerProfileAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ("Account", {"fields": ("user",)}),
+        ("Profile", {"fields": ("profile_photo",)}),
         ("Location", {"fields": ("address", "latitude", "longitude")}),
         (
             "Work profile",
@@ -83,6 +85,13 @@ class EmployerProfileAdmin(admin.ModelAdmin):
     )
 
     list_filter = ("verification_status",)
+
+    list_editable = (
+        "organization_name",
+        "address",
+        "pan_vat_number",
+        "verification_status",
+    )
 
     search_fields = (
         "organization_name",

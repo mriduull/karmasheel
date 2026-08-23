@@ -121,7 +121,11 @@ def filter_candidate_workers_for_job(job, *, max_distance_km=None):
 
     for worker in queryset:
         if worker.latitude is None or worker.longitude is None:
-            candidates.append(worker)
+            # When the caller explicitly asks for a distance filter, workers
+            # with no usable coordinates cannot be established to be inside
+            # that radius and must not leak into the filtered result.
+            if max_distance_km is None:
+                candidates.append(worker)
             continue
 
         radius = max_distance_km if max_distance_km is not None else worker.preferred_travel_radius_km

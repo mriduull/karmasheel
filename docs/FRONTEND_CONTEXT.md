@@ -1,7 +1,12 @@
 # Frontend Context — Handoff Document
 
+> **Historical implementation input.** This handoff predates the completed
+> React frontend and later seed/taxonomy expansion. Use the running code,
+> `README.md`, `DEVELOPMENT_SETUP.md`, and `DEPLOYMENT.md` for current facts.
+> Retained to document design decisions, not as an operational source of truth.
+
 Complete handoff for a frontend designer and a frontend coding agent building
-a React + TypeScript + Tailwind CSS client against the existing Karmasheel
+a React + TypeScript + Tailwind CSS client against the existing Workforce Matching
 Django REST API. This document describes **only what the backend actually
 does today**, verified by reading the repository (models, serializers,
 views, URLs, permissions, settings) as of Week 6 Phase 4. It does not
@@ -15,7 +20,7 @@ files were changed to produce this document.
 
 ## 1. Product purpose and target users
 
-Karmasheel is a workforce-matching and opportunity-advisory platform
+Workforce Matching is a workforce-matching and opportunity-advisory platform
 connecting **blue-collar and local-service workers** with **employers** in
 Nepal, using structured skills, location, availability, experience,
 preferences, and reliability indicators — with every match explained in
@@ -348,8 +353,8 @@ them — field names are exact.
 ```json
 {
   "id": 1,
-  "username": "demo_worker_ramesh",
-  "email": "demo_worker_ramesh@karmasheel.local",
+  "username": "demo_worker_electrician",
+  "email": "demo_worker_electrician@workforce-matching.local",
   "phone_number": "9811100011",
   "role": "WORKER",
   "is_contact_verified": true
@@ -498,7 +503,7 @@ details, PAN/VAT, or the raw skill-input fields.
   "id": 8,
   "job": 5,
   "job_title": "House Wiring for New Apartment Block",
-  "worker_username": "demo_worker_ramesh",
+  "worker_username": "demo_worker_electrician",
   "status": "COMPLETED",
   "worker_note": "",
   "employer_note": "",
@@ -517,7 +522,7 @@ details, PAN/VAT, or the raw skill-input fields.
   "id": 12,
   "application": 8,
   "direction": "WORKER_TO_EMPLOYER",
-  "reviewer_username": "demo_worker_ramesh",
+  "reviewer_username": "demo_worker_electrician",
   "reviewed_username": "demo_employer_verified",
   "score": 5,
   "review_text": "Paid on time and the site was well organized.",
@@ -660,7 +665,7 @@ Same shape, except `job` is replaced by `worker`
 ```json
 {
   "id": 3,
-  "username": "demo_worker_ramesh",
+  "username": "demo_worker_electrician",
   "address": "Koteshwor, Kathmandu",
   "experience_years": 6,
   "is_available": true,
@@ -732,7 +737,7 @@ account below is **`DemoPass123!`**.
 | `demo_admin` | Superuser | Django admin only (`/admin/`), not an API-usable worker/employer account |
 | `demo_employer_verified` | Employer — **VERIFIED** | "Kathmandu Home Services Pvt. Ltd.", owns all 5 demo jobs, PAN/VAT `100200300` |
 | `demo_employer_pending` | Employer — **PENDING** | "Pending Facility Works" — use this to demo the not-yet-verified state (e.g. a disabled "Post a Job" button, a `403` if attempted anyway) |
-| `demo_worker_ramesh` | Worker | Electrical skills, 6 yrs experience, contact-verified, close to the wiring job → strong match (~98) and a **fully COMPLETED** application with ratings in both directions |
+| `demo_worker_electrician` | Worker | Electrical skills, 6 yrs experience, contact-verified, close to the wiring job → strong match (~98) and a **fully COMPLETED** application with ratings in both directions |
 | `demo_worker_sita` | Worker | Cleaning skills, 2 yrs experience, contact-verified → strong match (~98), application status **SHORTLISTED** |
 | `demo_worker_hari` | Worker | Masonry (only 1 of 2 required skills), contact **unverified**, no wage/travel-radius preference → **near-miss** match (~67), application status **APPLIED**, missing-skill advisory surfaces "Tile Installation" |
 | `demo_worker_gita` | Worker | Cooking skills, no location on file (exercises the "distance unknown" UI state), contact unverified → **near-miss** match (~65), application **WITHDRAWN**, missing-skill advisory surfaces "Kitchen Helper" |

@@ -146,6 +146,49 @@ class RegistrationAPITests(APITestCase):
 
         self.assertIn("phone_number", response.data)
 
+    def test_registration_rejects_phone_number_that_is_not_ten_ascii_digits(self):
+        for index, phone_number in enumerate(
+            ("981111111", "98111111111", "98111abcde", "९८११११११११"),
+            start=1,
+        ):
+            with self.subTest(phone_number=phone_number):
+                response = self.client.post(
+                    self.register_url,
+                    {
+                        "username": f"invalidphone{index}",
+                        "phone_number": phone_number,
+                        "password": "SecurePassword123!",
+                        "role": User.Role.WORKER,
+                    },
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn("phone_number", response.data)
+
+    def test_registration_rejects_numeric_only_or_too_long_username(self):
+        cases = (
+            ("1234567890", "Username must include at least one letter."),
+            ("workername123456789012345678901", "Username must be 30 characters or fewer."),
+        )
+
+        for index, (username, expected_message) in enumerate(cases, start=1):
+            with self.subTest(username=username):
+                response = self.client.post(
+                    self.register_url,
+                    {
+                        "username": username,
+                        "phone_number": f"981111111{index}",
+                        "password": "SecurePassword123!",
+                        "role": User.Role.WORKER,
+                    },
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn("username", response.data)
+                self.assertIn(expected_message, response.data["username"])
+
 
 class AuthenticationAPITests(APITestCase):
     """Tests for JWT authentication, permissions, and logout."""
@@ -644,7 +687,7 @@ class SeedDemoCommandTests(TestCase):
         call_command("seed_demo", stdout=StringIO())
 
         application = Application.objects.get(
-            worker__user__username="demo_worker_ramesh",
+            worker__user__username="demo_worker_electrician",
             job__title="House Wiring for New Apartment Block",
         )
         self.assertEqual(application.status, Application.Status.COMPLETED)
@@ -711,7 +754,7 @@ class SeedDemoRecommendationEndpointTests(APITestCase):
         call_command("seed_demo", stdout=StringIO())
 
     def test_worker_job_recommendations_endpoint_has_demo_data(self):
-        worker_user = User.objects.get(username="demo_worker_ramesh")
+        worker_user = User.objects.get(username="demo_worker_electrician")
         self.client.force_authenticate(user=worker_user)
 
         response = self.client.get(reverse("recommendations:worker_job_recommendations"))
@@ -721,7 +764,7 @@ class SeedDemoRecommendationEndpointTests(APITestCase):
         self.assertIn("reasons", response.data[0])
 
     def test_worker_job_recommendations_are_ordered_by_score_descending(self):
-        worker_user = User.objects.get(username="demo_worker_ramesh")
+        worker_user = User.objects.get(username="demo_worker_electrician")
         self.client.force_authenticate(user=worker_user)
 
         response = self.client.get(reverse("recommendations:worker_job_recommendations"))
@@ -730,11 +773,11 @@ class SeedDemoRecommendationEndpointTests(APITestCase):
         self.assertEqual(scores, sorted(scores, reverse=True))
 
     def test_primary_worker_top_three_recommendations_each_match_a_required_skill(self):
-        """Every job in Ramesh's top three worker-to-job recommendations
+        """Every job in Lead electrician's top three worker-to-job recommendations
         must be a genuinely suitable suggestion, not just a subcategory
         match with a zero-skill-overlap score."""
 
-        worker_user = User.objects.get(username="demo_worker_ramesh")
+        worker_user = User.objects.get(username="demo_worker_electrician")
         self.client.force_authenticate(user=worker_user)
 
         response = self.client.get(reverse("recommendations:worker_job_recommendations"))
@@ -813,7 +856,7 @@ class SeedDemoRecommendationEndpointTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_worker_cv_preview_has_meaningful_demo_content(self):
-        worker_user = User.objects.get(username="demo_worker_ramesh")
+        worker_user = User.objects.get(username="demo_worker_electrician")
         self.client.force_authenticate(user=worker_user)
 
         response = self.client.get(reverse("profiles:worker_cv_preview"))

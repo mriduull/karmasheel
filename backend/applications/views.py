@@ -35,8 +35,16 @@ class ApplicationListCreateView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        applications = Application.objects.filter(worker=worker_profile).select_related("job")
-        serializer = ApplicationSerializer(applications, many=True)
+        applications = (
+            Application.objects.filter(worker=worker_profile)
+            .select_related("job__employer__user", "worker__user")
+            .prefetch_related("ratings")
+        )
+        serializer = ApplicationSerializer(
+            applications,
+            many=True,
+            context={"request": request},
+        )
         return Response(serializer.data)
 
     def post(self, request):
@@ -53,7 +61,13 @@ class ApplicationListCreateView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         application = serializer.save()
-        return Response(ApplicationSerializer(application).data, status=status.HTTP_201_CREATED)
+        return Response(
+            ApplicationSerializer(
+                application,
+                context={"request": request},
+            ).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class ApplicationStatusUpdateView(APIView):
@@ -99,7 +113,12 @@ class ApplicationStatusUpdateView(APIView):
             setattr(application, note_field, note)
             application.save(update_fields=[note_field])
 
-        return Response(ApplicationSerializer(application).data)
+        return Response(
+            ApplicationSerializer(
+                application,
+                context={"request": request},
+            ).data
+        )
 
 
 class JobApplicationsView(APIView):
@@ -119,8 +138,16 @@ class JobApplicationsView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        applications = Application.objects.filter(job=job).select_related("worker__user")
-        serializer = ApplicationSerializer(applications, many=True)
+        applications = (
+            Application.objects.filter(job=job)
+            .select_related("worker__user", "job__employer__user")
+            .prefetch_related("ratings")
+        )
+        serializer = ApplicationSerializer(
+            applications,
+            many=True,
+            context={"request": request},
+        )
         return Response(serializer.data)
 
 

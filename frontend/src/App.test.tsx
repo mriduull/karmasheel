@@ -23,7 +23,7 @@ describe('App', () => {
     render(<App />)
 
     await waitFor(() =>
-      expect(screen.getByRole('link', { name: 'Workforce Match' })).toBeInTheDocument(),
+      expect(screen.getByRole('link', { name: 'Workforce Matching' })).toBeInTheDocument(),
     )
     expect(
       screen.getByRole('heading', { level: 1, name: /find honest local work/i }),
@@ -37,7 +37,7 @@ describe('App', () => {
 
     const { container } = render(<App />)
     await waitFor(() =>
-      expect(screen.getByRole('link', { name: 'Workforce Match' })).toBeInTheDocument(),
+      expect(screen.getByRole('link', { name: 'Workforce Matching' })).toBeInTheDocument(),
     )
 
     const results = await axe(container)

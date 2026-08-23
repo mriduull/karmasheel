@@ -14,8 +14,8 @@ import { JobDetail } from './JobDetail'
 
 const WORKER_USER = {
   id: 1,
-  username: 'demo_worker_ramesh',
-  email: 'ramesh@example.com',
+  username: 'demo_worker_electrician',
+  email: 'electrician@example.com',
   phone_number: '9811100011',
   role: 'WORKER' as const,
   is_contact_verified: true,
@@ -110,6 +110,7 @@ describe('JobDetail', () => {
     setAuthenticatedUser(WORKER_USER)
     server.use(
       http.get(`${API_ROOT}/jobs/5/`, () => HttpResponse.json(buildJobFixture({ id: 5, status: 'CLOSED' }))),
+      http.get(`${API_ROOT}/applications/`, () => HttpResponse.json([])),
     )
 
     renderJobDetail('/jobs/5')

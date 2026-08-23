@@ -12,8 +12,8 @@ export const handlers = [
   http.get(`${API_ROOT}/auth/me/`, () =>
     HttpResponse.json({
       id: 1,
-      username: 'demo_worker_ramesh',
-      email: 'demo_worker_ramesh@example.com',
+      username: 'demo_worker_electrician',
+      email: 'demo_worker_electrician@example.com',
       phone_number: '9811100011',
       role: 'WORKER',
       is_contact_verified: true,

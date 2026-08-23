@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
@@ -9,9 +9,7 @@ import {
   employerDetailsSchema,
   type EmployerDetailsFormValues,
 } from '@/validation/employerProfile'
-import { locationValueFromProfile } from '@/lib/locationValue'
 import type { EmployerProfile, EmployerProfileUpdatePayload } from '@/types/employer'
-import type { LocationValue } from '@/types/location'
 import { PageContainer } from '@/components/primitives/PageContainer'
 import { PanVatField } from '@/components/primitives/PanVatField'
 import { TextField } from '@/components/primitives/TextField'
@@ -19,7 +17,7 @@ import { SkeletonCard } from '@/components/primitives/SkeletonCard'
 import { ErrorBanner } from '@/components/primitives/ErrorBanner'
 import { ProfileSection } from '@/components/shared/ProfileSection'
 import { VerificationStatusBanner } from '@/components/shared/VerificationStatusBanner'
-import { LocationPicker } from '@/components/shared/LocationPicker'
+import { CoordinateCapture } from '@/components/shared/CoordinateCapture'
 
 /**
  * Two independently-PATCHable sections — same verified pattern as the
@@ -74,14 +72,24 @@ function DetailsSection({ profile }: { profile: EmployerProfile }) {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
+    reset,
     setError,
   } = useForm<EmployerDetailsFormValues>({
     resolver: zodResolver(employerDetailsSchema),
     defaultValues: {
       organization_name: profile.organization_name,
+      address: profile.address,
       pan_vat_number: profile.pan_vat_number,
     },
   })
+
+  useEffect(() => {
+    reset({
+      organization_name: profile.organization_name,
+      address: profile.address,
+      pan_vat_number: profile.pan_vat_number,
+    })
+  }, [profile.address, profile.organization_name, profile.pan_vat_number, reset])
 
   const onSubmit = async (values: EmployerDetailsFormValues) => {
     setFormError(null)
@@ -90,6 +98,7 @@ function DetailsSection({ profile }: { profile: EmployerProfile }) {
     try {
       const updated = await updateEmployerProfile(values)
       queryClient.setQueryData(EMPLOYER_PROFILE_QUERY_KEY, updated)
+      await queryClient.invalidateQueries({ queryKey: EMPLOYER_PROFILE_QUERY_KEY })
       setIsSaved(true)
     } catch (error) {
       if (error instanceof ApiError) {
@@ -110,7 +119,7 @@ function DetailsSection({ profile }: { profile: EmployerProfile }) {
   return (
     <ProfileSection
       title="Business Details"
-      description="Your organization name and PAN/VAT registration number."
+      description="Your organization name, address, and PAN/VAT registration number."
       onSubmit={handleSubmit(onSubmit)}
       isSubmitting={isSubmitting}
       isSaved={isSaved}
@@ -122,6 +131,7 @@ function DetailsSection({ profile }: { profile: EmployerProfile }) {
         error={errors.organization_name?.message}
         {...register('organization_name')}
       />
+      <TextField label="Address" error={errors.address?.message} {...register('address')} />
       <PanVatField
         label="PAN/VAT number"
         hint="9 digits, e.g. 123456789 — optional"
@@ -137,9 +147,14 @@ function LocationSection({ profile }: { profile: EmployerProfile }) {
   const [isSaved, setIsSaved] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const initialLocationRef = useRef(locationValueFromProfile(profile))
-  const [location, setLocation] = useState<LocationValue | null>(initialLocationRef.current)
-  const [isDirty, setIsDirty] = useState(false)
+  const [pendingCoords, setPendingCoords] = useState<{ latitude: number; longitude: number } | null>(
+    null,
+  )
+  const [cleared, setCleared] = useState(false)
+
+  const hasCoordinates = cleared
+    ? false
+    : pendingCoords !== null || (profile.latitude !== null && profile.longitude !== null)
 
   const handleFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -147,20 +162,19 @@ function LocationSection({ profile }: { profile: EmployerProfile }) {
     setIsSaved(false)
     setIsSubmitting(true)
 
-    // Only the fields this section actually changed are sent — an
-    // untouched save (e.g. a legacy profile with an address but no
-    // coordinates yet) must never silently clear existing data.
-    const payload: EmployerProfileUpdatePayload = !isDirty
-      ? {}
-      : location
-        ? { address: location.address, latitude: location.latitude, longitude: location.longitude }
-        : { address: '', latitude: null, longitude: null }
+    let payload: EmployerProfileUpdatePayload = {}
+    if (cleared) {
+      payload = { latitude: null, longitude: null }
+    } else if (pendingCoords) {
+      payload = { latitude: pendingCoords.latitude, longitude: pendingCoords.longitude }
+    }
 
     try {
       const updated = await updateEmployerProfile(payload)
       queryClient.setQueryData(EMPLOYER_PROFILE_QUERY_KEY, updated)
       setIsSaved(true)
-      setIsDirty(false)
+      setPendingCoords(null)
+      setCleared(false)
     } catch (error) {
       setFormError(
         error instanceof ApiError ? toBannerMessage(error) : 'Something went wrong — please try again.',
@@ -173,21 +187,24 @@ function LocationSection({ profile }: { profile: EmployerProfile }) {
   return (
     <ProfileSection
       title="Location"
-      description="Optional — used for distance-based matching."
+      description="Optional — used only for distance-based matching. Never guessed from your address."
       onSubmit={handleFormSubmit}
       isSubmitting={isSubmitting}
       isSaved={isSaved}
       error={formError}
     >
-      <LocationPicker
-        value={location}
-        onChange={(next) => {
-          setLocation(next)
-          setIsDirty(true)
+      <CoordinateCapture
+        hasCoordinates={hasCoordinates}
+        onCaptured={(latitude, longitude) => {
+          setPendingCoords({ latitude, longitude })
+          setCleared(false)
           setIsSaved(false)
         }}
-        label="Business or organization location"
-        description="Used for distance-based matching. Job postings can use a different location."
+        onClear={() => {
+          setCleared(true)
+          setPendingCoords(null)
+          setIsSaved(false)
+        }}
       />
     </ProfileSection>
   )

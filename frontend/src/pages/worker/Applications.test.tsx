@@ -13,8 +13,8 @@ import { WorkerApplications } from './Applications'
 
 const WORKER_USER = {
   id: 1,
-  username: 'demo_worker_ramesh',
-  email: 'ramesh@example.com',
+  username: 'demo_worker_electrician',
+  email: 'electrician@example.com',
   phone_number: '9811100011',
   role: 'WORKER' as const,
   is_contact_verified: true,

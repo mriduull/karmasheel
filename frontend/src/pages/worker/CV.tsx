@@ -4,12 +4,14 @@ import { useQuery } from '@tanstack/react-query'
 import { Download } from 'lucide-react'
 import { fetchWorkerCvPdf, fetchWorkerCvPreviewHtml } from '@/api/endpoints/profiles'
 import { ApiError, toBannerMessage } from '@/api/errors'
+import { useWorkerProfile } from '@/hooks/useWorkerProfile'
 import { PageContainer } from '@/components/primitives/PageContainer'
 import { SkeletonBlock } from '@/components/primitives/SkeletonBlock'
 import { ErrorBanner } from '@/components/primitives/ErrorBanner'
 import { EmptyState } from '@/components/primitives/EmptyState'
 import { Button } from '@/components/primitives/Button'
 import { CVPreviewFrame } from '@/components/shared/CVPreviewFrame'
+import { ProfilePhotoUpload } from '@/components/shared/ProfilePhotoUpload'
 
 /**
  * `GET /api/profiles/worker/me/cv/preview/` (HTML) and
@@ -19,6 +21,7 @@ import { CVPreviewFrame } from '@/components/shared/CVPreviewFrame'
  * manual CV editor exists; editing happens on the Profile screen.
  */
 export function WorkerCV() {
+  const profileQuery = useWorkerProfile()
   const previewQuery = useQuery({
     queryKey: ['profiles', 'worker', 'me', 'cv', 'preview'],
     queryFn: fetchWorkerCvPreviewHtml,
@@ -79,6 +82,17 @@ export function WorkerCV() {
 
         {previewQuery.isSuccess && (
           <>
+            <section className="mb-4 rounded-md border border-text-secondary/10 bg-surface p-4 shadow-card sm:p-6">
+              <h2 className="text-lg font-semibold text-text-primary">Profile photo</h2>
+              <p className="mt-1 text-sm text-text-secondary">Shown in the CV preview and PDF.</p>
+              <div className="mt-4">
+                <ProfilePhotoUpload
+                  currentPhotoUrl={profileQuery.data?.profile_photo_url ?? null}
+                  onUploaded={() => previewQuery.refetch()}
+                />
+              </div>
+            </section>
+
             <div className="mb-4">
               <Button variant="primary" onClick={handleDownload} isLoading={isDownloading}>
                 <Download size={18} aria-hidden="true" />

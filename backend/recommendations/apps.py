@@ -7,4 +7,4 @@ class RecommendationsConfig(AppConfig):
     def ready(self):
         from . import services
 
-        services.validate_recommendation_weights()
+        services.validate_recommendation_settings()

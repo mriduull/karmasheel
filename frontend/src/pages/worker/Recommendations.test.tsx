@@ -12,8 +12,8 @@ import { WorkerRecommendations } from './Recommendations'
 
 const WORKER_USER = {
   id: 1,
-  username: 'demo_worker_ramesh',
-  email: 'ramesh@example.com',
+  username: 'demo_worker_electrician',
+  email: 'electrician@example.com',
   phone_number: '9811100011',
   role: 'WORKER' as const,
   is_contact_verified: true,
@@ -63,7 +63,7 @@ describe('WorkerRecommendations', () => {
     expect(await screen.findByText(/matches 2 of 2 required skills/i)).toBeInTheDocument()
   })
 
-  it('renders the empty state with a link to complete the profile', async () => {
+  it('renders the empty state with a link to browse active jobs', async () => {
     server.use(
       http.get(`${API_ROOT}/recommendations/jobs/`, () => HttpResponse.json([])),
       http.get(`${API_ROOT}/applications/`, () => HttpResponse.json([])),
@@ -71,11 +71,8 @@ describe('WorkerRecommendations', () => {
 
     renderWithProviders(<WorkerRecommendations />)
 
-    expect(await screen.findByText('No matches yet')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /complete your profile/i })).toHaveAttribute(
-      'href',
-      '/worker/profile',
-    )
+    expect(await screen.findByText('No recommended jobs right now')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Browse Jobs' })).toHaveAttribute('href', '/jobs')
   })
 
   it('shows a retryable error state on a genuine server failure', async () => {
@@ -156,9 +153,11 @@ describe('WorkerRecommendations', () => {
     )
 
     const { container } = renderWithProviders(<WorkerRecommendations />)
-    await waitFor(() => {
-      expect(screen.getByText('House Wiring for New Apartment Block')).toBeInTheDocument()
-    })
+    await screen.findByText('House Wiring for New Apartment Block')
+    // The recommendation and current-applications queries resolve
+    // independently. Wait for the latter's final UI before running axe so
+    // its state update cannot land during the accessibility scan.
+    await screen.findByRole('button', { name: 'Apply' })
 
     const results = await axe(container)
     expect(results).toHaveNoViolations()

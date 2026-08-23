@@ -78,12 +78,28 @@ class SkillAliasAdmin(admin.ModelAdmin):
 @admin.action(description="Resolve using best candidate and create alias")
 def resolve_using_best_candidate(modeladmin, request, queryset):
     resolved = 0
+    conflicts = 0
 
     for term in queryset.filter(best_candidate__isnull=False):
-        SkillAlias.objects.get_or_create(
-            phrase=term.normalized_term,
-            defaults={"skill": term.best_candidate},
-        )
+        existing_alias = SkillAlias.objects.filter(
+            phrase__iexact=term.normalized_term
+        ).first()
+
+        if (
+            existing_alias is not None
+            and existing_alias.skill_id != term.best_candidate_id
+        ):
+            # Do not claim the term was resolved to one skill when the
+            # normalization service will continue resolving that phrase to a
+            # different existing alias. Leave it pending for explicit review.
+            conflicts += 1
+            continue
+
+        if existing_alias is None:
+            SkillAlias.objects.create(
+                phrase=term.normalized_term,
+                skill=term.best_candidate,
+            )
 
         term.resolved_skill = term.best_candidate
         term.status = UnmatchedSkillTerm.Status.RESOLVED
@@ -91,12 +107,21 @@ def resolve_using_best_candidate(modeladmin, request, queryset):
         term.save(update_fields=["resolved_skill", "status", "resolved_by", "updated_at"])
         resolved += 1
 
-    modeladmin.message_user(request, f"Resolved {resolved} term(s).")
+    message = f"Resolved {resolved} term(s)."
+    if conflicts:
+        message += (
+            f" Skipped {conflicts} alias conflict(s); those terms remain "
+            "pending for review."
+        )
+    modeladmin.message_user(request, message)
 
 
 @admin.action(description="Reject selected unmatched terms")
 def reject_unmatched_terms(modeladmin, request, queryset):
-    updated = queryset.update(status=UnmatchedSkillTerm.Status.REJECTED, resolved_by=request.user)
+    updated = queryset.filter(status=UnmatchedSkillTerm.Status.PENDING).update(
+        status=UnmatchedSkillTerm.Status.REJECTED,
+        resolved_by=request.user,
+    )
     modeladmin.message_user(request, f"Rejected {updated} term(s).")
 
 
