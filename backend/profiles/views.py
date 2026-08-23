@@ -134,7 +134,9 @@ class WorkerCVPreviewView(APIView):
             )
 
         html = render_worker_cv_html(profile)
-        return HttpResponse(html, content_type="text/html")
+        response = HttpResponse(html, content_type="text/html")
+        response["Cache-Control"] = "private, no-store"
+        return response
 
 
 class WorkerCVPdfView(APIView):
@@ -161,6 +163,7 @@ class WorkerCVPdfView(APIView):
 
         response = HttpResponse(pdf_bytes, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response["Cache-Control"] = "private, no-store"
         return response
 
 

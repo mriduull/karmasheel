@@ -37,7 +37,7 @@ apt-get update && apt-get install -y \
 ```
 
 If the provider cannot install those libraries, use `CV_PDF_ENGINE=basic`
-and verify the reduced renderer in staging.
+to select the portable styled ReportLab renderer and verify it in staging.
 
 ## 2. Backend environment
 

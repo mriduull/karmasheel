@@ -18,7 +18,11 @@ from jobs.models import JobPost
 from taxonomy.models import Category, SkillAlias, SkillTag, Subcategory, UnmatchedSkillTerm
 
 from .models import EmployerProfile, WorkerProfile
-from .services import generate_worker_summary, render_worker_cv_pdf
+from .services import (
+    _SkillChipsFlowable,
+    generate_worker_summary,
+    render_worker_cv_pdf,
+)
 
 
 User = get_user_model()
@@ -1179,6 +1183,7 @@ class WorkerCVAPITests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("text/html", response["Content-Type"])
+        self.assertEqual(response["Cache-Control"], "private, no-store")
         content = response.content.decode()
         self.assertIn(self.worker.username, content)
         self.assertIn("Worker with 2 years of experience", content)
@@ -1244,11 +1249,73 @@ class WorkerCVAPITests(APITestCase):
         self.assertEqual(response["Content-Type"], "application/pdf")
         self.assertIn("attachment", response["Content-Disposition"])
         self.assertIn(f"cv-{self.worker.username}.pdf", response["Content-Disposition"])
+        self.assertEqual(response["Cache-Control"], "private, no-store")
         self.assertTrue(response.content.startswith(b"%PDF"))
         self.assertIn(b"xref", response.content)
         self.assertIn(b"trailer", response.content)
         self.assertIn(self.worker.username.encode("ascii"), response.content)
+        self.assertIn(b"PROFESSIONAL SUMMARY", response.content)
+        self.assertIn(b"CONTACT", response.content)
+        self.assertIn(b"SKILLS", response.content)
+        self.assertIn(b"WORK DETAILS", response.content)
+        self.assertNotIn(b"Username:", response.content)
+        self.assertNotIn(b"/Subtype /Image", response.content)
         self.assertTrue(response.content.endswith(b"%%EOF\n"))
+
+    def test_downloaded_cv_embeds_the_worker_profile_photo(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+
+        with tempfile.TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            self.worker_profile.profile_photo.save(
+                "profile.png",
+                make_test_image_upload(size=(160, 90)),
+            )
+            response = self.client.get(self.pdf_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn(b"/Subtype /Image", response.content)
+
+    def test_downloaded_cv_paginates_a_long_skill_list(self):
+        category = Category.objects.create(name="CV Pagination Services")
+        subcategory = Subcategory.objects.create(
+            category=category,
+            name="CV Pagination Trade",
+        )
+        skills = [
+            SkillTag.objects.create(
+                subcategory=subcategory,
+                name=f"Specialized installation and repair skill {index:02d}",
+            )
+            for index in range(80)
+        ]
+        self.worker_profile.skills.set(skills)
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+
+        response = self.client.get(self.pdf_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # One `/Type /Pages` node plus at least two `/Type /Page` objects.
+        self.assertGreaterEqual(response.content.count(b"/Type /Page"), 3)
+        self.assertIn(b"Specialized installation and repair skill 79", response.content)
+
+    def test_skill_chip_wraps_a_max_length_unbroken_name_within_page(self):
+        available_width = 470
+        rows = _SkillChipsFlowable(["W" * 100])._make_rows(available_width)
+        chip = rows[0][0]
+
+        self.assertGreater(len(chip[1]), 1)
+        self.assertLessEqual(chip[3], available_width)
+
+    def test_downloaded_cv_uses_full_name_without_a_separate_username_field(self):
+        self.worker.first_name = "Ramesh"
+        self.worker.last_name = "Shrestha"
+        self.worker.save(update_fields=["first_name", "last_name"])
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+
+        response = self.client.get(self.pdf_url)
+
+        self.assertIn(b"Ramesh Shrestha", response.content)
+        self.assertNotIn(self.worker.username.encode("ascii"), response.content)
 
     @override_settings(CV_PDF_ENGINE="weasyprint")
     @patch("profiles.services._render_pdf_with_browser")
@@ -1267,10 +1334,26 @@ class WorkerCVAPITests(APITestCase):
         weasyprint_renderer.assert_called_once()
         browser_renderer.assert_not_called()
 
+    @override_settings(CV_PDF_ENGINE="auto")
+    def test_auto_renderer_on_macos_skips_a_failed_browser_launch(self):
+        with (
+            patch("profiles.services.sys.platform", "darwin"),
+            patch(
+                "profiles.services._render_pdf_with_weasyprint",
+                return_value=None,
+            ) as weasyprint_renderer,
+            patch("profiles.services._render_pdf_with_browser") as browser_renderer,
+        ):
+            pdf = render_worker_cv_pdf(self.worker_profile)
+
+        weasyprint_renderer.assert_called_once()
+        browser_renderer.assert_not_called()
+        self.assertIn(b"PROFESSIONAL SUMMARY", pdf)
+
     @override_settings(CV_PDF_ENGINE="browser")
     @patch("profiles.services._render_pdf_with_weasyprint", return_value=None)
     @patch("profiles.services._render_pdf_with_browser", return_value=None)
-    def test_unavailable_optional_renderers_use_valid_basic_pdf(
+    def test_unavailable_optional_renderers_use_valid_styled_pdf(
         self,
         browser_renderer,
         weasyprint_renderer,
@@ -1280,6 +1363,7 @@ class WorkerCVAPITests(APITestCase):
         browser_renderer.assert_called_once()
         weasyprint_renderer.assert_called_once()
         self.assertTrue(pdf.startswith(b"%PDF"))
+        self.assertIn(b"PROFESSIONAL SUMMARY", pdf)
         self.assertTrue(pdf.endswith(b"%%EOF\n"))
 
     def test_cv_never_exposes_employer_only_data(self):

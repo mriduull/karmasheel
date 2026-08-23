@@ -21,7 +21,8 @@ trust the repository (`backend/config/settings.py`, `backend/requirements.txt`
 - **Node.js and npm** — `frontend/package.json` does not pin an exact
   `engines` version; this environment currently runs Node v24.18.0 / npm
   11.16.0. Any reasonably recent Node LTS (20+) should work.
-- **A C toolchain / system libraries for WeasyPrint** (CV PDF generation) —
+- **Optional system libraries for WeasyPrint** (exact HTML-to-PDF rendering;
+  the styled ReportLab renderer works without them) —
   on Debian/Ubuntu:
   ```bash
   sudo apt-get install libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libcairo2
@@ -113,7 +114,7 @@ the comments inside `.env.example` for what each variable does.
 | `DJANGO_DEBUG` | No (defaults `False`) | `True` for local development. `seed_demo` refuses to run when this is `False`. |
 | `DJANGO_ALLOWED_HOSTS` | Yes outside tests | Comma-separated backend hostnames. The example includes `localhost,127.0.0.1`. |
 | `CSRF_TRUSTED_ORIGINS` | No for local same-origin admin | Required for deployed HTTPS admin origins; see `DEPLOYMENT.md`. |
-| `CV_PDF_ENGINE` | No (defaults `auto`) | `auto`, `weasyprint`, `browser`, or dependency-free `basic`. |
+| `CV_PDF_ENGINE` | No (defaults `auto`) | `auto`, `weasyprint`, `browser`, or portable styled `basic`. |
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Yes | PostgreSQL connection settings. |
 | `DB_HOST` | No (defaults `localhost`) | PostgreSQL host. |
 | `DB_PORT` | No (defaults `5432`) | PostgreSQL port. |

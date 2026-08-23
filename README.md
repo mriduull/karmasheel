@@ -58,15 +58,17 @@ follow [`docs/DEFENSE_SCREENSHOTS.md`](docs/DEFENSE_SCREENSHOTS.md).
 - PostgreSQL
 - Simple JWT (`djangorestframework-simplejwt`)
 - RapidFuzz (fuzzy skill matching)
-- WeasyPrint (CV PDF generation)
+- ReportLab (portable styled CV PDF generation)
+- WeasyPrint (optional HTML-to-PDF rendering)
 - django-cors-headers
 
 ## Prerequisites
 
 - Python 3.12+
 - PostgreSQL 14+ (running locally or reachable over the network)
-- A C toolchain / system libraries required by WeasyPrint for PDF rendering
-  (Pango, Cairo, GDK-Pixbuf). On Debian/Ubuntu:
+- Optional: the system libraries used by WeasyPrint for exact HTML-to-PDF
+  rendering (Pango, Cairo, GDK-Pixbuf). The styled ReportLab renderer works
+  without them. On Debian/Ubuntu:
   ```bash
   sudo apt-get install libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libcairo2
   ```
@@ -288,7 +290,7 @@ via Postman/curl and the Django admin.
 | `django.db.utils.OperationalError: password authentication failed` | `DB_USER`/`DB_PASSWORD` in `.env` don't match the database role you created. |
 | `KeyError: 'DJANGO_SECRET_KEY'` (or `DB_NAME`, etc.) on startup | `.env` is missing or not in the repository root (`config/settings.py` loads it from `BASE_DIR.parent / ".env"`, i.e. `workforce-matching/.env`, not `backend/.env`). |
 | `seed_demo` raises `CommandError: ... refuses to run with DEBUG=False` | Set `DJANGO_DEBUG=True` in `.env` for local development, or pass `--force` if you are certain the database is not production. |
-| WeasyPrint import/PDF errors (`OSError: cannot load library ...`) | Install the system libraries listed under Prerequisites - WeasyPrint needs Pango/Cairo/GDK-Pixbuf, not just the Python package. |
+| WeasyPrint import/PDF errors (`OSError: cannot load library ...`) | Leave `CV_PDF_ENGINE=auto` to use the portable styled renderer, or install the optional system libraries listed under Prerequisites for WeasyPrint. |
 | Job creation returns `403 Forbidden` for an employer that should be allowed | Only employers with `verification_status = VERIFIED` may create jobs (`IsVerifiedEmployer`). Verify the employer through the Django admin, or run `seed_demo`, which seeds an already-verified employer. |
 | Tests are slow / hang on user creation | Make sure you passed `--settings=config.test_settings` - it swaps in a fast password hasher; without it, hundreds of fixture users each pay real PBKDF2 cost. |
 | Re-running `seed_demo` seems to create duplicate-looking jobs/applications | It shouldn't - every record is matched by a natural key (username, employer+title, worker+job) via `get_or_create`/`update_or_create`. If you see unexpected duplicates, check whether they predate `seed_demo` (e.g. from earlier manual testing or a Postman run) rather than being created by it. |

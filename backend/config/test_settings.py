@@ -54,7 +54,7 @@ RECOMMENDATION_SETTINGS = {
     "NEAR_MISS_MAX_SCORE": 75.0,
 }
 
-# Exercise the deterministic dependency-free branch in the unit suite. The
+# Exercise the deterministic portable ReportLab branch in the unit suite. The
 # browser and WeasyPrint renderers are covered by runtime smoke checks where
 # those optional system dependencies are available.
 CV_PDF_ENGINE = "basic"

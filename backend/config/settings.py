@@ -303,7 +303,7 @@ LOGGING = {
 
 # CV PDF renderer. ``auto`` prefers WeasyPrint on Unix-like deployment
 # environments and a locally installed Chromium browser on Windows, then
-# falls back to a dependency-free basic PDF if neither renderer is available.
+# falls back to the portable styled ReportLab renderer.
 CV_PDF_ENGINE = os.getenv("CV_PDF_ENGINE", "auto").strip().lower()
 if CV_PDF_ENGINE not in {"auto", "basic", "browser", "weasyprint"}:
     raise ImproperlyConfigured(
