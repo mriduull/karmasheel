@@ -96,6 +96,7 @@ class WorkerProfileAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["id"], self.worker_profile.id)
         self.assertEqual(response.data["skills"], [])
+        self.assertEqual(response.data["skill_matches"], [])
 
     def test_missing_worker_profile_returns_404_not_500(self):
         self.worker_profile.delete()
@@ -295,9 +296,103 @@ class WorkerProfileAPITests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["unmatched_terms"], [])
+        self.assertEqual(len(response.data["skill_matches"]), 1)
+        match = response.data["skill_matches"][0]
+        self.assertEqual(
+            set(match),
+            {
+                "input_term",
+                "method",
+                "confidence",
+                "matched_skill",
+                "matched_skill_was_selected",
+                "suggestions",
+            },
+        )
+        self.assertEqual(match["input_term"], "House Wiring")
+        self.assertEqual(match["method"], "exact_name")
+        self.assertEqual(match["confidence"], 100.0)
+        self.assertEqual(
+            match["matched_skill"],
+            {
+                "id": self.skill.id,
+                "name": "House Wiring",
+                "subcategory": "Construction & Repair - Electrical",
+            },
+        )
+        self.assertFalse(match["matched_skill_was_selected"])
+        self.assertEqual(match["suggestions"], [])
 
         self.worker_profile.refresh_from_db()
         self.assertIn(self.skill, self.worker_profile.skills.all())
+
+    def test_worker_skill_input_lists_are_limited_to_twenty_items(self):
+        self.worker_profile.address = "Original address"
+        self.worker_profile.save(update_fields=["address"])
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+
+        oversized_payloads = {
+            "skill_input": [f"Skill phrase {index}" for index in range(21)],
+            "skill_review_input": [f"Review phrase {index}" for index in range(21)],
+        }
+        for field, value in oversized_payloads.items():
+            with self.subTest(field=field):
+                response = self.client.patch(
+                    self.worker_url,
+                    {"address": "Must not be saved", field: value},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn(field, response.data)
+                self.worker_profile.refresh_from_db()
+                self.assertEqual(self.worker_profile.address, "Original address")
+
+    def test_worker_can_save_more_than_twenty_explicit_skill_ids(self):
+        explicit_skills = SkillTag.objects.bulk_create(
+            [
+                SkillTag(
+                    subcategory=self.skill.subcategory,
+                    name=f"Explicit Skill {index}",
+                )
+                for index in range(21)
+            ]
+        )
+
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {"skill_ids": [skill.id for skill in explicit_skills]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.worker_profile.refresh_from_db()
+        self.assertEqual(self.worker_profile.skills.count(), 21)
+
+    def test_more_than_five_hundred_unique_explicit_skill_ids_is_rejected_safely(self):
+        self.worker_profile.address = "Original address"
+        self.worker_profile.save(update_fields=["address"])
+        self.worker_profile.skills.add(self.skill)
+
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {
+                "address": "Must not be saved",
+                "skill_ids": list(range(1, 502)),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("skill_ids", response.data)
+        self.worker_profile.refresh_from_db()
+        self.assertEqual(self.worker_profile.address, "Original address")
+        self.assertEqual(
+            set(self.worker_profile.skills.values_list("id", flat=True)),
+            {self.skill.id},
+        )
 
     def test_worker_can_set_skills_via_romanized_nepali_alias(self):
         self.authenticate_as(self.worker, "WorkerPassword123!")
@@ -329,6 +424,321 @@ class WorkerProfileAPITests(APITestCase):
                 normalized_term="completely made up nonexistent skill"
             ).exists()
         )
+        match = response.data["skill_matches"][0]
+        self.assertEqual(match["method"], "unmatched")
+        self.assertIsNone(match["matched_skill"])
+
+    def test_skill_matches_preserve_input_order_and_deduplicate_suggestions(self):
+        SkillAlias.objects.create(skill=self.skill, phrase="residential wiring")
+        panel_wiring = SkillTag.objects.create(
+            subcategory=self.skill.subcategory,
+            name="Electrical Panel Wiring",
+        )
+        SkillAlias.objects.create(skill=panel_wiring, phrase="panel wire setup")
+
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {"skill_input": ["ghar wiring", "panel wire setup"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [item["input_term"] for item in response.data["skill_matches"]],
+            ["ghar wiring", "panel wire setup"],
+        )
+        for item in response.data["skill_matches"]:
+            suggestion_ids = [suggestion["id"] for suggestion in item["suggestions"]]
+            self.assertLessEqual(len(suggestion_ids), 5)
+            self.assertEqual(len(suggestion_ids), len(set(suggestion_ids)))
+            self.assertTrue(
+                all(
+                    suggestion["subcategory"]
+                    == "Construction & Repair - Electrical"
+                    for suggestion in item["suggestions"]
+                )
+            )
+
+    def test_skill_suggestions_are_scoped_to_matched_skill_subcategory(self):
+        other_subcategory = Subcategory.objects.create(
+            category=self.skill.subcategory.category,
+            name="Events",
+        )
+        SkillTag.objects.create(
+            subcategory=other_subcategory,
+            name="Cable And Wiring Setup For Events",
+        )
+        SkillTag.objects.create(
+            subcategory=self.skill.subcategory,
+            name="Electrical Panel Wiring",
+        )
+
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {"skill_input": ["ghar wiring"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        suggestions = response.data["skill_matches"][0]["suggestions"]
+        self.assertNotEqual(suggestions, [])
+        self.assertTrue(
+            all(
+                suggestion["subcategory"] == "Construction & Repair - Electrical"
+                for suggestion in suggestions
+            )
+        )
+
+    def test_explicit_skill_id_disambiguates_duplicate_canonical_names(self):
+        other_subcategory = Subcategory.objects.create(
+            category=self.skill.subcategory.category,
+            name="Building Maintenance",
+        )
+        selected_duplicate = SkillTag.objects.create(
+            subcategory=other_subcategory,
+            name="House Wiring",
+        )
+
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {
+                "skill_input": ["House Wiring"],
+                "skill_ids": [selected_duplicate.id],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["skill_matches"], [])
+        self.worker_profile.refresh_from_db()
+        self.assertEqual(
+            set(self.worker_profile.skills.values_list("id", flat=True)),
+            {selected_duplicate.id},
+        )
+
+    def test_explicit_skill_ids_combine_with_nonduplicate_raw_phrases(self):
+        selected_skill = SkillTag.objects.create(
+            subcategory=self.skill.subcategory,
+            name="Electrical Panel Wiring",
+        )
+
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {
+                "skill_input": ["ghar wiring"],
+                "skill_ids": [selected_skill.id],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [match["input_term"] for match in response.data["skill_matches"]],
+            ["ghar wiring"],
+        )
+        self.worker_profile.refresh_from_db()
+        self.assertEqual(
+            set(self.worker_profile.skills.values_list("id", flat=True)),
+            {self.skill.id, selected_skill.id},
+        )
+
+    def test_skill_match_reports_when_matched_skill_was_explicitly_selected(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {
+                "skill_input": ["ghar wiring"],
+                "skill_ids": [self.skill.id],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["skill_matches"]), 1)
+        self.assertTrue(
+            response.data["skill_matches"][0]["matched_skill_was_selected"]
+        )
+
+    def test_explicit_skill_ids_alone_replace_confirmed_skills(self):
+        selected_skill = SkillTag.objects.create(
+            subcategory=self.skill.subcategory,
+            name="Electrical Panel Wiring",
+        )
+        self.worker_profile.skills.add(self.skill)
+
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {"skill_ids": [selected_skill.id]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["skill_matches"], [])
+        self.worker_profile.refresh_from_db()
+        self.assertEqual(
+            set(self.worker_profile.skills.values_list("id", flat=True)),
+            {selected_skill.id},
+        )
+
+    def test_invalid_or_inactive_explicit_skill_ids_are_rejected_safely(self):
+        inactive_skill = SkillTag.objects.create(
+            subcategory=self.skill.subcategory,
+            name="Inactive Wiring Skill",
+            is_active=False,
+        )
+        self.worker_profile.address = "Original address"
+        self.worker_profile.save(update_fields=["address"])
+        self.worker_profile.skills.add(self.skill)
+
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        for rejected_id in (999_999, inactive_skill.id):
+            with self.subTest(rejected_id=rejected_id):
+                response = self.client.patch(
+                    self.worker_url,
+                    {
+                        "address": "Must not be saved",
+                        "skill_ids": [rejected_id],
+                    },
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn("skill_ids", response.data)
+                self.worker_profile.refresh_from_db()
+                self.assertEqual(self.worker_profile.address, "Original address")
+                self.assertEqual(
+                    set(self.worker_profile.skills.values_list("id", flat=True)),
+                    {self.skill.id},
+                )
+
+    def test_worker_can_force_accepted_skill_phrase_into_admin_review(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {"skill_review_input": ["House Wireing"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["skill_matches"], [])
+        self.assertEqual(response.data["unmatched_terms"], ["House Wireing"])
+        self.assertNotIn(self.skill, self.worker_profile.skills.all())
+
+        review_term = UnmatchedSkillTerm.objects.get(
+            normalized_term="house wireing"
+        )
+        self.assertEqual(review_term.status, UnmatchedSkillTerm.Status.PENDING)
+        self.assertEqual(review_term.best_candidate, self.skill)
+        self.assertGreaterEqual(review_term.best_candidate_score, 85)
+        self.assertEqual(review_term.submitted_by, self.worker)
+
+    def test_review_only_patch_preserves_existing_confirmed_skills(self):
+        retained_skill = SkillTag.objects.create(
+            subcategory=self.skill.subcategory,
+            name="Electrical Safety Inspection",
+        )
+        self.worker_profile.skills.add(retained_skill)
+
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {"skill_review_input": ["House Wiring"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["unmatched_terms"], ["House Wiring"])
+        self.worker_profile.refresh_from_db()
+        self.assertEqual(list(self.worker_profile.skills.all()), [retained_skill])
+        self.assertTrue(
+            UnmatchedSkillTerm.objects.filter(
+                normalized_term="house wiring",
+                status=UnmatchedSkillTerm.Status.PENDING,
+            ).exists()
+        )
+
+    def test_explicit_review_terms_are_deduplicated_in_response(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {
+                "skill_input": [],
+                "skill_review_input": ["House Wiring", "house-wiring!"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["unmatched_terms"], ["House Wiring"])
+        review_term = UnmatchedSkillTerm.objects.get(normalized_term="house wiring")
+        self.assertEqual(review_term.occurrence_count, 1)
+
+    def test_reviewed_phrase_in_skill_input_is_not_assigned(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {
+                "skill_input": ["House Wiring"],
+                "skill_review_input": ["house wiring"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["unmatched_terms"], ["House Wiring"])
+        self.worker_profile.refresh_from_db()
+        self.assertNotIn(self.skill, self.worker_profile.skills.all())
+        self.assertTrue(
+            UnmatchedSkillTerm.objects.filter(
+                normalized_term="house wiring",
+                status=UnmatchedSkillTerm.Status.PENDING,
+            ).exists()
+        )
+
+    def test_explicit_review_reopens_terminal_status_and_preserves_audit_fields(self):
+        terminal_terms = [
+            UnmatchedSkillTerm.objects.create(
+                raw_term="House Wiring",
+                normalized_term="house wiring",
+                best_candidate=self.skill,
+                best_candidate_score=100,
+                submitted_by=self.employer,
+                status=UnmatchedSkillTerm.Status.RESOLVED,
+                resolved_skill=self.skill,
+                resolved_by=self.employer,
+            ),
+            UnmatchedSkillTerm.objects.create(
+                raw_term="House Wireing",
+                normalized_term="house wireing",
+                best_candidate=self.skill,
+                best_candidate_score=90,
+                submitted_by=self.employer,
+                status=UnmatchedSkillTerm.Status.REJECTED,
+                resolved_skill=self.skill,
+                resolved_by=self.employer,
+            ),
+        ]
+
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(
+            self.worker_url,
+            {"skill_review_input": ["House Wiring", "House Wireing"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        for review_term in terminal_terms:
+            review_term.refresh_from_db()
+            self.assertEqual(review_term.status, UnmatchedSkillTerm.Status.PENDING)
+            self.assertEqual(review_term.resolved_skill, self.skill)
+            self.assertEqual(review_term.resolved_by, self.employer)
+            self.assertEqual(review_term.submitted_by, self.employer)
+            self.assertEqual(review_term.occurrence_count, 2)
 
     def test_worker_latitude_out_of_range_is_rejected(self):
         self.authenticate_as(self.worker, "WorkerPassword123!")

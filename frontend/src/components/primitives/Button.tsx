@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from 'react'
+import { forwardRef, type ButtonHTMLAttributes } from 'react'
 import { LoadingIndicator } from './LoadingIndicator'
 
 type Variant = 'primary' | 'secondary' | 'danger'
@@ -16,16 +16,20 @@ const VARIANT_CLASSES: Record<Variant, string> = {
 }
 
 /** Every button meets the ≥44px touch-target minimum via `min-h-touch`/`min-w-touch`. */
-export function Button({
-  variant = 'primary',
-  isLoading = false,
-  disabled,
-  className = '',
-  children,
-  ...rest
-}: ButtonProps) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  {
+    variant = 'primary',
+    isLoading = false,
+    disabled,
+    className = '',
+    children,
+    ...rest
+  },
+  ref,
+) {
   return (
     <button
+      ref={ref}
       type="button"
       className={`inline-flex min-h-touch min-w-touch items-center justify-center gap-2 rounded-sm px-4 text-base font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${VARIANT_CLASSES[variant]} ${className}`}
       disabled={disabled || isLoading}
@@ -36,4 +40,4 @@ export function Button({
       {children}
     </button>
   )
-}
+})

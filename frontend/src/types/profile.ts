@@ -1,5 +1,18 @@
 import type { SkillTagSummary } from './skill'
 
+export interface SkillMatchSuggestion extends SkillTagSummary {
+  confidence: number
+}
+
+export interface WorkerSkillMatch {
+  input_term: string
+  method: 'exact_name' | 'exact_alias' | 'fuzzy' | 'unmatched'
+  confidence: number
+  matched_skill: SkillTagSummary | null
+  matched_skill_was_selected: boolean
+  suggestions: SkillMatchSuggestion[]
+}
+
 /**
  * profiles/serializers.py:WorkerProfileSerializer — response shape from
  * `GET`/`PATCH /api/profiles/worker/me/`. `latitude`/`longitude`/
@@ -19,11 +32,16 @@ export interface WorkerProfile {
   preferred_travel_radius_km: number | null
   skills: SkillTagSummary[]
   /**
-   * Only ever non-empty in the response to a request that itself included
-   * `skill_input` (a `SerializerMethodField` backed by a transient
-   * instance attribute set during that same request/response cycle) — a
-   * plain `GET` always returns `[]` here, even if a previous save had
-   * unmatched terms. See src/api/endpoints/profiles.ts.
+   * Transient details for the phrases submitted in the current request.
+   * A plain GET returns an empty list. The worker uses non-canonical
+   * matches to verify or correct the normalization decision.
+   */
+  skill_matches: WorkerSkillMatch[]
+  /**
+   * Only ever non-empty in the response to a request that included
+   * `skill_input` and/or `skill_review_input` (a `SerializerMethodField`
+   * backed by transient request state). A plain GET always returns `[]`,
+   * even if a previous save created an admin-review term.
    */
   unmatched_terms: string[]
   created_at: string
@@ -46,4 +64,8 @@ export interface WorkerProfileUpdatePayload {
   expected_wage?: number | null
   preferred_travel_radius_km?: number | null
   skill_input?: string[]
+  /** Explicit active taxonomy choices, used by the category picker. */
+  skill_ids?: number[]
+  /** Phrases the worker explicitly wants an administrator to review. */
+  skill_review_input?: string[]
 }

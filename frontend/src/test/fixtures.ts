@@ -85,6 +85,7 @@ export function buildWorkerProfileFixture(overrides: Partial<WorkerProfile> = {}
     expected_wage: '1200.00',
     preferred_travel_radius_km: 15,
     skills: [{ id: 2, name: 'House Wiring', subcategory: 'Electrical' }],
+    skill_matches: [],
     unmatched_terms: [],
     created_at: '2026-07-22T12:00:00Z',
     updated_at: '2026-07-22T12:00:00Z',

@@ -118,6 +118,39 @@ class NormalizeSkillPhraseTests(TestCase):
         self.assertEqual(result.skill, self.skill)
         self.assertEqual(result.method, "exact_name")
 
+    def test_exact_standardized_name_match_preprocesses_punctuation(self):
+        punctuated_skill = SkillTag.objects.create(
+            subcategory=self.subcategory,
+            name="Cash-On-Delivery Handling",
+        )
+
+        result = normalize_skill_phrase("Cash-On-Delivery Handling")
+
+        self.assertEqual(result.skill, punctuated_skill)
+        self.assertEqual(result.method, "exact_name")
+        self.assertEqual(result.confidence, 100.0)
+
+    def test_preprocessed_canonical_name_collision_uses_canonical_preference(self):
+        other_subcategory = Subcategory.objects.create(
+            category=self.category,
+            name="Delivery",
+        )
+        less_established = SkillTag.objects.create(
+            subcategory=other_subcategory,
+            name="Cash On Delivery Handling",
+        )
+        preferred = SkillTag.objects.create(
+            subcategory=self.subcategory,
+            name="Cash-On-Delivery Handling",
+        )
+        SkillAlias.objects.create(skill=preferred, phrase="cod handling")
+
+        result = normalize_skill_phrase("Cash On Delivery Handling")
+
+        self.assertEqual(result.skill, preferred)
+        self.assertNotEqual(result.skill, less_established)
+        self.assertEqual(result.method, "exact_name")
+
     def test_exact_alias_match_romanized_nepali(self):
         """'ghar wiring' must resolve to 'House Wiring' (Week 2 demo requirement)."""
 
@@ -138,6 +171,18 @@ class NormalizeSkillPhraseTests(TestCase):
 
         self.assertEqual(result.skill, self.skill)
         self.assertEqual(result.method, "exact_alias")
+
+    def test_exact_alias_match_preprocesses_punctuation(self):
+        SkillAlias.objects.create(
+            skill=self.skill,
+            phrase="residential-house-wiring",
+        )
+
+        result = normalize_skill_phrase("residential house wiring")
+
+        self.assertEqual(result.skill, self.skill)
+        self.assertEqual(result.method, "exact_alias")
+        self.assertEqual(result.confidence, 100.0)
 
     def test_fuzzy_match_above_threshold(self):
         # One character off from the standardized name; should be caught by
@@ -1097,6 +1142,14 @@ class SeedTaxonomyV1CommandTests(TestCase):
         self.assertIsNotNone(result.skill)
         self.assertEqual(result.skill.name, "House Wiring")
         self.assertEqual(result.method, "exact_alias")
+
+    def test_punctuated_seeded_canonical_name_is_an_exact_match(self):
+        result = normalize_skill_phrase("Cash-On-Delivery Handling")
+
+        self.assertIsNotNone(result.skill)
+        self.assertEqual(result.skill.name, "Cash-On-Delivery Handling")
+        self.assertEqual(result.method, "exact_name")
+        self.assertEqual(result.confidence, 100.0)
 
     def test_new_v1_alias_resolves_to_its_intended_skill(self):
         result = normalize_skill_phrase("budhesakal herchah")

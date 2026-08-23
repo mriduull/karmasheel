@@ -12,8 +12,9 @@ export function fetchWorkerProfile(): Promise<WorkerProfile> {
 /**
  * PATCH /api/profiles/worker/me/ — a true partial update
  * (`WorkerProfileSerializer.update`): any field omitted from `payload` is
- * left completely untouched server-side, including `skill_input` (only
- * applied when the key is present at all, even as an empty array).
+ * left completely untouched server-side. `skill_input` replaces the
+ * confirmed skill set only when present; `skill_review_input` can submit
+ * disputed phrases without changing that set when used on its own.
  */
 export function updateWorkerProfile(payload: WorkerProfileUpdatePayload): Promise<WorkerProfile> {
   return apiFetch<WorkerProfile>('/profiles/worker/me/', { method: 'PATCH', body: payload })
