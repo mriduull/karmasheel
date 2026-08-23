@@ -6,6 +6,7 @@ interface GeolocationState {
   status: GeolocationStatus
   latitude: number | null
   longitude: number | null
+  accuracy: number | null
   /** Explicitly requests the browser's geolocation permission. Never
    * called automatically — only in response to the user choosing
    * "Use my location". */
@@ -22,6 +23,7 @@ export function useGeolocation(): GeolocationState {
   const [status, setStatus] = useState<GeolocationStatus>('idle')
   const [latitude, setLatitude] = useState<number | null>(null)
   const [longitude, setLongitude] = useState<number | null>(null)
+  const [accuracy, setAccuracy] = useState<number | null>(null)
 
   const request = useCallback(() => {
     if (!('geolocation' in navigator)) {
@@ -38,6 +40,7 @@ export function useGeolocation(): GeolocationState {
         // Django correctly rejects instead of silently truncating.
         setLatitude(Number(position.coords.latitude.toFixed(6)))
         setLongitude(Number(position.coords.longitude.toFixed(6)))
+        setAccuracy(Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null)
         setStatus('success')
       },
       (error) => {
@@ -47,5 +50,5 @@ export function useGeolocation(): GeolocationState {
     )
   }, [])
 
-  return { status, latitude, longitude, request }
+  return { status, latitude, longitude, accuracy, request }
 }
