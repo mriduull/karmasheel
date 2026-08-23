@@ -63,7 +63,7 @@ describe('WorkerRecommendations', () => {
     expect(await screen.findByText(/matches 2 of 2 required skills/i)).toBeInTheDocument()
   })
 
-  it('renders the empty state with a link to complete the profile', async () => {
+  it('renders the empty state with a link to browse active jobs', async () => {
     server.use(
       http.get(`${API_ROOT}/recommendations/jobs/`, () => HttpResponse.json([])),
       http.get(`${API_ROOT}/applications/`, () => HttpResponse.json([])),
@@ -71,11 +71,8 @@ describe('WorkerRecommendations', () => {
 
     renderWithProviders(<WorkerRecommendations />)
 
-    expect(await screen.findByText('No matches yet')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /complete your profile/i })).toHaveAttribute(
-      'href',
-      '/worker/profile',
-    )
+    expect(await screen.findByText('No recommended jobs right now')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Browse Jobs' })).toHaveAttribute('href', '/jobs')
   })
 
   it('shows a retryable error state on a genuine server failure', async () => {
