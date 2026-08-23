@@ -11,13 +11,14 @@ import { optionalNonNegativeNumberString } from './common'
  *
  * Mirrors `profiles/models.py:WorkerProfile` + `WorkerProfileSerializer`
  * exactly, split into the same independently-PATCHable sections used in
- * the form:
- * - `address`: `CharField(max_length=255, blank=True)` — optional, ≤255 chars.
+ * the form. `address` is deliberately NOT here — it moved into the
+ * unified Location section (`LocationPicker`, F4.5), submitted together
+ * with `latitude`/`longitude` as one `LocationValue` rather than as a
+ * plain text field alongside `experience_years`.
  * - `experience_years`: `PositiveSmallIntegerField(default=0)`, NOT
  *   nullable — always a real integer ≥ 0 when this section is submitted.
  */
 export const workerBasicsSchema = z.object({
-  address: z.string().trim().max(255, 'Must be at most 255 characters.'),
   experience_years: z
     .string()
     .trim()

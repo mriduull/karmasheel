@@ -36,30 +36,27 @@ const requiredNonNegativeIntString = (label: string, { min = 0 }: { min?: number
 /**
  * `address`/`latitude`/`longitude` are all REQUIRED on `JobPost` — unlike
  * `WorkerProfile`/`EmployerProfile`, where all three are optional. No
- * `blank=True`/`null=True` on any of the three model fields. This is a
- * genuine, verified difference from the Worker/Employer profile location
- * pattern (`CoordinateCapture`), not an oversight — see
- * `components/shared/JobLocationFields.tsx`.
+ * `blank=True`/`null=True` on any of the three model fields.
+ *
+ * Unlike `jobBasicsSchema`/`jobTermsSchema`, location is NOT a
+ * react-hook-form-registered field group — `JobForm` holds it as a single
+ * `LocationValue | null` (`src/types/location.ts`), same pattern as its
+ * `requiredSkills`/`preferredSkills` chip state, since `LocationPicker`
+ * (F4.5) owns address+lat+lon as one controlled value rather than three
+ * separate form fields. `isLocationValue` is the runtime check `JobForm`
+ * uses in place of a zod-registered field.
  */
-export const jobLocationSchema = z.object({
-  address: nonEmptyString('Address').max(255, 'Must be at most 255 characters.'),
-  latitude: z
-    .string()
-    .trim()
-    .min(1, 'Latitude is required.')
-    .refine((value) => !Number.isNaN(Number(value)) && Number(value) >= -90 && Number(value) <= 90, {
-      message: 'Enter a latitude between -90 and 90.',
-    }),
-  longitude: z
-    .string()
-    .trim()
-    .min(1, 'Longitude is required.')
-    .refine((value) => !Number.isNaN(Number(value)) && Number(value) >= -180 && Number(value) <= 180, {
-      message: 'Enter a longitude between -180 and 180.',
-    }),
-})
-
-export type JobLocationFormValues = z.infer<typeof jobLocationSchema>
+export function isValidJobLocation(value: { latitude: number; longitude: number } | null): boolean {
+  if (!value) return false
+  return (
+    Number.isFinite(value.latitude) &&
+    Number.isFinite(value.longitude) &&
+    value.latitude >= -90 &&
+    value.latitude <= 90 &&
+    value.longitude >= -180 &&
+    value.longitude <= 180
+  )
+}
 
 /**
  * - `wage_type`/`work_type`: choice fields with defaults — always sent
@@ -95,8 +92,10 @@ export type JobTermsFormValues = z.infer<typeof jobTermsSchema>
 /** The whole job form submits as ONE request (unlike the Worker/Employer
  * profile forms' independent per-section PATCHes) — `POST /api/jobs/`
  * has no concept of partial creation, so Basics/Location/Terms are
- * visually sectioned but validated and submitted together. */
-export const jobFormSchema = jobBasicsSchema.merge(jobLocationSchema).merge(jobTermsSchema)
+ * visually sectioned but validated and submitted together. Location
+ * itself is validated separately (see `isValidJobLocation`), not part of
+ * this schema. */
+export const jobFormSchema = jobBasicsSchema.merge(jobTermsSchema)
 
 export type JobFormValues = z.infer<typeof jobFormSchema>
 

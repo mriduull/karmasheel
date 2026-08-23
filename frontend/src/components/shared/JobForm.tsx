@@ -7,9 +7,12 @@ import { createJob, updateJob } from '@/api/endpoints/jobs'
 import { ApiError, toBannerMessage, toFieldErrors } from '@/api/errors'
 import { MY_JOBS_QUERY_KEY } from '@/hooks/useMyJobs'
 import { ownerJobQueryKey } from '@/hooks/useOwnerJob'
-import { jobFormSchema, isDeadlineInPast, type JobFormValues } from '@/validation/job'
+import { useEmployerProfile } from '@/hooks/useEmployerProfile'
+import { jobFormSchema, isDeadlineInPast, isValidJobLocation, type JobFormValues } from '@/validation/job'
 import { formatWageTypeLabel, formatWorkType, fromDatetimeLocalInputValue, toDatetimeLocalInputValue } from '@/lib/formatters'
+import { locationValueFromProfile } from '@/lib/locationValue'
 import type { EmployerJobPost, WageType, WorkType } from '@/types/job'
+import type { LocationValue } from '@/types/location'
 import { TextField } from '@/components/primitives/TextField'
 import { Button } from '@/components/primitives/Button'
 import { ErrorBanner } from '@/components/primitives/ErrorBanner'
@@ -17,7 +20,7 @@ import { CategorySelect } from './CategorySelect'
 import { SubcategorySelect } from './SubcategorySelect'
 import { SkillChipInput } from './SkillChipInput'
 import { UnmatchedTermNotice } from './UnmatchedTermNotice'
-import { JobLocationFields } from './JobLocationFields'
+import { LocationPicker } from './LocationPicker'
 import { JobFormSection } from './JobFormSection'
 
 const WAGE_TYPES: WageType[] = ['HOURLY', 'DAILY', 'MONTHLY', 'FIXED']
@@ -42,6 +45,7 @@ interface JobFormProps {
 export function JobForm({ mode, job }: JobFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const employerProfileQuery = useEmployerProfile()
   const [formError, setFormError] = useState<string | null>(null)
   const [requiredSkills, setRequiredSkills] = useState<string[]>(
     () => job?.required_skills.map((skill) => skill.name) ?? [],
@@ -49,6 +53,8 @@ export function JobForm({ mode, job }: JobFormProps) {
   const [preferredSkills, setPreferredSkills] = useState<string[]>(
     () => job?.preferred_skills.map((skill) => skill.name) ?? [],
   )
+  const [location, setLocation] = useState<LocationValue | null>(() => (job ? locationValueFromProfile(job) : null))
+  const [locationError, setLocationError] = useState<string | null>(null)
   const [savedJob, setSavedJob] = useState<EmployerJobPost | null>(null)
   const [unmatchedRequired, setUnmatchedRequired] = useState<string[]>([])
   const [unmatchedPreferred, setUnmatchedPreferred] = useState<string[]>([])
@@ -67,9 +73,6 @@ export function JobForm({ mode, job }: JobFormProps) {
       description: job?.description ?? '',
       category: job ? String(job.category) : '',
       subcategory: job ? String(job.subcategory) : '',
-      address: job?.address ?? '',
-      latitude: job?.latitude ?? '',
-      longitude: job?.longitude ?? '',
       wage_type: job?.wage_type ?? 'DAILY',
       wage_amount: job?.wage_amount ?? '',
       work_type: job?.work_type ?? 'ONE_TIME',
@@ -88,9 +91,15 @@ export function JobForm({ mode, job }: JobFormProps) {
 
   const onSubmit = async (values: JobFormValues) => {
     setFormError(null)
+    setLocationError(null)
 
     if (mode === 'create' && isDeadlineInPast(values.application_deadline)) {
       setError('application_deadline', { message: 'Application deadline cannot be in the past.' })
+      return
+    }
+
+    if (!isValidJobLocation(location)) {
+      setLocationError('Select a location for this job — search, use your current location, or tap the map.')
       return
     }
 
@@ -99,9 +108,9 @@ export function JobForm({ mode, job }: JobFormProps) {
       category: Number(values.category),
       subcategory: Number(values.subcategory),
       description: values.description,
-      address: values.address,
-      latitude: Number(values.latitude),
-      longitude: Number(values.longitude),
+      address: location!.address,
+      latitude: location!.latitude,
+      longitude: location!.longitude,
       required_experience_years: Number(values.required_experience_years),
       wage_type: values.wage_type,
       wage_amount: Number(values.wage_amount),
@@ -145,9 +154,12 @@ export function JobForm({ mode, job }: JobFormProps) {
         const fieldErrors = toFieldErrors(error)
         if (fieldErrors) {
           const knownFields = new Set(Object.keys(jobFormSchema.shape))
+          const locationFields = new Set(['address', 'latitude', 'longitude'])
           for (const [field, message] of Object.entries(fieldErrors)) {
             if (knownFields.has(field)) {
               setError(field as keyof JobFormValues, { type: 'server', message })
+            } else if (locationFields.has(field)) {
+              setLocationError(message)
             } else {
               setFormError(message)
             }
@@ -178,7 +190,19 @@ export function JobForm({ mode, job }: JobFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-6">
+    <form
+      onSubmit={(event) => {
+        event.preventDefault()
+        // Location is validated independently of react-hook-form/zod (it
+        // isn't a registered field — see validation/job.ts) so its error
+        // shows up alongside every other field's error on the same
+        // submit attempt, not only once the rest of the form is valid.
+        setLocationError(isValidJobLocation(location) ? null : 'Select a location for this job — search, use your current location, or tap the map.')
+        void handleSubmit(onSubmit)(event)
+      }}
+      noValidate
+      className="flex flex-col gap-6"
+    >
       {mode === 'create' && (
         <p className="text-sm text-text-secondary">
           This job will be visible to workers immediately once you publish it — there is no draft
@@ -233,7 +257,35 @@ export function JobForm({ mode, job }: JobFormProps) {
       </JobFormSection>
 
       <JobFormSection title="Location">
-        <JobLocationFields register={register} errors={errors} setValue={setValue} />
+        {employerProfileQuery.data?.latitude != null && employerProfileQuery.data?.longitude != null && (
+          <Button
+            type="button"
+            variant="secondary"
+            className="self-start"
+            onClick={() => {
+              const profile = employerProfileQuery.data!
+              setLocation({
+                address: profile.address,
+                latitude: Number(profile.latitude),
+                longitude: Number(profile.longitude),
+                placeId: null,
+              })
+              setLocationError(null)
+            }}
+          >
+            Use employer profile location
+          </Button>
+        )}
+        <LocationPicker
+          value={location}
+          onChange={(next) => {
+            setLocation(next)
+            if (next) setLocationError(null)
+          }}
+          label="Actual workplace location"
+          description="Where the work will actually happen — this can be different from your business address."
+          error={locationError ?? undefined}
+        />
       </JobFormSection>
 
       <JobFormSection title="Work terms">

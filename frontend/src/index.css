@@ -70,6 +70,30 @@ h6 {
   outline-offset: 2px;
 }
 
+/* LocationPicker's marker (src/components/shared/LocationPicker.tsx) —
+   plays once when a marker first mounts (no location -> a location
+   picked), never replayed on drag/click since react-leaflet repositions
+   an existing marker via setLatLng rather than remounting it. */
+@keyframes location-pin-drop {
+  0% {
+    transform: translateY(-16px);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(2px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.location-pin-marker {
+  animation: location-pin-drop 0.35s ease-out;
+  transform-origin: bottom center;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -10,6 +10,17 @@ import { renderWithProviders, resetAuthStore, setAuthenticatedUser } from '@/tes
 import { buildEmployerProfileFixture } from '@/test/fixtures'
 import { EmployerProfile } from './Profile'
 
+vi.mock('react-leaflet', () => import('@/test/mocks/reactLeaflet'))
+
+vi.mock('@/lib/geoapify', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/geoapify')>()
+  return {
+    ...actual,
+    searchPlaces: vi.fn().mockResolvedValue([]),
+    reverseGeocode: vi.fn().mockResolvedValue('Baneshwor, Kathmandu, Nepal'),
+  }
+})
+
 const EMPLOYER_USER = {
   id: 2,
   username: 'demo_employer_verified',
@@ -78,7 +89,6 @@ describe('EmployerProfile', () => {
     await waitFor(() => {
       expect(capturedBody).toEqual({
         organization_name: 'Kathmandu Home Services Pvt. Ltd.',
-        address: 'Baneshwor, Kathmandu',
         pan_vat_number: '123456789',
       })
     })
@@ -147,9 +157,9 @@ describe('EmployerProfile', () => {
 
     renderWithProviders(<EmployerProfile />)
 
-    await user.click(await screen.findByRole('button', { name: /use my location/i }))
+    await user.click(await screen.findByRole('button', { name: 'Use my current location' }))
 
-    expect(await screen.findByText(/location permission was declined/i)).toBeInTheDocument()
+    expect(await screen.findByText(/location permission was denied/i)).toBeInTheDocument()
 
     const saveButtons = screen.getAllByRole('button', { name: 'Save' })
     for (const button of saveButtons) {
@@ -160,13 +170,21 @@ describe('EmployerProfile', () => {
   it('preserves the previously saved location value across renders (no invented coordinates)', async () => {
     server.use(
       http.get(`${API_ROOT}/profiles/employer/me/`, () =>
-        HttpResponse.json(buildEmployerProfileFixture({ latitude: '27.693800', longitude: '85.335500' })),
+        HttpResponse.json(
+          buildEmployerProfileFixture({
+            address: 'Baneshwor, Kathmandu',
+            latitude: '27.693800',
+            longitude: '85.335500',
+          }),
+        ),
       ),
     )
 
     renderWithProviders(<EmployerProfile />)
 
-    expect(await screen.findByText('Location saved.')).toBeInTheDocument()
+    expect(await screen.findByText('Baneshwor, Kathmandu')).toBeInTheDocument()
+    expect(screen.getByText('27.693800', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('Location selected.')).toBeInTheDocument()
   })
 
   it('shows an API error state when the profile fails to load, with a retry action', async () => {

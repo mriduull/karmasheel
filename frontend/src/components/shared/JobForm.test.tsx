@@ -1,5 +1,5 @@
 import '@/i18n'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -10,6 +10,17 @@ import { API_ROOT } from '@/test/msw/handlers'
 import { renderWithProviders, resetAuthStore, setAuthenticatedUser } from '@/test/utils'
 import { CATEGORY_FIXTURES, SUBCATEGORY_FIXTURES, buildEmployerJobFixture } from '@/test/fixtures'
 import { JobForm } from './JobForm'
+
+vi.mock('react-leaflet', () => import('@/test/mocks/reactLeaflet'))
+
+vi.mock('@/lib/geoapify', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/geoapify')>()
+  return {
+    ...actual,
+    searchPlaces: vi.fn().mockResolvedValue([]),
+    reverseGeocode: vi.fn().mockResolvedValue('Baneshwor, Kathmandu, Nepal'),
+  }
+})
 
 const EMPLOYER_USER = {
   id: 2,
@@ -46,9 +57,8 @@ async function fillRequiredBasics(user: ReturnType<typeof userEvent.setup>) {
   await within(subcategorySelect).findByRole('option', { name: 'Electrical' })
   await user.selectOptions(subcategorySelect, '1')
 
-  await user.type(screen.getByLabelText('Address'), 'Baneshwor, Kathmandu')
-  await user.type(screen.getByLabelText('Latitude'), '27.6938')
-  await user.type(screen.getByLabelText('Longitude'), '85.3355')
+  await user.click(screen.getByRole('button', { name: 'Simulate map click' }))
+  await screen.findByText('Baneshwor, Kathmandu, Nepal')
   await user.type(screen.getByLabelText('Wage amount'), '1500')
 }
 
@@ -60,7 +70,7 @@ describe('JobForm', () => {
   })
 
   describe('create mode', () => {
-    it('requires Title, Description, Category, Subcategory, Address, Latitude, Longitude, and Wage amount', async () => {
+    it('requires Title, Description, Category, Subcategory, Location, and Wage amount', async () => {
       const user = userEvent.setup()
       let postCalled = false
       server.use(
@@ -77,9 +87,7 @@ describe('JobForm', () => {
       expect(await screen.findByText('Title is required.')).toBeInTheDocument()
       expect(screen.getByText('Description is required.')).toBeInTheDocument()
       expect(screen.getByText('Choose a category.')).toBeInTheDocument()
-      expect(screen.getByText('Address is required.')).toBeInTheDocument()
-      expect(screen.getByText('Latitude is required.')).toBeInTheDocument()
-      expect(screen.getByText('Longitude is required.')).toBeInTheDocument()
+      expect(screen.getByText(/select a location for this job/i)).toBeInTheDocument()
       expect(screen.getByText('Wage amount is required.')).toBeInTheDocument()
       expect(postCalled).toBe(false)
     })
@@ -239,6 +247,43 @@ describe('JobForm', () => {
       expect(await screen.findByText('Must be zero or more.')).toBeInTheDocument()
     })
 
+    it('submits the picked address/latitude/longitude together as one payload', async () => {
+      const user = userEvent.setup()
+      let capturedBody: Record<string, unknown> | null = null
+
+      server.use(
+        http.post(`${API_ROOT}/jobs/`, async ({ request }) => {
+          capturedBody = (await request.json()) as Record<string, unknown>
+          return HttpResponse.json(buildEmployerJobFixture())
+        }),
+      )
+
+      renderWithProviders(<JobForm mode="create" />)
+      await fillRequiredBasics(user)
+      await user.click(screen.getByRole('button', { name: 'Publish job' }))
+
+      await waitFor(() => expect(capturedBody).not.toBeNull())
+      expect(capturedBody).toMatchObject({
+        address: 'Baneshwor, Kathmandu, Nepal',
+        latitude: 27.7005,
+        longitude: 85.301,
+      })
+    })
+
+    it('fills the job location from the employer profile via the convenience button, still adjustable', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<JobForm mode="create" />)
+
+      await user.click(await screen.findByRole('button', { name: 'Use employer profile location' }))
+
+      expect(await screen.findByText('Baneshwor, Kathmandu')).toBeInTheDocument()
+      expect(screen.getByText('27.693800', { exact: false })).toBeInTheDocument()
+
+      // Still adjustable afterwards — clicking the map moves it again.
+      await user.click(screen.getByRole('button', { name: 'Simulate map click' }))
+      expect(await screen.findByText('Baneshwor, Kathmandu, Nepal')).toBeInTheDocument()
+    })
+
     it('disables the submit button while a create request is in flight (no duplicate submit)', async () => {
       const user = userEvent.setup()
       const state: { resolveRequest: (() => void) | null } = { resolveRequest: null }
@@ -276,6 +321,8 @@ describe('JobForm', () => {
       expect(await screen.findByDisplayValue('Existing Job Title')).toBeInTheDocument()
       expect(screen.getByText('House Wiring')).toBeInTheDocument()
       expect(screen.getByText('Electrical Repair')).toBeInTheDocument()
+      expect(screen.getByText(job.address)).toBeInTheDocument()
+      expect(screen.getByText('27.693800', { exact: false })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument()
     })
 

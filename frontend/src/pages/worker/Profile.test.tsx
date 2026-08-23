@@ -10,6 +10,17 @@ import { renderWithProviders, resetAuthStore, setAuthenticatedUser } from '@/tes
 import { buildWorkerProfileFixture } from '@/test/fixtures'
 import { WorkerProfile } from './Profile'
 
+vi.mock('react-leaflet', () => import('@/test/mocks/reactLeaflet'))
+
+vi.mock('@/lib/geoapify', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/geoapify')>()
+  return {
+    ...actual,
+    searchPlaces: vi.fn().mockResolvedValue([]),
+    reverseGeocode: vi.fn().mockResolvedValue('Baneshwor, Kathmandu, Nepal'),
+  }
+})
+
 const WORKER_USER = {
   id: 1,
   username: 'demo_worker_ramesh',
@@ -38,7 +49,7 @@ describe('WorkerProfile', () => {
 
     renderWithProviders(<WorkerProfile />)
 
-    expect(await screen.findByDisplayValue('Koteshwor, Kathmandu')).toBeInTheDocument()
+    expect(await screen.findByText('Koteshwor, Kathmandu')).toBeInTheDocument()
   })
 
   it('submits a valid PATCH for the Basics section and shows a saved confirmation', async () => {
@@ -49,25 +60,57 @@ describe('WorkerProfile', () => {
       http.get(`${API_ROOT}/profiles/worker/me/`, () => HttpResponse.json(buildWorkerProfileFixture())),
       http.patch(`${API_ROOT}/profiles/worker/me/`, async ({ request }) => {
         capturedBody = await request.json()
+        return HttpResponse.json(buildWorkerProfileFixture({ experience_years: 7 }))
+      }),
+    )
+
+    renderWithProviders(<WorkerProfile />)
+
+    const experienceInput = await screen.findByLabelText('Years of experience')
+    await user.clear(experienceInput)
+    await user.type(experienceInput, '7')
+
+    const basicsForm = experienceInput.closest('form') as HTMLFormElement
+    await user.click(within(basicsForm).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(capturedBody).toEqual({ experience_years: 7 })
+    })
+    expect(within(basicsForm).getByText('Saved')).toBeInTheDocument()
+  })
+
+  it('submits address/latitude/longitude together for the Location section on map click', async () => {
+    const user = userEvent.setup()
+    let capturedBody: unknown = null
+
+    server.use(
+      http.get(`${API_ROOT}/profiles/worker/me/`, () =>
+        HttpResponse.json(buildWorkerProfileFixture({ address: '', latitude: null, longitude: null })),
+      ),
+      http.patch(`${API_ROOT}/profiles/worker/me/`, async ({ request }) => {
+        capturedBody = await request.json()
         return HttpResponse.json(
-          buildWorkerProfileFixture({ address: 'Baneshwor, Kathmandu', experience_years: 7 }),
+          buildWorkerProfileFixture({ address: 'Baneshwor, Kathmandu, Nepal', latitude: '27.700500', longitude: '85.301000' }),
         )
       }),
     )
 
     renderWithProviders(<WorkerProfile />)
 
-    const addressInput = await screen.findByLabelText('Address')
-    await user.clear(addressInput)
-    await user.type(addressInput, 'Baneshwor, Kathmandu')
+    await user.click(await screen.findByRole('button', { name: 'Simulate map click' }))
+    await screen.findByText('Baneshwor, Kathmandu, Nepal')
 
-    const basicsForm = addressInput.closest('form') as HTMLFormElement
-    await user.click(within(basicsForm).getByRole('button', { name: 'Save' }))
+    const locationForm = screen.getByText('Your usual work location').closest('form') as HTMLFormElement
+    await user.click(within(locationForm).getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
-      expect(capturedBody).toEqual({ address: 'Baneshwor, Kathmandu', experience_years: 6 })
+      expect(capturedBody).toEqual({
+        address: 'Baneshwor, Kathmandu, Nepal',
+        latitude: 27.7005,
+        longitude: 85.301,
+      })
     })
-    expect(within(basicsForm).getByText('Saved')).toBeInTheDocument()
+    expect(within(locationForm).getByText('Saved')).toBeInTheDocument()
   })
 
   it('shows a field validation error without calling the API', async () => {
@@ -169,15 +212,12 @@ describe('WorkerProfile', () => {
 
     renderWithProviders(<WorkerProfile />)
 
-    await user.click(await screen.findByRole('button', { name: /use my location/i }))
+    await user.click(await screen.findByRole('button', { name: 'Use my current location' }))
 
-    expect(
-      await screen.findByText(/location permission was declined/i),
-    ).toBeInTheDocument()
+    expect(await screen.findByText(/location permission was denied/i)).toBeInTheDocument()
 
     // The rest of the form remains fully usable.
-    const addressInput = screen.getByLabelText('Address')
-    expect(addressInput).not.toBeDisabled()
+    expect(screen.getByLabelText('Search an area, landmark or address')).not.toBeDisabled()
   })
 
   it('shows an API error state when the profile fails to load, with a retry action', async () => {

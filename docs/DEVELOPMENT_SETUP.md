@@ -226,6 +226,32 @@ cp .env.example .env
 `runserver` address above; you shouldn't need to change it for local
 development.
 
+#### Geoapify API key (interactive location picker)
+
+The Worker/Employer profile and Job forms use an interactive map + search
+location picker (`src/components/shared/LocationPicker.tsx`), backed by
+[Geoapify](https://www.geoapify.com/) for map tiles, address autocomplete,
+and reverse geocoding.
+
+1. Create a free account at <https://myprojects.geoapify.com/> and
+   generate an API key.
+2. **Restrict the key** to your frontend origins — Project settings > your
+   project > "Manage API keys" > referrer restrictions. Add
+   `http://localhost:5173`, `http://127.0.0.1:5173`, and, once you deploy,
+   your production domain. An unrestricted key can be read out of the
+   built frontend bundle and used by anyone.
+3. Set it in `frontend/.env`:
+
+   ```bash
+   VITE_GEOAPIFY_API_KEY=your-real-key-here
+   ```
+
+Without this key, the location picker still renders and the map still
+supports tap-to-place/drag-to-adjust and "use my current location" —
+address search/autocomplete and reverse geocoding (converting a tapped
+point into a readable address) are simply unavailable, and the map has no
+tiles. Nothing crashes either way.
+
 ### 3. Install dependencies
 
 This repository has a committed `frontend/package-lock.json`, so prefer a

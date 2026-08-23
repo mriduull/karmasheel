@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
@@ -11,7 +11,9 @@ import {
   type WorkerAvailabilityFormValues,
   type WorkerBasicsFormValues,
 } from '@/validation/workerProfile'
+import { locationValueFromProfile } from '@/lib/locationValue'
 import type { WorkerProfile, WorkerProfileUpdatePayload } from '@/types/profile'
+import type { LocationValue } from '@/types/location'
 import { PageContainer } from '@/components/primitives/PageContainer'
 import { TextField } from '@/components/primitives/TextField'
 import { SkeletonCard } from '@/components/primitives/SkeletonCard'
@@ -20,7 +22,7 @@ import { ProfileSection } from '@/components/shared/ProfileSection'
 import { SkillChipInput } from '@/components/shared/SkillChipInput'
 import { SkillChipList } from '@/components/shared/SkillChipList'
 import { UnmatchedTermNotice } from '@/components/shared/UnmatchedTermNotice'
-import { CoordinateCapture } from '@/components/shared/CoordinateCapture'
+import { LocationPicker } from '@/components/shared/LocationPicker'
 
 /**
  * Four independently-PATCHable sections, matching the design spec's
@@ -83,7 +85,6 @@ function BasicsSection({ profile }: { profile: WorkerProfile }) {
   } = useForm<WorkerBasicsFormValues>({
     resolver: zodResolver(workerBasicsSchema),
     defaultValues: {
-      address: profile.address,
       experience_years: String(profile.experience_years),
     },
   })
@@ -94,7 +95,6 @@ function BasicsSection({ profile }: { profile: WorkerProfile }) {
 
     try {
       const updated = await updateWorkerProfile({
-        address: values.address,
         experience_years: Number(values.experience_years),
       })
       queryClient.setQueryData(WORKER_PROFILE_QUERY_KEY, updated)
@@ -118,13 +118,12 @@ function BasicsSection({ profile }: { profile: WorkerProfile }) {
   return (
     <ProfileSection
       title="Basics"
-      description="Your address and experience."
+      description="Your years of experience."
       onSubmit={handleSubmit(onSubmit)}
       isSubmitting={isSubmitting}
       isSaved={isSaved}
       error={formError}
     >
-      <TextField label="Address" error={errors.address?.message} {...register('address')} />
       <TextField
         label="Years of experience"
         inputMode="numeric"
@@ -140,14 +139,9 @@ function LocationSection({ profile }: { profile: WorkerProfile }) {
   const [isSaved, setIsSaved] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [pendingCoords, setPendingCoords] = useState<{ latitude: number; longitude: number } | null>(
-    null,
-  )
-  const [cleared, setCleared] = useState(false)
-
-  const hasCoordinates = cleared
-    ? false
-    : pendingCoords !== null || (profile.latitude !== null && profile.longitude !== null)
+  const initialLocationRef = useRef(locationValueFromProfile(profile))
+  const [location, setLocation] = useState<LocationValue | null>(initialLocationRef.current)
+  const [isDirty, setIsDirty] = useState(false)
 
   const handleFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -155,19 +149,20 @@ function LocationSection({ profile }: { profile: WorkerProfile }) {
     setIsSaved(false)
     setIsSubmitting(true)
 
-    let payload: WorkerProfileUpdatePayload = {}
-    if (cleared) {
-      payload = { latitude: null, longitude: null }
-    } else if (pendingCoords) {
-      payload = { latitude: pendingCoords.latitude, longitude: pendingCoords.longitude }
-    }
+    // Only the fields this section actually changed are sent — an
+    // untouched save (e.g. a legacy profile with an address but no
+    // coordinates yet) must never silently clear existing data.
+    const payload: WorkerProfileUpdatePayload = !isDirty
+      ? {}
+      : location
+        ? { address: location.address, latitude: location.latitude, longitude: location.longitude }
+        : { address: '', latitude: null, longitude: null }
 
     try {
       const updated = await updateWorkerProfile(payload)
       queryClient.setQueryData(WORKER_PROFILE_QUERY_KEY, updated)
       setIsSaved(true)
-      setPendingCoords(null)
-      setCleared(false)
+      setIsDirty(false)
     } catch (error) {
       setFormError(
         error instanceof ApiError ? toBannerMessage(error) : 'Something went wrong — please try again.',
@@ -180,24 +175,21 @@ function LocationSection({ profile }: { profile: WorkerProfile }) {
   return (
     <ProfileSection
       title="Location"
-      description="Optional — improves distance-based job matching. Never guessed from your address."
+      description="Optional — improves distance-based job matching."
       onSubmit={handleFormSubmit}
       isSubmitting={isSubmitting}
       isSaved={isSaved}
       error={formError}
     >
-      <CoordinateCapture
-        hasCoordinates={hasCoordinates}
-        onCaptured={(latitude, longitude) => {
-          setPendingCoords({ latitude, longitude })
-          setCleared(false)
+      <LocationPicker
+        value={location}
+        onChange={(next) => {
+          setLocation(next)
+          setIsDirty(true)
           setIsSaved(false)
         }}
-        onClear={() => {
-          setCleared(true)
-          setPendingCoords(null)
-          setIsSaved(false)
-        }}
+        label="Your usual work location"
+        description="Used to find nearby opportunities and calculate distance to jobs."
       />
     </ProfileSection>
   )

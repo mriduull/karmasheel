@@ -6,6 +6,36 @@ from taxonomy.services import normalize_skill_phrases
 from .models import EmployerProfile, WorkerProfile
 
 
+def _validate_coordinate_pair(attrs, instance):
+    """`latitude`/`longitude` must end up either both set or both unset —
+    never one alone. Checks the FINAL state after `attrs` is applied on
+    top of `instance` (so a PATCH that only touches `latitude` while
+    `longitude` was already saved is still valid), not just the request
+    body in isolation. `JobPost` doesn't need this: both fields are
+    non-nullable there, so the database itself already forbids a
+    half-set pair.
+    """
+
+    def resolve(field):
+        if field in attrs:
+            return attrs[field]
+        return getattr(instance, field, None) if instance is not None else None
+
+    latitude = resolve("latitude")
+    longitude = resolve("longitude")
+
+    if (latitude is None) != (longitude is None):
+        # Both field names carry the error - the constraint is symmetric
+        # (neither field is independently "wrong"), and the request may
+        # have touched either one (a fresh single-field PATCH, or a PATCH
+        # clearing one field while the other's previously-saved value
+        # stands), so there's no single field to blame.
+        message = "Latitude and longitude must be provided together."
+        raise serializers.ValidationError({"latitude": message, "longitude": message})
+
+    return attrs
+
+
 class SkillTagSummarySerializer(serializers.ModelSerializer):
     """Read-only, minimal representation of a standardized skill."""
 
@@ -55,6 +85,9 @@ class WorkerProfileSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("id", "skills", "unmatched_terms", "created_at", "updated_at")
 
+    def validate(self, attrs):
+        return _validate_coordinate_pair(attrs, self.instance)
+
     def get_unmatched_terms(self, instance):
         return getattr(self, "_unmatched_terms", [])
 
@@ -103,6 +136,9 @@ class EmployerProfileSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = ("id", "verification_status", "created_at", "updated_at")
+
+    def validate(self, attrs):
+        return _validate_coordinate_pair(attrs, self.instance)
 
     def validate_pan_vat_number(self, value):
         if not value:

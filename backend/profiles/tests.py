@@ -181,6 +181,45 @@ class WorkerProfileAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("longitude", response.data)
 
+    def test_worker_latitude_without_longitude_is_rejected(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(self.worker_url, {"latitude": "27.700000"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("latitude", response.data)
+
+    def test_worker_longitude_without_latitude_is_rejected(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        response = self.client.patch(self.worker_url, {"longitude": "85.300000"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("longitude", response.data)
+
+    def test_worker_clearing_latitude_while_longitude_already_saved_is_rejected(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        self.client.patch(
+            self.worker_url, {"latitude": "27.700000", "longitude": "85.300000"}, format="json"
+        )
+
+        response = self.client.patch(self.worker_url, {"latitude": None}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("latitude", response.data)
+
+    def test_worker_can_clear_both_coordinates_together(self):
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+        self.client.patch(
+            self.worker_url, {"latitude": "27.700000", "longitude": "85.300000"}, format="json"
+        )
+
+        response = self.client.patch(
+            self.worker_url, {"latitude": None, "longitude": None}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["latitude"])
+        self.assertIsNone(response.data["longitude"])
+
     def test_negative_experience_years_is_rejected(self):
         self.authenticate_as(self.worker, "WorkerPassword123!")
         response = self.client.patch(self.worker_url, {"experience_years": -1}, format="json")
@@ -387,6 +426,20 @@ class EmployerProfileAPITests(APITestCase):
     def test_longitude_below_negative_180_is_rejected(self):
         self.authenticate_as(self.employer, "EmployerPassword123!")
         response = self.client.patch(self.employer_url, {"longitude": "-180.5"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("longitude", response.data)
+
+    def test_employer_latitude_without_longitude_is_rejected(self):
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.patch(self.employer_url, {"latitude": "27.700000"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("latitude", response.data)
+
+    def test_employer_longitude_without_latitude_is_rejected(self):
+        self.authenticate_as(self.employer, "EmployerPassword123!")
+        response = self.client.patch(self.employer_url, {"longitude": "85.300000"}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("longitude", response.data)
