@@ -8,15 +8,14 @@ The report-ready PNG files live in [`appendix-c/screenshots/`](appendix-c/screen
 Regenerate them after any visible UI/data change; do not mix captures from
 different commits.
 
-The generated UI set is complete and contains these 15 files:
+The current screenshot directory contains these 14 files:
 
 - `c01-public-landing.png`
 - `c02-public-job-discovery.png`
-- `c03-worker-profile-skills.png`
+- `c03a-worker-profile-photo-basics.png`
+- `c03b-worker-profile-location-skills.png`
 - `c04-worker-job-recommendations.png`
-- `c05a-opportunity-near-miss.png`
-- `c05b-opportunity-skill-gap.png`
-- `c06-worker-applications-ratings.png`
+- `c05-opportunity-advisory-empty-state.png`
 - `c07-generated-worker-cv.png`
 - `c08-employer-job-management.png`
 - `c09-employer-application-lifecycle.png`
@@ -26,10 +25,9 @@ The generated UI set is complete and contains these 15 files:
 - `c12b-admin-taxonomy-moderation.png`
 - `c13-mobile-job-discovery.png`
 
-Figures C05 and C12 intentionally use two readable screenshots each. The
-desktop files are 1440x900 and C13 is 390x844. They were generated from fresh,
-isolated browser profiles; the capture script rejected visible secrets,
-passwords, tokens, browser autofill overlays, and page errors.
+Figures C03 and C12 use two readable screenshots each. Figure C06 remains a
+capture target but is not currently present in the directory. C13 is the
+mobile capture; the remaining files are desktop captures.
 
 ## Prepare a clean capture state
 
