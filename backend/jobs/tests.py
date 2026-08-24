@@ -173,6 +173,61 @@ class JobPostCreationTests(JobPostAPITestsBase):
         preferred_ids = set(job.preferred_skills.values_list("id", flat=True))
         self.assertEqual(required_ids & preferred_ids, set())
 
+    def test_fuzzy_skill_match_returns_review_details(self):
+        access_card = SkillTag.objects.create(
+            subcategory=self.subcategory,
+            name="Access Card Management",
+        )
+        self.authenticate_as(self.verified_employer_user, "EmployerPassword123!")
+        payload = {
+            **self.valid_payload,
+            "required_skills_input": ["Aces card mangmnt"],
+        }
+
+        response = self.client.post(self.list_create_url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(list(JobPost.objects.get().required_skills.all()), [access_card])
+        match = response.data["required_skill_matches"][0]
+        self.assertEqual(match["input_term"], "Aces card mangmnt")
+        self.assertEqual(match["method"], "fuzzy")
+        self.assertEqual(match["matched_skill"]["name"], "Access Card Management")
+        self.assertGreaterEqual(match["confidence"], 85)
+
+    def test_employer_can_remove_fuzzy_match_and_send_original_for_review(self):
+        access_card = SkillTag.objects.create(
+            subcategory=self.subcategory,
+            name="Access Card Management",
+        )
+        self.authenticate_as(self.verified_employer_user, "EmployerPassword123!")
+        create_response = self.client.post(
+            self.list_create_url,
+            {**self.valid_payload, "required_skills_input": ["Aces card mangmnt"]},
+            format="json",
+        )
+        job = JobPost.objects.get()
+        self.assertIn(access_card, job.required_skills.all())
+
+        response = self.client.patch(
+            reverse("jobs:detail", args=[job.id]),
+            {
+                "required_skills_input": [],
+                "required_skills_review_input": ["Aces card mangmnt"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        job.refresh_from_db()
+        self.assertEqual(job.required_skills.count(), 0)
+        self.assertEqual(response.data["unmatched_required_terms"], ["Aces card mangmnt"])
+        self.assertTrue(
+            UnmatchedSkillTerm.objects.filter(
+                normalized_term="aces card mangmnt",
+                status=UnmatchedSkillTerm.Status.PENDING,
+            ).exists()
+        )
+
     def test_unmatched_skill_phrase_is_reported_and_not_stored_as_a_skill(self):
         self.authenticate_as(self.verified_employer_user, "EmployerPassword123!")
         payload = {**self.valid_payload, "required_skills_input": ["completely unrelated gibberish"]}

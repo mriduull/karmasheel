@@ -4,7 +4,13 @@ from rest_framework import serializers
 
 from profiles.models import WorkerProfile
 from profiles.serializers import SkillTagSummarySerializer
-from taxonomy.services import normalize_skill_phrases
+from taxonomy.services import (
+    get_similar_skill_suggestions,
+    normalize_skill_phrase,
+    normalize_skill_phrases,
+    preprocess_skill_phrase,
+    record_skill_for_review,
+)
 
 from .models import JobPost
 
@@ -35,8 +41,21 @@ class JobPostSerializer(serializers.ModelSerializer):
         required=False,
     )
 
+    required_skills_review_input = serializers.ListField(
+        child=serializers.CharField(max_length=150),
+        write_only=True,
+        required=False,
+    )
+    preferred_skills_review_input = serializers.ListField(
+        child=serializers.CharField(max_length=150),
+        write_only=True,
+        required=False,
+    )
+
     unmatched_required_terms = serializers.SerializerMethodField()
     unmatched_preferred_terms = serializers.SerializerMethodField()
+    required_skill_matches = serializers.SerializerMethodField()
+    preferred_skill_matches = serializers.SerializerMethodField()
 
     category_name = serializers.CharField(source="category.name", read_only=True)
     subcategory_name = serializers.CharField(source="subcategory.name", read_only=True)
@@ -56,8 +75,12 @@ class JobPostSerializer(serializers.ModelSerializer):
             "preferred_skills",
             "required_skills_input",
             "preferred_skills_input",
+            "required_skills_review_input",
+            "preferred_skills_review_input",
             "unmatched_required_terms",
             "unmatched_preferred_terms",
+            "required_skill_matches",
+            "preferred_skill_matches",
             "description",
             "address",
             "latitude",
@@ -84,6 +107,39 @@ class JobPostSerializer(serializers.ModelSerializer):
 
     def get_unmatched_preferred_terms(self, instance):
         return getattr(self, "_unmatched_preferred_terms", [])
+
+    def get_required_skill_matches(self, instance):
+        return getattr(self, "_required_skill_matches", [])
+
+    def get_preferred_skill_matches(self, instance):
+        return getattr(self, "_preferred_skill_matches", [])
+
+    def _skill_match_summary(self, phrase, result):
+        suggestions = []
+        if result.method != "exact_name":
+            candidate = result.skill or result.candidate
+            subcategory_id = candidate.subcategory_id if candidate is not None else None
+            for skill, confidence in get_similar_skill_suggestions(
+                phrase,
+                limit=5,
+                subcategory_id=subcategory_id,
+            ):
+                suggestion = dict(SkillTagSummarySerializer(skill).data)
+                suggestion["confidence"] = round(confidence, 2)
+                suggestions.append(suggestion)
+
+        return {
+            "input_term": phrase,
+            "method": result.method,
+            "confidence": round(result.confidence, 2),
+            "matched_skill": (
+                SkillTagSummarySerializer(result.skill).data
+                if result.skill is not None
+                else None
+            ),
+            "matched_skill_was_selected": result.skill is not None,
+            "suggestions": suggestions,
+        }
 
     def validate(self, attrs):
         category = attrs.get("category") or getattr(self.instance, "category", None)
@@ -149,37 +205,100 @@ class JobPostSerializer(serializers.ModelSerializer):
 
         return value
 
-    def _apply_skill_inputs(self, instance, required_input, preferred_input):
+    def _resolve_skill_input(self, phrases, review_phrases, *, user):
+        review_phrases = review_phrases or []
+        reviewed = {preprocess_skill_phrase(phrase) for phrase in review_phrases}
+        matched = []
+        unmatched = []
+        matches = []
+
+        for phrase in phrases or []:
+            is_reviewed = preprocess_skill_phrase(phrase) in reviewed
+            result = normalize_skill_phrase(
+                phrase,
+                user=user,
+                record_unmatched=not is_reviewed,
+            )
+            matches.append(self._skill_match_summary(phrase, result))
+            if result.skill is not None and not is_reviewed:
+                matched.append(result.skill)
+            else:
+                unmatched.append(phrase)
+
+        recorded = set()
+        for phrase in review_phrases:
+            normalized = preprocess_skill_phrase(phrase)
+            if not normalized or normalized in recorded:
+                continue
+            record_skill_for_review(phrase, user=user)
+            recorded.add(normalized)
+            if normalized not in {preprocess_skill_phrase(term) for term in unmatched}:
+                unmatched.append(phrase)
+
+        return matched, unmatched, matches
+
+    def _apply_skill_inputs(
+        self,
+        instance,
+        required_input,
+        preferred_input,
+        required_review_input=None,
+        preferred_review_input=None,
+    ):
         request = self.context.get("request")
         user = request.user if request else None
 
         self._unmatched_required_terms = []
         self._unmatched_preferred_terms = []
+        self._required_skill_matches = []
+        self._preferred_skill_matches = []
 
-        if required_input is not None:
-            matched, unmatched = normalize_skill_phrases(required_input, user=user)
+        if required_input is not None or required_review_input is not None:
+            matched, unmatched, matches = self._resolve_skill_input(
+                required_input or [], required_review_input, user=user
+            )
             instance.required_skills.set(matched)
             self._unmatched_required_terms = unmatched
+            self._required_skill_matches = matches
 
-        if preferred_input is not None:
-            matched, unmatched = normalize_skill_phrases(preferred_input, user=user)
+        if preferred_input is not None or preferred_review_input is not None:
+            matched, unmatched, matches = self._resolve_skill_input(
+                preferred_input or [], preferred_review_input, user=user
+            )
             instance.preferred_skills.set(matched)
             self._unmatched_preferred_terms = unmatched
+            self._preferred_skill_matches = matches
 
     @transaction.atomic
     def create(self, validated_data):
         required_input = validated_data.pop("required_skills_input", None)
         preferred_input = validated_data.pop("preferred_skills_input", None)
+        required_review_input = validated_data.pop("required_skills_review_input", None)
+        preferred_review_input = validated_data.pop("preferred_skills_review_input", None)
         instance = super().create(validated_data)
-        self._apply_skill_inputs(instance, required_input, preferred_input)
+        self._apply_skill_inputs(
+            instance,
+            required_input,
+            preferred_input,
+            required_review_input,
+            preferred_review_input,
+        )
         return instance
 
     @transaction.atomic
     def update(self, instance, validated_data):
         required_input = validated_data.pop("required_skills_input", None)
         preferred_input = validated_data.pop("preferred_skills_input", None)
+        required_review_input = validated_data.pop("required_skills_review_input", None)
+        preferred_review_input = validated_data.pop("preferred_skills_review_input", None)
         instance = super().update(instance, validated_data)
-        self._apply_skill_inputs(instance, required_input, preferred_input)
+        self._apply_skill_inputs(
+            instance,
+            required_input,
+            preferred_input,
+            required_review_input,
+            preferred_review_input,
+        )
         return instance
 
 

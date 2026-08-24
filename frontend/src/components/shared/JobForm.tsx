@@ -18,9 +18,9 @@ import { ErrorBanner } from '@/components/primitives/ErrorBanner'
 import { CategorySelect } from './CategorySelect'
 import { SubcategorySelect } from './SubcategorySelect'
 import { SkillChipInput, type SkillChipInputHandle } from './SkillChipInput'
-import { UnmatchedTermNotice } from './UnmatchedTermNotice'
 import { JobLocationFields } from './JobLocationFields'
 import { JobFormSection } from './JobFormSection'
+import { JobSkillDecisionScreen } from './JobSkillDecisionScreen'
 
 const WAGE_TYPES: WageType[] = ['HOURLY', 'DAILY', 'MONTHLY', 'FIXED']
 const WORK_TYPES: WorkType[] = ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'ONE_TIME']
@@ -54,8 +54,6 @@ export function JobForm({ mode, job }: JobFormProps) {
     () => job?.preferred_skills.map((skill) => skill.name) ?? [],
   )
   const [savedJob, setSavedJob] = useState<EmployerJobPost | null>(null)
-  const [unmatchedRequired, setUnmatchedRequired] = useState<string[]>([])
-  const [unmatchedPreferred, setUnmatchedPreferred] = useState<string[]>([])
   const [inferenceInput, setInferenceInput] = useState<JobTaxonomyInferenceRequest | null>(null)
 
   const {
@@ -193,12 +191,15 @@ export function JobForm({ mode, job }: JobFormProps) {
       await queryClient.invalidateQueries({ queryKey: MY_JOBS_QUERY_KEY })
       queryClient.setQueryData(ownerJobQueryKey(result.id), result)
 
-      if (result.unmatched_required_terms.length > 0 || result.unmatched_preferred_terms.length > 0) {
+      const hasReviewableMatches = [
+        ...result.required_skill_matches,
+        ...result.preferred_skill_matches,
+      ].some((match) => match.matched_skill !== null && match.method !== 'exact_name')
+
+      if (result.unmatched_required_terms.length > 0 || result.unmatched_preferred_terms.length > 0 || hasReviewableMatches) {
         // Stay on this screen long enough for the unmatched-term notice
         // to actually be seen, rather than redirecting it away instantly.
         setSavedJob(result)
-        setUnmatchedRequired(result.unmatched_required_terms)
-        setUnmatchedPreferred(result.unmatched_preferred_terms)
       } else {
         navigate(`/employer/jobs/${result.id}`, { replace: true })
       }
@@ -231,19 +232,7 @@ export function JobForm({ mode, job }: JobFormProps) {
   }
 
   if (savedJob) {
-    return (
-      <div className="flex flex-col gap-4">
-        <div role="status" className="rounded-md bg-success-bg p-4 text-success-text">
-          <p className="font-semibold">
-            {mode === 'create' ? 'Job published.' : 'Job updated.'}
-          </p>
-        </div>
-        <UnmatchedTermNotice terms={[...unmatchedRequired, ...unmatchedPreferred]} />
-        <Button variant="primary" onClick={() => navigate(`/employer/jobs/${savedJob.id}`)}>
-          View Job
-        </Button>
-      </div>
-    )
+    return <JobSkillDecisionScreen job={savedJob} wasCreated={mode === 'create'} />
   }
 
   return (

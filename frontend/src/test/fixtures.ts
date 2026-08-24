@@ -121,6 +121,8 @@ export function buildEmployerJobFixture(overrides: Partial<EmployerJobPost> = {}
     preferred_skills: [{ id: 4, name: 'Electrical Repair', subcategory: 'Electrical' }],
     unmatched_required_terms: [],
     unmatched_preferred_terms: [],
+    required_skill_matches: [],
+    preferred_skill_matches: [],
     description: 'Complete wiring and breaker installation for a new four-unit apartment block.',
     address: 'Baneshwor, Kathmandu',
     latitude: '27.693800',

@@ -273,6 +273,57 @@ describe('JobForm', () => {
       expect(screen.getByRole('button', { name: 'View Job' })).toBeInTheDocument()
     })
 
+    it('lets an employer review a fuzzy skill match and send the original phrase to admin review', async () => {
+      const user = userEvent.setup()
+      const accessCard = { id: 20, name: 'Access Card Management', subcategory: 'Electrical' }
+      let patchBody: Record<string, unknown> | null = null
+      server.use(
+        http.post(`${API_ROOT}/jobs/`, () =>
+          HttpResponse.json(buildEmployerJobFixture({
+            id: 77,
+            required_skills: [accessCard],
+            preferred_skills: [],
+            required_skill_matches: [{
+              input_term: 'Aces card mangmnt',
+              method: 'fuzzy',
+              confidence: 87.18,
+              matched_skill: accessCard,
+              matched_skill_was_selected: true,
+              suggestions: [{ ...accessCard, confidence: 87.18 }],
+            }],
+          })),
+        ),
+        http.patch(`${API_ROOT}/jobs/77/`, async ({ request }) => {
+          patchBody = (await request.json()) as Record<string, unknown>
+          return HttpResponse.json(buildEmployerJobFixture({
+            id: 77,
+            required_skills: [],
+            preferred_skills: [],
+            unmatched_required_terms: ['Aces card mangmnt'],
+          }))
+        }),
+      )
+
+      renderWithProviders(<JobForm mode="create" />)
+      await fillRequiredBasics(user)
+      const input = screen.getByLabelText('Required skills')
+      await user.type(input, 'Aces card mangmnt')
+      await user.click(within(input.closest('div') as HTMLElement).getByRole('button', { name: 'Add' }))
+      await user.click(screen.getByRole('button', { name: 'Publish job' }))
+
+      expect(await screen.findByRole('region', { name: 'Review match for Aces card mangmnt' })).toBeInTheDocument()
+      expect(screen.getByText(/matched to/i)).toHaveTextContent('Access Card Management')
+      await user.click(screen.getByRole('button', { name: 'Remove this match and send original for review' }))
+      await user.click(screen.getByRole('button', { name: 'Save skill decisions' }))
+
+      await waitFor(() => expect(patchBody).not.toBeNull())
+      expect(patchBody).toMatchObject({
+        required_skills_input: [],
+        required_skills_review_input: ['Aces card mangmnt'],
+      })
+      expect(await screen.findByText('Skill decisions saved.')).toBeInTheDocument()
+    })
+
     it('shows a verification-specific message on a 403 without crashing', async () => {
       const user = userEvent.setup()
       server.use(
