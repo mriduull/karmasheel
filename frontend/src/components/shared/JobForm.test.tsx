@@ -22,6 +22,7 @@ const EMPLOYER_USER = {
 
 function mockTaxonomy() {
   server.use(
+    http.get(`${API_ROOT}/jobs/`, () => HttpResponse.json([])),
     http.get(`${API_ROOT}/taxonomy/categories/`, () => HttpResponse.json(CATEGORY_FIXTURES)),
     http.get(`${API_ROOT}/taxonomy/subcategories/`, ({ request }) => {
       const url = new URL(request.url)
@@ -287,6 +288,92 @@ describe('JobForm', () => {
       expect(
         await screen.findByText('Application deadline cannot be in the past.'),
       ).toBeInTheDocument()
+    })
+
+    it('requires the application deadline to be earlier than the scheduled start', async () => {
+      const user = userEvent.setup()
+      let postCalled = false
+      server.use(
+        http.post(`${API_ROOT}/jobs/`, () => {
+          postCalled = true
+          return HttpResponse.json(buildEmployerJobFixture())
+        }),
+      )
+
+      renderWithProviders(<JobForm mode="create" />)
+      await fillRequiredBasics(user)
+      await user.type(screen.getByLabelText('Scheduled start'), '2099-08-27T15:00')
+      await user.type(screen.getByLabelText('Application deadline'), '2099-08-29T15:00')
+
+      await user.click(screen.getByRole('button', { name: 'Publish job' }))
+
+      expect(
+        await screen.findByText('Application deadline must be earlier than the scheduled start.'),
+      ).toBeInTheDocument()
+      expect(postCalled).toBe(false)
+    })
+
+    it('duplicates reusable details from a previous job but leaves both dates blank', async () => {
+      const user = userEvent.setup()
+      const previousJob = buildEmployerJobFixture({
+        id: 42,
+        title: 'Electrician Needed for House Wiring',
+        description: 'Need an electrician for house wiring and switch installation.',
+        required_skills: [{ id: 2, name: 'House Wiring', subcategory: 'Electrical' }],
+        preferred_skills: [{ id: 8, name: 'Switch Installation', subcategory: 'Electrical' }],
+        address: 'Patan, Lalitpur',
+        latitude: '27.683219',
+        longitude: '85.327463',
+        wage_type: 'DAILY',
+        wage_amount: '1800.00',
+        work_type: 'ONE_TIME',
+        required_experience_years: 1,
+        number_of_workers_required: 1,
+        duration_days: 1,
+        scheduled_datetime: '2099-08-27T09:15:00Z',
+        application_deadline: '2099-08-26T09:15:00Z',
+      })
+      server.use(http.get(`${API_ROOT}/jobs/`, () => HttpResponse.json([previousJob])))
+
+      renderWithProviders(<JobForm mode="create" />)
+
+      await user.type(screen.getByLabelText('Required skills'), 'stale required draft')
+      await user.type(screen.getByLabelText('Preferred skills'), 'stale preferred draft')
+      const previousJobSelect = await screen.findByLabelText('Previous job')
+      await within(previousJobSelect).findByRole('option', { name: previousJob.title })
+      await user.selectOptions(previousJobSelect, String(previousJob.id))
+      await user.click(screen.getByRole('button', { name: 'Use Previous Job' }))
+
+      expect(screen.getByLabelText('Title')).toHaveValue(previousJob.title)
+      expect(screen.getByLabelText('Description')).toHaveValue(previousJob.description)
+      expect(screen.getByLabelText('Address')).toHaveValue('Patan, Lalitpur')
+      expect(screen.getByLabelText('Latitude')).toHaveValue('27.683219')
+      expect(screen.getByLabelText('Longitude')).toHaveValue('85.327463')
+      expect(screen.getByLabelText('Wage type')).toHaveValue('DAILY')
+      expect(screen.getByLabelText('Wage amount')).toHaveValue('1800.00')
+      expect(screen.getByLabelText('Work type')).toHaveValue('ONE_TIME')
+      expect(screen.getByLabelText('Required experience (years)')).toHaveValue('1')
+      expect(screen.getByLabelText('Number of workers needed')).toHaveValue('1')
+      expect(screen.getByLabelText('Duration (days)')).toHaveValue('1')
+      expect(screen.getByRole('button', { name: 'Remove House Wiring' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Remove Switch Installation' })).toBeInTheDocument()
+      expect(screen.getByLabelText('Required skills')).toHaveValue('')
+      expect(screen.getByLabelText('Preferred skills')).toHaveValue('')
+      expect(screen.getByLabelText('Scheduled start')).toHaveValue('')
+      expect(screen.getByLabelText('Application deadline')).toHaveValue('')
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Enter a new scheduled start and application deadline before publishing.',
+      )
+    })
+
+    it('renders em dashes without mojibake', async () => {
+      const { container } = renderWithProviders(<JobForm mode="create" />)
+
+      expect(
+        screen.getByText(/publish it — there is no draft state/i),
+      ).toBeInTheDocument()
+      expect(screen.getByText('Optional — leave blank to remove')).toBeInTheDocument()
+      expect(container).not.toHaveTextContent('\u00e2')
     })
 
     it('adds and removes skill chips, submitting them as required_skills_input/preferred_skills_input', async () => {
@@ -558,6 +645,32 @@ describe('JobForm', () => {
       await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
       expect(screen.queryByText('Application deadline cannot be in the past.')).not.toBeInTheDocument()
+    })
+
+    it('still validates deadline order on edit', async () => {
+      const user = userEvent.setup()
+      let patchCalled = false
+      const job = buildEmployerJobFixture({
+        id: 9,
+        scheduled_datetime: '2099-08-27T09:15:00Z',
+        application_deadline: '2099-08-29T09:15:00Z',
+      })
+
+      server.use(
+        http.patch(`${API_ROOT}/jobs/9/`, () => {
+          patchCalled = true
+          return HttpResponse.json(job)
+        }),
+      )
+
+      renderWithProviders(<JobForm mode="edit" job={job} />)
+      await screen.findByDisplayValue(job.title)
+      await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+      expect(
+        await screen.findByText('Application deadline must be earlier than the scheduled start.'),
+      ).toBeInTheDocument()
+      expect(patchCalled).toBe(false)
     })
   })
 

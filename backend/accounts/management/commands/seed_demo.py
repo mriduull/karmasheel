@@ -4,7 +4,7 @@ Builds a coherent, idempotent demonstration dataset on top of the
 standardized taxonomy (reusing `seed_taxonomy` rather than duplicating
 it): a superuser, three verified employers and one pending employer, ten
 workers with deliberately different skills/experience/location/
-availability/wage/reliability profiles, a dozen active jobs spanning
+availability/wage/reliability profiles, more than a dozen active jobs spanning
 electrical, plumbing, masonry, painting, cleaning, cooking, hospitality,
 driving/delivery and caregiving work, applications covering every legal
 status in the application state machine (including one full
@@ -30,7 +30,9 @@ passed - this is synthetic local-development data and must never land in
 a production database by accident.
 """
 
+from datetime import datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -49,6 +51,7 @@ from taxonomy.services import normalize_skill_phrase
 User = get_user_model()
 
 DEMO_PASSWORD = "DemoPass123!"
+NEPAL_TIME_ZONE = ZoneInfo("Asia/Kathmandu")
 
 
 class Command(BaseCommand):
@@ -524,7 +527,28 @@ class Command(BaseCommand):
     # Jobs
     # ------------------------------------------------------------------
 
-    def _job(self, *, title, category_name, subcategory_name, required, preferred, description, address, latitude, longitude, required_experience_years, wage_type, wage_amount, work_type, number_of_workers_required=1, employer=None):
+    def _job(
+        self,
+        *,
+        title,
+        category_name,
+        subcategory_name,
+        required,
+        preferred,
+        description,
+        address,
+        latitude,
+        longitude,
+        required_experience_years,
+        wage_type,
+        wage_amount,
+        work_type,
+        number_of_workers_required=1,
+        scheduled_datetime=None,
+        duration_days=None,
+        application_deadline=None,
+        employer=None,
+    ):
         category = Category.objects.get(name=category_name)
         subcategory = Subcategory.objects.get(category=category, name=subcategory_name)
 
@@ -542,8 +566,14 @@ class Command(BaseCommand):
                 "wage_type": wage_type,
                 "wage_amount": Decimal(wage_amount),
                 "work_type": work_type,
+                "scheduled_datetime": scheduled_datetime,
+                "duration_days": duration_days,
                 "number_of_workers_required": number_of_workers_required,
-                "application_deadline": timezone.now() + timezone.timedelta(days=30),
+                "application_deadline": (
+                    application_deadline
+                    if application_deadline is not None
+                    else timezone.now() + timezone.timedelta(days=30)
+                ),
                 "status": JobPost.Status.ACTIVE,
             },
         )
@@ -689,6 +719,35 @@ class Command(BaseCommand):
             employer=self.employer_retail,
         )
 
+        # A deterministic copy of the electrician posting used while
+        # exercising the employer job form. Keeping the exact local Nepal
+        # schedule makes the record useful for repeatable manual checks of
+        # date/time rendering as well as skill and taxonomy mapping.
+        self.job_user_electrician, user_electrician_created = self._job(
+            title="Electrician Needed for House Wiring",
+            category_name=construction,
+            subcategory_name="Electrical",
+            required=["House Wiring"],
+            preferred=["Switchboard Installation"],
+            description="Need an electrician for house wiring and switch installation.",
+            address="Patan, Lalitpur",
+            latitude="27.683219",
+            longitude="85.327463",
+            required_experience_years=1,
+            wage_type=JobPost.WageType.DAILY,
+            wage_amount="1800.00",
+            work_type=JobPost.WorkType.ONE_TIME,
+            scheduled_datetime=datetime(
+                2026, 8, 27, 15, 0, tzinfo=NEPAL_TIME_ZONE
+            ),
+            duration_days=1,
+            number_of_workers_required=1,
+            application_deadline=datetime(
+                2026, 8, 26, 15, 0, tzinfo=NEPAL_TIME_ZONE
+            ),
+            employer=self.employer_retail,
+        )
+
         # The worker already has an application history for the primary
         # House Wiring job, and recommendation candidates intentionally
         # exclude jobs that cannot be applied to again. This additional
@@ -826,6 +885,7 @@ class Command(BaseCommand):
             (self.job_plumbing.title, plumbing_created),
             (self.job_wiring2.title, wiring2_created),
             (self.job_switchboard.title, switchboard_created),
+            (self.job_user_electrician.title, user_electrician_created),
             (self.job_electrical_maintenance.title, electrical_maintenance_created),
             (self.job_masonry2.title, masonry2_created),
             (self.job_masonry3.title, masonry3_created),

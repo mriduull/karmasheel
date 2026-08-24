@@ -145,6 +145,30 @@ class JobPostSerializer(serializers.ModelSerializer):
         category = attrs.get("category") or getattr(self.instance, "category", None)
         subcategory = attrs.get("subcategory") or getattr(self.instance, "subcategory", None)
 
+        scheduled_datetime = (
+            attrs["scheduled_datetime"]
+            if "scheduled_datetime" in attrs
+            else getattr(self.instance, "scheduled_datetime", None)
+        )
+        application_deadline = (
+            attrs["application_deadline"]
+            if "application_deadline" in attrs
+            else getattr(self.instance, "application_deadline", None)
+        )
+
+        if (
+            scheduled_datetime is not None
+            and application_deadline is not None
+            and application_deadline >= scheduled_datetime
+        ):
+            raise serializers.ValidationError(
+                {
+                    "application_deadline": (
+                        "Application deadline must be earlier than the scheduled start."
+                    )
+                }
+            )
+
         if category and subcategory and subcategory.category_id != category.id:
             raise serializers.ValidationError(
                 {"subcategory": "This subcategory does not belong to the selected category."}

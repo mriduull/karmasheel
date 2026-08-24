@@ -12,6 +12,7 @@ interface SkillChipInputProps {
 
 export interface SkillChipInputHandle {
   commitDraft: () => string[] | null
+  clearDraft: () => void
 }
 
 /**
@@ -60,6 +61,10 @@ export const SkillChipInput = forwardRef<SkillChipInputHandle, SkillChipInputPro
 
     useImperativeHandle(ref, () => ({
       commitDraft: commitDraftIfPresent,
+      clearDraft: () => {
+        setDraft('')
+        setError(null)
+      },
     }))
 
     const addDraft = () => {
