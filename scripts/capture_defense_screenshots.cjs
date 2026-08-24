@@ -13,6 +13,11 @@
  *   # terminal 3, from repository root
  *   node scripts/capture_defense_screenshots.cjs
  *
+ * Optional capture variants:
+ *   CAPTURE_OUTPUT_DIR=docs/appendix-c/screenshots-2026-08-24
+ *   CAPTURE_DESKTOP_WIDTH=1440 CAPTURE_DESKTOP_HEIGHT=1080 CAPTURE_ZOOM=1.25
+ *   CAPTURE_FRAME_MOBILE=true  # keep C13 responsive inside the 4:3 canvas
+ *
  * The script prefers a project-local Playwright package. If none is present,
  * it installs Playwright in the OS temporary directory (not package.json or
  * package-lock.json) and uses the system Chrome/Edge binary. Browser contexts
@@ -27,20 +32,50 @@ const path = require('node:path')
 const { execFileSync } = require('node:child_process')
 
 const repoRoot = path.resolve(__dirname, '..')
-const outputDir = path.join(repoRoot, 'docs', 'appendix-c', 'screenshots')
+const configuredOutputDir = process.env.CAPTURE_OUTPUT_DIR
+const outputDir = configuredOutputDir
+  ? path.resolve(repoRoot, configuredOutputDir)
+  : path.join(repoRoot, 'docs', 'appendix-c', 'screenshots')
 const frontendOrigin = process.env.CAPTURE_FRONTEND_ORIGIN || 'http://127.0.0.1:5173'
 const backendOrigin = process.env.CAPTURE_BACKEND_ORIGIN || 'http://127.0.0.1:8000'
 const demoPassword = process.env.CAPTURE_DEMO_PASSWORD || 'DemoPass123!'
 const playwrightVersion = '1.62.1'
 const temporaryRunner = path.join(os.tmpdir(), 'karmasheel-playwright-runner')
 
-const desktopViewport = { width: 1440, height: 900 }
-const mobileViewport = { width: 390, height: 844 }
+function positiveNumber(name, fallback) {
+  const raw = process.env[name]
+  if (raw === undefined) return fallback
+  const value = Number(raw)
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${name} must be a positive number`)
+  }
+  return value
+}
+
+function positiveInteger(name, fallback) {
+  const value = positiveNumber(name, fallback)
+  if (!Number.isInteger(value)) throw new Error(`${name} must be a whole number`)
+  return value
+}
+
+const desktopViewport = {
+  width: positiveInteger('CAPTURE_DESKTOP_WIDTH', 1440),
+  height: positiveInteger('CAPTURE_DESKTOP_HEIGHT', 900),
+}
+const mobileViewport = {
+  width: positiveInteger('CAPTURE_MOBILE_WIDTH', 390),
+  height: positiveInteger('CAPTURE_MOBILE_HEIGHT', 844),
+}
+const captureZoom = positiveNumber('CAPTURE_ZOOM', 1)
+const frameMobileCapture = ['1', 'true', 'yes', 'on'].includes(
+  (process.env.CAPTURE_FRAME_MOBILE || '').trim().toLowerCase(),
+)
 
 const outputFiles = {
   landing: 'c01-public-landing.png',
   jobs: 'c02-public-job-discovery.png',
-  workerProfile: 'c03-worker-profile-skills.png',
+  workerProfileBasics: 'c03a-worker-profile-photo-basics.png',
+  workerProfileSkills: 'c03b-worker-profile-location-skills.png',
   workerRecommendations: 'c04-worker-job-recommendations.png',
   opportunityNearMiss: 'c05a-opportunity-near-miss.png',
   opportunitySkills: 'c05b-opportunity-skill-gap.png',
@@ -184,9 +219,22 @@ async function settle(page, expectedText) {
     )
   }
   await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {})
+  await page.waitForFunction(
+    () =>
+      !Array.from(document.querySelectorAll('.animate-pulse')).some(
+        (element) => element.getClientRects().length > 0,
+      ),
+    undefined,
+    { timeout: 20_000 },
+  )
   await page.evaluate(async () => {
     if (document.fonts?.ready) await document.fonts.ready
   })
+  if (captureZoom !== 1) {
+    await page.evaluate((zoom) => {
+      document.documentElement.style.zoom = String(zoom)
+    }, captureZoom)
+  }
   await page.waitForTimeout(250)
 }
 
@@ -241,13 +289,13 @@ async function screenshot(page, filename) {
     width: window.innerWidth,
     height: window.innerHeight,
   }))
-  console.log(`Captured ${filename} (${width}x${height})`)
+  console.log(`Captured ${filename} (${width}x${height}, zoom ${captureZoom})`)
 }
 
 async function capturePublic(browser) {
   const { context, page } = await newPage(browser)
   try {
-    await goto(page, '/', 'Find honest local work')
+    await goto(page, '/', 'Find work that fits. Find workers who fit.')
     await screenshot(page, outputFiles.landing)
 
     await goto(page, '/jobs', 'Browse Jobs')
@@ -259,14 +307,71 @@ async function capturePublic(browser) {
     await context.close()
   }
 
-  const mobile = await newPage(browser, { viewport: mobileViewport })
-  try {
-    await goto(mobile.page, '/jobs', 'Browse Jobs')
-    await mobile.page.evaluate(() => window.scrollTo(0, 330))
-    await mobile.page.waitForTimeout(200)
-    await screenshot(mobile.page, outputFiles.mobileJobs)
-  } finally {
-    await mobile.context.close()
+  if (frameMobileCapture) {
+    const mobile = await newPage(browser, { viewport: desktopViewport })
+    try {
+      const frameScale = Math.min(
+        (desktopViewport.width - 96) / mobileViewport.width,
+        (desktopViewport.height - 96) / mobileViewport.height,
+        1.15,
+      )
+      // Establish a same-origin top-level document before adding the iframe.
+      // Chrome otherwise treats the about:blank wrapper as an opaque origin
+      // and denies the app access to its localStorage during bootstrap.
+      await mobile.page.goto(`${frontendOrigin}/`, { waitUntil: 'domcontentloaded' })
+      await mobile.page.setContent(`
+        <!doctype html>
+        <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <style>
+              html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+              body {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #f4efe5;
+              }
+              iframe {
+                width: ${mobileViewport.width}px;
+                height: ${mobileViewport.height}px;
+                border: 1px solid rgba(74, 55, 40, 0.2);
+                border-radius: 18px;
+                background: white;
+                box-shadow: 0 18px 50px rgba(74, 55, 40, 0.2);
+                transform: scale(${frameScale});
+              }
+            </style>
+          </head>
+          <body><iframe title="Mobile job discovery" src="${frontendOrigin}/jobs"></iframe></body>
+        </html>
+      `)
+      const frame = mobile.page.frameLocator('iframe[title="Mobile job discovery"]')
+      await frame.getByRole('heading', { name: 'Browse Jobs' }).waitFor({ timeout: 20_000 })
+      const framePage = mobile.page
+        .frames()
+        .find(
+          (candidate) =>
+            candidate !== mobile.page.mainFrame() && candidate.url().startsWith(`${frontendOrigin}/jobs`),
+        )
+      if (!framePage) throw new Error('The framed mobile job page did not load')
+      await settle(framePage, 'Browse Jobs')
+      await framePage.evaluate(() => window.scrollTo(0, 330))
+      await mobile.page.waitForTimeout(200)
+      await screenshot(mobile.page, outputFiles.mobileJobs)
+    } finally {
+      await mobile.context.close()
+    }
+  } else {
+    const mobile = await newPage(browser, { viewport: mobileViewport })
+    try {
+      await goto(mobile.page, '/jobs', 'Browse Jobs')
+      await mobile.page.evaluate(() => window.scrollTo(0, 330))
+      await mobile.page.waitForTimeout(200)
+      await screenshot(mobile.page, outputFiles.mobileJobs)
+    } finally {
+      await mobile.context.close()
+    }
   }
 }
 
@@ -274,10 +379,13 @@ async function captureWorker(browser) {
   const worker = await newPage(browser, { username: 'demo_worker_electrician' })
   try {
     await goto(worker.page, '/worker/profile', 'Worker Profile')
+    await worker.page.evaluate(() => window.scrollTo(0, 0))
+    await screenshot(worker.page, outputFiles.workerProfileBasics)
+
     const skillsHeading = worker.page.getByRole('heading', { name: 'Skills', exact: true })
     await skillsHeading.scrollIntoViewIfNeeded()
     await worker.page.evaluate(() => window.scrollBy(0, -160))
-    await screenshot(worker.page, outputFiles.workerProfile)
+    await screenshot(worker.page, outputFiles.workerProfileSkills)
 
     await goto(worker.page, '/worker/recommendations', 'Recommended Jobs')
     await worker.page.getByRole('button', { name: 'Why this match?' }).first().click()
@@ -383,6 +491,11 @@ async function captureAdmin(browser) {
 async function main() {
   fs.mkdirSync(outputDir, { recursive: true })
   await assertServicesReady()
+
+  console.log(
+    `Output: ${outputDir}\nDesktop: ${desktopViewport.width}x${desktopViewport.height}; ` +
+      `mobile: ${mobileViewport.width}x${mobileViewport.height}; zoom: ${captureZoom}`,
+  )
 
   const { chromium } = loadPlaywright()
   const executablePath = findBrowserExecutable()
