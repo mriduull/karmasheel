@@ -2,7 +2,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -20,6 +20,7 @@ from taxonomy.models import (
 )
 
 from .models import JobPost
+from .serializers import JobPostSerializer
 from .services import haversine_distance_km
 
 User = get_user_model()
@@ -932,3 +933,226 @@ class JobPostAdminTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertIn("/admin/login/", response.url)
+
+
+@override_settings(DEBUG=True)
+class SeedDemoJobsCommandTests(APITestCase):
+    """Targeted tests for jobs.management.commands.seed_demo_jobs.
+
+    Class-level `DEBUG=True` mirrors normal local-development settings -
+    Django's test runner otherwise forces `DEBUG=False` for every test,
+    which would trip the command's own production-safety guard before any
+    of these tests could exercise its actual seeding behaviour (same
+    pattern as `accounts.tests.SeedDemoCommandTests`). The one test of
+    that guard itself overrides `DEBUG=False` again locally.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.core.management import call_command
+
+        call_command("seed_demo_jobs")
+
+    def _demo_jobs(self):
+        from jobs.management.commands.seed_demo_jobs import USERNAME_PREFIX
+
+        return JobPost.objects.filter(
+            employer__user__username__startswith=USERNAME_PREFIX
+        )
+
+    def _demo_employers(self):
+        from jobs.management.commands.seed_demo_jobs import USERNAME_PREFIX
+
+        return EmployerProfile.objects.filter(
+            user__username__startswith=USERNAME_PREFIX
+        )
+
+    def test_creates_exactly_sixty_demo_jobs(self):
+        self.assertEqual(self._demo_jobs().count(), 60)
+
+    def test_exactly_five_jobs_per_top_level_category_and_all_categories_covered(self):
+        from jobs.management.commands.seed_demo_jobs import DEMO_MARKETPLACE
+
+        self.assertEqual(len(DEMO_MARKETPLACE), 12)
+
+        for category_block in DEMO_MARKETPLACE:
+            category = Category.objects.get(name=category_block["category"])
+            count = self._demo_jobs().filter(category=category).count()
+            self.assertEqual(
+                count, 5, f"{category_block['category']} has {count} demo jobs, expected 5"
+            )
+
+    def test_every_job_references_real_taxonomy_records(self):
+        for job in self._demo_jobs().select_related("category", "subcategory"):
+            # Subcategory must genuinely belong to the job's category - the
+            # same invariant JobPostSerializer.validate() enforces for a
+            # real employer's job post.
+            self.assertEqual(job.subcategory.category_id, job.category_id)
+
+            for skill in list(job.required_skills.all()) + list(job.preferred_skills.all()):
+                self.assertEqual(skill.subcategory_id, job.subcategory_id)
+
+            self.assertGreaterEqual(job.required_skills.count(), 1)
+
+    def test_seeded_jobs_satisfy_job_post_serializer_validation(self):
+        # Independent confirmation, not just trusting the command's own use
+        # of the serializer at creation time: re-validate a sample of
+        # already-saved jobs as if they were being freshly submitted.
+        for job in self._demo_jobs().order_by("id")[:10]:
+            payload = {
+                "title": job.title,
+                "category": job.category_id,
+                "subcategory": job.subcategory_id,
+                "description": job.description,
+                "address": job.address,
+                "latitude": str(job.latitude),
+                "longitude": str(job.longitude),
+                "required_experience_years": job.required_experience_years,
+                "wage_type": job.wage_type,
+                "wage_amount": str(job.wage_amount),
+                "work_type": job.work_type,
+                "number_of_workers_required": job.number_of_workers_required,
+                "application_deadline": job.application_deadline.isoformat(),
+                "required_skills_input": [skill.name for skill in job.required_skills.all()],
+                "preferred_skills_input": [skill.name for skill in job.preferred_skills.all()],
+            }
+            serializer = JobPostSerializer(data=payload)
+            self.assertTrue(
+                serializer.is_valid(), f"{job.title} failed serializer validation: {serializer.errors}"
+            )
+
+    def test_seeded_employers_are_valid_verified_employers(self):
+        employers = self._demo_employers()
+        self.assertEqual(employers.count(), 24)
+
+        for employer in employers:
+            self.assertEqual(employer.verification_status, EmployerProfile.VerificationStatus.VERIFIED)
+            self.assertEqual(employer.user.role, User.Role.EMPLOYER)
+            self.assertTrue(employer.user.is_contact_verified)
+            self.assertTrue(employer.organization_name)
+            self.assertRegex(employer.user.phone_number, r"^\d{10}$")
+
+    def test_job_dates_are_valid(self):
+        now = timezone.now()
+
+        for job in self._demo_jobs():
+            self.assertIsNotNone(job.application_deadline)
+            self.assertGreater(job.application_deadline, now)
+
+            if job.scheduled_datetime is not None:
+                self.assertGreater(job.scheduled_datetime, job.application_deadline)
+
+    def test_wages_are_valid(self):
+        for job in self._demo_jobs():
+            self.assertIn(job.wage_type, JobPost.WageType.values)
+            self.assertGreater(job.wage_amount, Decimal("0"))
+            # Sanity bounds - demo wages must look believable, never absurd.
+            self.assertLess(job.wage_amount, Decimal("100000"))
+
+    def test_locations_are_valid_kathmandu_valley_coordinates(self):
+        for job in self._demo_jobs():
+            self.assertNotEqual((job.latitude, job.longitude), (Decimal("0"), Decimal("0")))
+            self.assertTrue(Decimal("27.0") < job.latitude < Decimal("28.0"))
+            self.assertTrue(Decimal("85.0") < job.longitude < Decimal("86.0"))
+            self.assertTrue(job.address)
+
+        for employer in self._demo_employers():
+            self.assertNotEqual((employer.latitude, employer.longitude), (Decimal("0"), Decimal("0")))
+
+    def test_rerun_does_not_create_duplicates(self):
+        from django.core.management import call_command
+
+        call_command("seed_demo_jobs")
+        call_command("seed_demo_jobs")
+
+        self.assertEqual(self._demo_jobs().count(), 60)
+        self.assertEqual(self._demo_employers().count(), 24)
+
+    def test_rerun_preserves_a_still_valid_existing_deadline(self):
+        from django.core.management import call_command
+
+        job = self._demo_jobs().first()
+        original_deadline = job.application_deadline
+
+        call_command("seed_demo_jobs")
+
+        job.refresh_from_db()
+        self.assertEqual(job.application_deadline, original_deadline)
+
+    def test_refresh_dates_flag_forces_new_deadlines(self):
+        from django.core.management import call_command
+
+        job = self._demo_jobs().first()
+        original_deadline = job.application_deadline
+
+        call_command("seed_demo_jobs", "--refresh-dates")
+
+        job.refresh_from_db()
+        self.assertGreaterEqual(job.application_deadline, original_deadline)
+
+    def test_rerun_does_not_modify_genuine_non_demo_records(self):
+        from django.core.management import call_command
+
+        genuine_user = User.objects.create_user(
+            username="a_real_employer",
+            phone_number="9800099999",
+            password="RealPassword123!",
+            role=User.Role.EMPLOYER,
+        )
+        genuine_employer = EmployerProfile.objects.create(
+            user=genuine_user,
+            organization_name="A Genuine Real Business",
+            verification_status=EmployerProfile.VerificationStatus.VERIFIED,
+            latitude=Decimal("27.700000"),
+            longitude=Decimal("85.300000"),
+        )
+        category = Category.objects.get(name="Construction & Repair")
+        subcategory = Subcategory.objects.filter(category=category).first()
+        genuine_job = JobPost.objects.create(
+            employer=genuine_employer,
+            title="A Genuine Real Job Post",
+            category=category,
+            subcategory=subcategory,
+            description="Created directly by a real employer, not by any seed command.",
+            address="Somewhere Real, Kathmandu",
+            latitude=Decimal("27.700000"),
+            longitude=Decimal("85.300000"),
+            wage_amount=Decimal("999.99"),
+            application_deadline=timezone.now() + timedelta(days=30),
+        )
+
+        call_command("seed_demo_jobs")
+
+        genuine_user.refresh_from_db()
+        genuine_employer.refresh_from_db()
+        genuine_job.refresh_from_db()
+
+        self.assertEqual(genuine_employer.organization_name, "A Genuine Real Business")
+        self.assertEqual(genuine_job.title, "A Genuine Real Job Post")
+        self.assertEqual(genuine_job.wage_amount, Decimal("999.99"))
+        self.assertTrue(User.objects.filter(pk=genuine_user.pk).exists())
+        self.assertTrue(JobPost.objects.filter(pk=genuine_job.pk).exists())
+
+    def test_command_refuses_to_run_without_debug_or_force(self):
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+
+        with override_settings(DEBUG=False):
+            with self.assertRaises(CommandError):
+                call_command("seed_demo_jobs")
+
+    def test_browse_api_returns_seeded_jobs(self):
+        response = self.client.get(reverse("jobs:browse"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        titles = {job["title"] for job in response.data}
+        self.assertIn("Residential Electrician", titles)
+        self.assertGreaterEqual(len(response.data), 60)
+
+    def test_browse_api_can_filter_to_a_demo_category(self):
+        category = Category.objects.get(name="Beauty & Personal Care Services")
+
+        response = self.client.get(reverse("jobs:browse"), {"category": category.id})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 5)
