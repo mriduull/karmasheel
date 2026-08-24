@@ -613,7 +613,12 @@ describe('WorkerProfile', () => {
 
     expect(screen.queryByRole('region', { name: 'Review match for sarkit wiring' }))
       .not.toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent(
+    // Scoped to the Skills form specifically — the Location section (now
+    // LocationPicker-backed) has its own "Location selected." status role
+    // on this page whenever a saved location exists, as it does by default
+    // in `buildWorkerProfileFixture`.
+    const skillsStatusForm = screen.getByLabelText('Your skills').closest('form') as HTMLFormElement
+    expect(within(skillsStatusForm).getByRole('status')).toHaveTextContent(
       'Automatic match kept: Electrical Panel Wiring.',
     )
     expect(stableDecisionButton).toHaveFocus()

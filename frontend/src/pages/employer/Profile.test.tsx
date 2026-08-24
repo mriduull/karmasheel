@@ -61,7 +61,6 @@ describe('EmployerProfile', () => {
         HttpResponse.json(
           buildEmployerProfileFixture({
             organization_name: '',
-            address: '',
             pan_vat_number: '',
           }),
         ),
@@ -76,15 +75,45 @@ describe('EmployerProfile', () => {
       EMPLOYER_PROFILE_QUERY_KEY,
       buildEmployerProfileFixture({
         organization_name: 'My org',
-        address: 'Buddhanagar, Kathmandu',
         pan_vat_number: '123456789',
       }),
     )
 
     await waitFor(() => {
       expect(screen.getByLabelText('Organization name')).toHaveValue('My org')
-      expect(screen.getByLabelText('Address')).toHaveValue('Buddhanagar, Kathmandu')
       expect(screen.getByLabelText('PAN/VAT number')).toHaveValue('123456789')
+    })
+  })
+
+  // Address now lives in the Location section (LocationPicker owns
+  // address+latitude+longitude as one unit) — see validation/employerProfile.ts.
+  it('repopulates the Location section when fresher profile data arrives after navigation', async () => {
+    const queryClient = createTestQueryClient()
+
+    server.use(
+      http.get(`${API_ROOT}/profiles/employer/me/`, () =>
+        HttpResponse.json(
+          buildEmployerProfileFixture({ address: '', latitude: null, longitude: null }),
+        ),
+      ),
+    )
+
+    renderWithProviders(<EmployerProfile />, { queryClient })
+
+    await screen.findByLabelText('Organization name')
+    expect(screen.queryByText('Buddhanagar, Kathmandu')).not.toBeInTheDocument()
+
+    queryClient.setQueryData(
+      EMPLOYER_PROFILE_QUERY_KEY,
+      buildEmployerProfileFixture({
+        address: 'Buddhanagar, Kathmandu',
+        latitude: '27.700000',
+        longitude: '85.320000',
+      }),
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Buddhanagar, Kathmandu')).toBeInTheDocument()
     })
   })
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from 'react-router-dom'
@@ -8,10 +8,12 @@ import { inferJobTaxonomy } from '@/api/endpoints/taxonomy'
 import { ApiError, toBannerMessage, toFieldErrors } from '@/api/errors'
 import { MY_JOBS_QUERY_KEY } from '@/hooks/useMyJobs'
 import { ownerJobQueryKey } from '@/hooks/useOwnerJob'
-import { jobFormSchema, isDeadlineInPast, type JobFormValues } from '@/validation/job'
+import { useEmployerProfile } from '@/hooks/useEmployerProfile'
+import { jobFormSchema, isDeadlineInPast, isValidJobLocation, type JobFormValues } from '@/validation/job'
 import { formatWageTypeLabel, formatWorkType, fromDatetimeLocalInputValue, toDatetimeLocalInputValue } from '@/lib/formatters'
 import type { EmployerJobPost, WageType, WorkType } from '@/types/job'
 import type { JobTaxonomyInferenceRequest } from '@/types/taxonomy'
+import type { LocationValue } from '@/types/location'
 import { TextField } from '@/components/primitives/TextField'
 import { Button } from '@/components/primitives/Button'
 import { ErrorBanner } from '@/components/primitives/ErrorBanner'
@@ -19,7 +21,7 @@ import { CategorySelect } from './CategorySelect'
 import { SubcategorySelect } from './SubcategorySelect'
 import { SkillChipInput, type SkillChipInputHandle } from './SkillChipInput'
 import { UnmatchedTermNotice } from './UnmatchedTermNotice'
-import { JobLocationFields } from './JobLocationFields'
+import { LocationPicker } from './LocationPicker'
 import { JobFormSection } from './JobFormSection'
 
 const WAGE_TYPES: WageType[] = ['HOURLY', 'DAILY', 'MONTHLY', 'FIXED']
@@ -57,6 +59,33 @@ export function JobForm({ mode, job }: JobFormProps) {
   const [unmatchedRequired, setUnmatchedRequired] = useState<string[]>([])
   const [unmatchedPreferred, setUnmatchedPreferred] = useState<string[]>([])
   const [inferenceInput, setInferenceInput] = useState<JobTaxonomyInferenceRequest | null>(null)
+  // Address+latitude+longitude travel together as one LocationPicker-owned
+  // value (see validation/job.ts) rather than three separate form fields —
+  // `latitude`/`longitude` are always present together on an existing job
+  // (both required, non-nullable on JobPost), so edit mode never needs a
+  // partial value here.
+  const [location, setLocation] = useState<LocationValue | null>(() =>
+    job
+      ? { address: job.address, latitude: Number(job.latitude), longitude: Number(job.longitude), placeId: null }
+      : null,
+  )
+  const [locationError, setLocationError] = useState<string | null>(null)
+
+  // Convenience prefill only — the employer's own saved profile location,
+  // offered as a starting point the picker's search/map/current-location
+  // controls can still adjust afterward (never submitted as-is without
+  // going through the same LocationPicker value).
+  const employerProfileQuery = useEmployerProfile()
+  const employerProfile = employerProfileQuery.data
+  const employerLocation: LocationValue | null =
+    employerProfile && employerProfile.latitude !== null && employerProfile.longitude !== null
+      ? {
+          address: employerProfile.address,
+          latitude: Number(employerProfile.latitude),
+          longitude: Number(employerProfile.longitude),
+          placeId: null,
+        }
+      : null
 
   const {
     register,
@@ -72,9 +101,6 @@ export function JobForm({ mode, job }: JobFormProps) {
       description: job?.description ?? '',
       category: job ? String(job.category) : '',
       subcategory: job ? String(job.subcategory) : '',
-      address: job?.address ?? '',
-      latitude: job?.latitude ?? '',
-      longitude: job?.longitude ?? '',
       wage_type: job?.wage_type ?? 'DAILY',
       wage_amount: job?.wage_amount ?? '',
       work_type: job?.work_type ?? 'ONE_TIME',
@@ -157,6 +183,14 @@ export function JobForm({ mode, job }: JobFormProps) {
       return
     }
 
+    if (!location || !isValidJobLocation(location)) {
+      // The submit wrapper below already surfaces this to the user; this
+      // is only the guard against actually sending the request — `onSubmit`
+      // fires whenever every RHF-registered field passes, which says
+      // nothing about `location` since it isn't one.
+      return
+    }
+
     const committedRequiredSkills = requiredSkillsRef.current?.commitDraft() ?? requiredSkills
     if (committedRequiredSkills === null) return
 
@@ -168,9 +202,9 @@ export function JobForm({ mode, job }: JobFormProps) {
       category: Number(values.category),
       subcategory: Number(values.subcategory),
       description: values.description,
-      address: values.address,
-      latitude: Number(values.latitude),
-      longitude: Number(values.longitude),
+      address: location.address,
+      latitude: location.latitude,
+      longitude: location.longitude,
       required_experience_years: Number(values.required_experience_years),
       wage_type: values.wage_type,
       wage_amount: Number(values.wage_amount),
@@ -230,6 +264,17 @@ export function JobForm({ mode, job }: JobFormProps) {
     }
   }
 
+  // Location isn't RHF-registered (see the `location` state above), so
+  // react-hook-form's own `handleSubmit` never sees it — without this
+  // wrapper, a missing location would only surface once every other field
+  // already passed validation, instead of alongside them on the same click.
+  const handleFormSubmit = (event: FormEvent<HTMLFormElement>) => {
+    setLocationError(
+      location && isValidJobLocation(location) ? null : 'Select a location for this job.',
+    )
+    return handleSubmit(onSubmit)(event)
+  }
+
   if (savedJob) {
     return (
       <div className="flex flex-col gap-4">
@@ -247,7 +292,7 @@ export function JobForm({ mode, job }: JobFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-6">
+    <form onSubmit={handleFormSubmit} noValidate className="flex flex-col gap-6">
       {mode === 'create' && (
         <p className="text-sm text-text-secondary">
           This job will be visible to workers immediately once you publish it — there is no draft
@@ -308,7 +353,29 @@ export function JobForm({ mode, job }: JobFormProps) {
       </JobFormSection>
 
       <JobFormSection title="Location">
-        <JobLocationFields register={register} errors={errors} setValue={setValue} />
+        {employerLocation && (
+          <Button
+            type="button"
+            variant="secondary"
+            className="self-start"
+            onClick={() => {
+              setLocation(employerLocation)
+              setLocationError(null)
+            }}
+          >
+            Use employer profile location
+          </Button>
+        )}
+        <LocationPicker
+          label="Job location"
+          description="Search, tap the map, or use your current location — required."
+          value={location}
+          onChange={(value) => {
+            setLocation(value)
+            setLocationError(null)
+          }}
+          error={locationError ?? undefined}
+        />
       </JobFormSection>
 
       <JobFormSection title="Work terms">

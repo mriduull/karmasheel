@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
@@ -20,6 +20,7 @@ import type {
   WorkerSkillMatch,
 } from '@/types/profile'
 import type { SkillTagSummary } from '@/types/skill'
+import type { LocationValue } from '@/types/location'
 import { PageContainer } from '@/components/primitives/PageContainer'
 import { Button } from '@/components/primitives/Button'
 import { TextField } from '@/components/primitives/TextField'
@@ -30,7 +31,7 @@ import { SkillChipInput, type SkillChipInputHandle } from '@/components/shared/S
 import { UnmatchedTermNotice } from '@/components/shared/UnmatchedTermNotice'
 import { ManualSkillPicker } from '@/components/shared/ManualSkillPicker'
 import { SkillMatchReview } from '@/components/shared/SkillMatchReview'
-import { CoordinateCapture } from '@/components/shared/CoordinateCapture'
+import { LocationPicker } from '@/components/shared/LocationPicker'
 import { ProfilePhotoUpload } from '@/components/shared/ProfilePhotoUpload'
 
 /**
@@ -107,7 +108,6 @@ function BasicsSection({ profile }: { profile: WorkerProfile }) {
   } = useForm<WorkerBasicsFormValues>({
     resolver: zodResolver(workerBasicsSchema),
     defaultValues: {
-      address: profile.address,
       experience_years: String(profile.experience_years),
     },
   })
@@ -118,7 +118,6 @@ function BasicsSection({ profile }: { profile: WorkerProfile }) {
 
     try {
       const updated = await updateWorkerProfile({
-        address: values.address,
         experience_years: Number(values.experience_years),
       })
       queryClient.setQueryData(WORKER_PROFILE_QUERY_KEY, updated)
@@ -148,7 +147,6 @@ function BasicsSection({ profile }: { profile: WorkerProfile }) {
       isSaved={isSaved}
       error={formError}
     >
-      <TextField label="Address" error={errors.address?.message} {...register('address')} />
       <TextField
         label="Years of experience"
         inputMode="numeric"
@@ -164,14 +162,36 @@ function LocationSection({ profile }: { profile: WorkerProfile }) {
   const [isSaved, setIsSaved] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [pendingCoords, setPendingCoords] = useState<{ latitude: number; longitude: number } | null>(
-    null,
+  // Address now travels with latitude/longitude as one LocationPicker-owned
+  // value (validation/workerProfile.ts) rather than a separate always-on
+  // text field — see BasicsSection above, which no longer touches address.
+  const [location, setLocation] = useState<LocationValue | null>(() =>
+    profile.latitude !== null && profile.longitude !== null
+      ? {
+          address: profile.address,
+          latitude: Number(profile.latitude),
+          longitude: Number(profile.longitude),
+          placeId: null,
+        }
+      : null,
   )
-  const [cleared, setCleared] = useState(false)
 
-  const hasCoordinates = cleared
-    ? false
-    : pendingCoords !== null || (profile.latitude !== null && profile.longitude !== null)
+  // Kept in sync with the query cache (e.g. after a background refetch
+  // elsewhere), not just the initial mount — same "always trust fresher
+  // server data" convention Basics/Availability get via useForm's own
+  // defaultValues re-derivation on remount.
+  useEffect(() => {
+    setLocation(
+      profile.latitude !== null && profile.longitude !== null
+        ? {
+            address: profile.address,
+            latitude: Number(profile.latitude),
+            longitude: Number(profile.longitude),
+            placeId: null,
+          }
+        : null,
+    )
+  }, [profile.address, profile.latitude, profile.longitude])
 
   const handleFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -179,19 +199,17 @@ function LocationSection({ profile }: { profile: WorkerProfile }) {
     setIsSaved(false)
     setIsSubmitting(true)
 
-    let payload: WorkerProfileUpdatePayload = {}
-    if (cleared) {
-      payload = { latitude: null, longitude: null }
-    } else if (pendingCoords) {
-      payload = { latitude: pendingCoords.latitude, longitude: pendingCoords.longitude }
-    }
+    // Clearing the picker clears the whole unit, address included — there
+    // is no supported way to keep a typed address without coordinates once
+    // it's owned by this section.
+    const payload: WorkerProfileUpdatePayload = location
+      ? { address: location.address, latitude: location.latitude, longitude: location.longitude }
+      : { address: '', latitude: null, longitude: null }
 
     try {
       const updated = await updateWorkerProfile(payload)
       queryClient.setQueryData(WORKER_PROFILE_QUERY_KEY, updated)
       setIsSaved(true)
-      setPendingCoords(null)
-      setCleared(false)
     } catch (error) {
       setFormError(
         error instanceof ApiError ? toBannerMessage(error) : 'Something went wrong — please try again.',
@@ -210,16 +228,11 @@ function LocationSection({ profile }: { profile: WorkerProfile }) {
       isSaved={isSaved}
       error={formError}
     >
-      <CoordinateCapture
-        hasCoordinates={hasCoordinates}
-        onCaptured={(latitude, longitude) => {
-          setPendingCoords({ latitude, longitude })
-          setCleared(false)
-          setIsSaved(false)
-        }}
-        onClear={() => {
-          setCleared(true)
-          setPendingCoords(null)
+      <LocationPicker
+        label="Your usual work location"
+        value={location}
+        onChange={(value) => {
+          setLocation(value)
           setIsSaved(false)
         }}
       />

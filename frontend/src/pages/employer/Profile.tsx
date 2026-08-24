@@ -10,6 +10,7 @@ import {
   type EmployerDetailsFormValues,
 } from '@/validation/employerProfile'
 import type { EmployerProfile, EmployerProfileUpdatePayload } from '@/types/employer'
+import type { LocationValue } from '@/types/location'
 import { PageContainer } from '@/components/primitives/PageContainer'
 import { PanVatField } from '@/components/primitives/PanVatField'
 import { TextField } from '@/components/primitives/TextField'
@@ -17,7 +18,7 @@ import { SkeletonCard } from '@/components/primitives/SkeletonCard'
 import { ErrorBanner } from '@/components/primitives/ErrorBanner'
 import { ProfileSection } from '@/components/shared/ProfileSection'
 import { VerificationStatusBanner } from '@/components/shared/VerificationStatusBanner'
-import { CoordinateCapture } from '@/components/shared/CoordinateCapture'
+import { LocationPicker } from '@/components/shared/LocationPicker'
 
 /**
  * Two independently-PATCHable sections — same verified pattern as the
@@ -78,7 +79,6 @@ function DetailsSection({ profile }: { profile: EmployerProfile }) {
     resolver: zodResolver(employerDetailsSchema),
     defaultValues: {
       organization_name: profile.organization_name,
-      address: profile.address,
       pan_vat_number: profile.pan_vat_number,
     },
   })
@@ -86,10 +86,9 @@ function DetailsSection({ profile }: { profile: EmployerProfile }) {
   useEffect(() => {
     reset({
       organization_name: profile.organization_name,
-      address: profile.address,
       pan_vat_number: profile.pan_vat_number,
     })
-  }, [profile.address, profile.organization_name, profile.pan_vat_number, reset])
+  }, [profile.organization_name, profile.pan_vat_number, reset])
 
   const onSubmit = async (values: EmployerDetailsFormValues) => {
     setFormError(null)
@@ -131,7 +130,6 @@ function DetailsSection({ profile }: { profile: EmployerProfile }) {
         error={errors.organization_name?.message}
         {...register('organization_name')}
       />
-      <TextField label="Address" error={errors.address?.message} {...register('address')} />
       <PanVatField
         label="PAN/VAT number"
         hint="9 digits, e.g. 123456789 — optional"
@@ -147,14 +145,35 @@ function LocationSection({ profile }: { profile: EmployerProfile }) {
   const [isSaved, setIsSaved] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [pendingCoords, setPendingCoords] = useState<{ latitude: number; longitude: number } | null>(
-    null,
+  // Address now travels with latitude/longitude as one LocationPicker-owned
+  // value (validation/employerProfile.ts) rather than a separate always-on
+  // text field — see DetailsSection above, which no longer touches address.
+  const [location, setLocation] = useState<LocationValue | null>(() =>
+    profile.latitude !== null && profile.longitude !== null
+      ? {
+          address: profile.address,
+          latitude: Number(profile.latitude),
+          longitude: Number(profile.longitude),
+          placeId: null,
+        }
+      : null,
   )
-  const [cleared, setCleared] = useState(false)
 
-  const hasCoordinates = cleared
-    ? false
-    : pendingCoords !== null || (profile.latitude !== null && profile.longitude !== null)
+  // Same "always trust fresher server data" convention as DetailsSection's
+  // own `reset` effect above — kept in sync with the query cache (e.g.
+  // after a background refetch elsewhere), not just the initial mount.
+  useEffect(() => {
+    setLocation(
+      profile.latitude !== null && profile.longitude !== null
+        ? {
+            address: profile.address,
+            latitude: Number(profile.latitude),
+            longitude: Number(profile.longitude),
+            placeId: null,
+          }
+        : null,
+    )
+  }, [profile.address, profile.latitude, profile.longitude])
 
   const handleFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -162,19 +181,17 @@ function LocationSection({ profile }: { profile: EmployerProfile }) {
     setIsSaved(false)
     setIsSubmitting(true)
 
-    let payload: EmployerProfileUpdatePayload = {}
-    if (cleared) {
-      payload = { latitude: null, longitude: null }
-    } else if (pendingCoords) {
-      payload = { latitude: pendingCoords.latitude, longitude: pendingCoords.longitude }
-    }
+    // Clearing the picker clears the whole unit, address included — there
+    // is no supported way to keep a typed address without coordinates once
+    // it's owned by this section.
+    const payload: EmployerProfileUpdatePayload = location
+      ? { address: location.address, latitude: location.latitude, longitude: location.longitude }
+      : { address: '', latitude: null, longitude: null }
 
     try {
       const updated = await updateEmployerProfile(payload)
       queryClient.setQueryData(EMPLOYER_PROFILE_QUERY_KEY, updated)
       setIsSaved(true)
-      setPendingCoords(null)
-      setCleared(false)
     } catch (error) {
       setFormError(
         error instanceof ApiError ? toBannerMessage(error) : 'Something went wrong — please try again.',
@@ -193,16 +210,11 @@ function LocationSection({ profile }: { profile: EmployerProfile }) {
       isSaved={isSaved}
       error={formError}
     >
-      <CoordinateCapture
-        hasCoordinates={hasCoordinates}
-        onCaptured={(latitude, longitude) => {
-          setPendingCoords({ latitude, longitude })
-          setCleared(false)
-          setIsSaved(false)
-        }}
-        onClear={() => {
-          setCleared(true)
-          setPendingCoords(null)
+      <LocationPicker
+        label="Business location"
+        value={location}
+        onChange={(value) => {
+          setLocation(value)
           setIsSaved(false)
         }}
       />
