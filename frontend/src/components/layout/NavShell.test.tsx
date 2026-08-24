@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { Home } from 'lucide-react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { server } from '@/test/msw/server'
 import { API_ROOT } from '@/test/msw/handlers'
@@ -56,6 +56,7 @@ describe('NavShell — presentation variant', () => {
     )
 
     expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument()
+    expect(screen.getByRole('banner').firstElementChild).toHaveClass('w-full', 'max-w-none')
     // The same item renders once per breakpoint wrapper (desktop, tablet,
     // mobile bottom tabs) — all present in the DOM at once, CSS-hidden per
     // breakpoint, same existing pattern the rest of this suite relies on.
@@ -81,12 +82,57 @@ describe('NavShell — presentation variant', () => {
     )
 
     expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument()
+    expect(screen.getByRole('banner').firstElementChild).toHaveClass('mx-auto', 'max-w-6xl')
     const browseJobsLinks = screen.getAllByRole('link', { name: 'Browse Jobs' })
     expect(browseJobsLinks.length).toBeGreaterThan(0)
     browseJobsLinks.forEach((link) => expect(link).toHaveAttribute('href', '/jobs'))
     // At least the desktop/tablet top-bar instances get the pill
     // treatment — the mobile bottom-tab item is unaffected by variant.
     expect(browseJobsLinks.some((link) => link.className.includes('rounded-full'))).toBe(true)
+  })
+
+  it('keeps the current route directly visible in both compact top-bar layouts', () => {
+    const items = [
+      { to: '/worker', label: 'Home', icon: Home },
+      { to: '/worker/jobs', label: 'Browse Jobs', icon: Home },
+      { to: '/worker/applications', label: 'Applications', icon: Home },
+      { to: '/worker/recommendations', label: 'Recommendations', icon: Home },
+      { to: '/worker/advisory', label: 'Opportunity Advisory', icon: Home },
+      { to: '/worker/profile', label: 'Profile', icon: Home },
+      { to: '/worker/cv', label: 'CV', icon: Home },
+      { to: '/worker/ratings', label: 'Ratings', icon: Home },
+    ]
+
+    const { container } = render(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <MemoryRouter initialEntries={['/worker/ratings']}>
+          <Routes>
+            <Route
+              path="/worker/*"
+              element={
+                <NavShell items={items} brandHref="/worker">
+                  <p>content</p>
+                </NavShell>
+              }
+            />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    const compactDesktop = container.querySelector(
+      '[class~="xl:flex"][class~="2xl:hidden"]',
+    ) as HTMLElement
+    const tablet = container.querySelector(
+      '[class~="md:flex"][class~="xl:hidden"]',
+    ) as HTMLElement
+
+    expect(compactDesktop).toBeInTheDocument()
+    expect(within(compactDesktop).getAllByRole('link')).toHaveLength(5)
+    expect(within(compactDesktop).getByRole('link', { name: 'Ratings' })).toBeInTheDocument()
+    expect(tablet).toBeInTheDocument()
+    expect(within(tablet).getAllByRole('link')).toHaveLength(2)
+    expect(within(tablet).getByRole('link', { name: 'Ratings' })).toBeInTheDocument()
   })
 })
 

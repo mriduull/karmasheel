@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -30,23 +30,35 @@ interface NavShellProps {
 
 /** How many items stay directly visible on the tablet top bar before the
  * rest collapse into the "More" menu (design spec §3.3). */
-const TABLET_VISIBLE_ITEMS = 3
+const TABLET_VISIBLE_ITEMS = 2
+const COMPACT_DESKTOP_VISIBLE_ITEMS = 5
 /** Bottom tab bar shows at most 5 items on mobile (design spec §3.4). */
 const MOBILE_TAB_ITEMS = 5
 
 /**
- * Role-aware navigation shell: a full top bar on desktop (≥1024px), a
- * "first few items + More" top bar on tablet (768–1023px), and a bottom
+ * Role-aware navigation shell: a full top bar on wide desktop (≥1536px),
+ * progressively compacted "items + More" bars from 768–1535px, and a bottom
  * tab bar on mobile (<768px). Every item is icon + text, always — no
  * icon-only navigation anywhere, per the design spec's explicit requirement.
  */
 export function NavShell({ items, brandHref, children, variant = 'app' }: NavShellProps) {
   const { t } = useTranslation()
+  const { pathname } = useLocation()
   const user = useAuthStore((state) => state.user)
   const [isMoreOpen, setMoreOpen] = useState(false)
 
-  const tabletPrimaryItems = items.slice(0, TABLET_VISIBLE_ITEMS)
-  const tabletOverflowItems = items.slice(TABLET_VISIBLE_ITEMS)
+  const tabletPrimaryItems = visibleItemsIncludingCurrent(items, TABLET_VISIBLE_ITEMS, pathname)
+  const tabletPrimaryPaths = new Set(tabletPrimaryItems.map((item) => item.to))
+  const tabletOverflowItems = items.filter((item) => !tabletPrimaryPaths.has(item.to))
+  const compactDesktopPrimaryItems = visibleItemsIncludingCurrent(
+    items,
+    COMPACT_DESKTOP_VISIBLE_ITEMS,
+    pathname,
+  )
+  const compactDesktopPrimaryPaths = new Set(compactDesktopPrimaryItems.map((item) => item.to))
+  const compactDesktopOverflowItems = items.filter(
+    (item) => !compactDesktopPrimaryPaths.has(item.to),
+  )
   const mobileItems = items.slice(0, MOBILE_TAB_ITEMS)
 
   const handleLogout = async () => {
@@ -82,16 +94,18 @@ export function NavShell({ items, brandHref, children, variant = 'app' }: NavShe
         }
       >
         <div
-          className={`mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8 ${
-            isPublicVariant ? 'h-20' : 'h-16'
-          }`}
+          className={`flex items-center ${
+            isPublicVariant
+              ? 'mx-auto max-w-6xl justify-between gap-4 px-4 sm:px-6 lg:px-8'
+              : 'w-full max-w-none gap-2 px-3 sm:px-4 xl:px-5'
+          } ${isPublicVariant ? 'h-20' : 'h-16'}`}
         >
           <Link
             to={brandHref}
             className={
               isPublicVariant
                 ? 'shrink-0 font-display text-xl font-bold text-brand-primary'
-                : 'shrink-0 text-lg font-semibold text-brand-primary'
+                : 'shrink-0 whitespace-nowrap text-base font-semibold text-brand-primary'
             }
           >
             {t('brand.name')}
@@ -103,53 +117,74 @@ export function NavShell({ items, brandHref, children, variant = 'app' }: NavShe
               DOM (multiple <nav aria-label="Primary"> elements at once is
               an accessibility-tree violation even when only one is
               visually shown). */}
-          <nav aria-label="Primary" className="flex items-center gap-1">
-            {/* Desktop: every item, icon + text. */}
-            <div className="hidden items-center gap-1 lg:flex">
+          <nav
+            aria-label="Primary"
+            className={`flex min-w-0 items-center gap-1 ${isPublicVariant ? '' : 'flex-1 justify-center'}`}
+          >
+            {/* Wide desktop: every item, icon + text. */}
+            <div className="hidden min-w-0 items-center gap-0.5 2xl:flex">
               {items.map((item) => (
-                <NavLinkItem key={item.to} item={item} pill={isPublicVariant} />
+                <NavLinkItem
+                  key={item.to}
+                  item={item}
+                  pill={isPublicVariant}
+                  compact={!isPublicVariant}
+                />
               ))}
             </div>
 
-            {/* Tablet: first few items directly visible + a labeled "More" menu. */}
-            <div className="hidden items-center gap-1 md:flex lg:hidden">
-              {tabletPrimaryItems.map((item) => (
-                <NavLinkItem key={item.to} item={item} pill={isPublicVariant} />
+            {/* Medium desktop: use the available width without allowing the
+                final links to collide with the account controls. */}
+            <div className="hidden items-center gap-1 xl:flex 2xl:hidden">
+              {compactDesktopPrimaryItems.map((item) => (
+                <NavLinkItem
+                  key={item.to}
+                  item={item}
+                  pill={isPublicVariant}
+                  compact={!isPublicVariant}
+                />
               ))}
-              {tabletOverflowItems.length > 0 && (
-                <div className="relative">
-                  <button
-                    type="button"
-                    className="inline-flex min-h-touch items-center gap-1 rounded-sm px-3 text-base font-semibold text-text-primary hover:bg-surface-muted"
-                    aria-expanded={isMoreOpen}
-                    aria-haspopup="true"
-                    onClick={() => setMoreOpen((open) => !open)}
-                  >
-                    {t('nav.more')}
-                  </button>
-                  {isMoreOpen && (
-                    <div className="absolute right-0 z-10 mt-1 flex w-48 flex-col gap-1 rounded-md border border-text-secondary/10 bg-surface p-2 shadow-float">
-                      {tabletOverflowItems.map((item) => (
-                        <NavLinkItem key={item.to} item={item} onClick={() => setMoreOpen(false)} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+              <NavMoreMenu
+                items={compactDesktopOverflowItems}
+                isOpen={isMoreOpen}
+                setOpen={setMoreOpen}
+                compact={!isPublicVariant}
+              />
+            </div>
+
+            {/* Tablet/small desktop: first two items + a labeled "More" menu. */}
+            <div className="hidden items-center gap-1 md:flex xl:hidden">
+              {tabletPrimaryItems.map((item) => (
+                <NavLinkItem
+                  key={item.to}
+                  item={item}
+                  pill={isPublicVariant}
+                  compact={!isPublicVariant}
+                />
+              ))}
+              <NavMoreMenu
+                items={tabletOverflowItems}
+                isOpen={isMoreOpen}
+                setOpen={setMoreOpen}
+                compact={!isPublicVariant}
+              />
             </div>
           </nav>
 
           {user && (
-            <div className="hidden shrink-0 items-center gap-3 md:flex">
-              <span className="max-w-64 truncate text-sm text-text-secondary" title={user.username}>
+            <div className="hidden shrink-0 items-center gap-1 md:flex xl:gap-2">
+              <span
+                className="max-w-28 truncate text-xs text-text-secondary xl:max-w-44 2xl:max-w-52"
+                title={user.username}
+              >
                 {user.username} · {user.role === 'WORKER' ? 'Worker' : 'Employer'}
               </span>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="inline-flex min-h-touch items-center gap-1 rounded-sm px-3 text-base font-semibold text-text-primary hover:bg-surface-muted"
+                className="inline-flex min-h-touch shrink-0 items-center gap-1 whitespace-nowrap rounded-sm px-1.5 text-sm font-semibold text-text-primary hover:bg-surface-muted xl:px-2"
               >
-                <LogOut size={20} aria-hidden="true" />
+                <LogOut size={18} aria-hidden="true" />
                 {t('nav.logout')}
               </button>
             </div>
@@ -175,14 +210,68 @@ export function NavShell({ items, brandHref, children, variant = 'app' }: NavShe
   )
 }
 
+function visibleItemsIncludingCurrent(items: NavItem[], limit: number, pathname: string): NavItem[] {
+  const primary = items.slice(0, limit)
+  const current = items.find((item) =>
+    pathname === item.to ||
+    (item.to !== '/worker' &&
+      item.to !== '/employer' &&
+      pathname.startsWith(`${item.to}/`)),
+  )
+
+  if (!current || primary.some((item) => item.to === current.to)) return primary
+  return [...primary.slice(0, Math.max(0, limit - 1)), current]
+}
+
+function NavMoreMenu({
+  items,
+  isOpen,
+  setOpen,
+  compact,
+}: {
+  items: NavItem[]
+  isOpen: boolean
+  setOpen: (open: boolean | ((current: boolean) => boolean)) => void
+  compact: boolean
+}) {
+  const { t } = useTranslation()
+
+  if (items.length === 0) return null
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        className={`inline-flex min-h-touch items-center gap-1 rounded-sm font-semibold text-text-primary hover:bg-surface-muted ${
+          compact ? 'px-2 text-sm' : 'px-3 text-base'
+        }`}
+        aria-expanded={isOpen}
+        aria-haspopup="true"
+        onClick={() => setOpen((open) => !open)}
+      >
+        {t('nav.more')}
+      </button>
+      {isOpen && (
+        <div className="absolute right-0 z-10 mt-1 flex w-56 flex-col gap-1 rounded-md border border-text-secondary/10 bg-surface p-2 shadow-float">
+          {items.map((item) => (
+            <NavLinkItem key={item.to} item={item} onClick={() => setOpen(false)} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function NavLinkItem({
   item,
   onClick,
   pill = false,
+  compact = false,
 }: {
   item: NavItem
   onClick?: () => void
   pill?: boolean
+  compact?: boolean
 }) {
   const Icon = item.icon
 
@@ -191,12 +280,14 @@ function NavLinkItem({
       to={item.to}
       onClick={onClick}
       className={({ isActive }) =>
-        `inline-flex min-h-touch items-center gap-2 px-3 text-base font-semibold ${
+        `inline-flex min-h-touch items-center whitespace-nowrap font-semibold ${
+          compact ? 'gap-1 px-1.5 text-xs xl:px-2' : 'gap-2 px-3 text-base'
+        } ${
           pill ? 'rounded-full px-4' : 'rounded-sm'
         } ${isActive ? 'bg-surface-muted text-brand-primary' : 'text-text-primary hover:bg-surface-muted'}`
       }
     >
-      <Icon size={20} aria-hidden="true" />
+      <Icon size={compact ? 18 : 20} aria-hidden="true" />
       {item.label}
     </NavLink>
   )
