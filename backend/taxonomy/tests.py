@@ -651,6 +651,69 @@ class TaxonomyPublicAPITests(APITestCase):
         self.assertEqual(response.data["subcategory_name"], "Electrical")
         self.assertEqual(response.data["matched_terms"][0]["skill_name"], "House Wiring")
 
+    def test_job_taxonomy_inference_returns_every_skill_mapping_with_suggestions(self):
+        medication = SkillTag.objects.create(
+            subcategory=self.sub_electrical,
+            name="Medication Reminder Support",
+        )
+        SkillAlias.objects.create(
+            skill=medication,
+            phrase="ausadhi samjhaune",
+            language=SkillAlias.Language.NE_ROMANIZED,
+        )
+
+        response = self.client.post(
+            reverse("taxonomy:infer_job_category"),
+            {
+                "required_skills": ["ghar wiring"],
+                "preferred_skills": ["aaunsadi samjhaune"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        terms = {term["term"]: term for term in response.data["matched_terms"]}
+        self.assertEqual(terms["ghar wiring"]["skill_name"], "House Wiring")
+        self.assertEqual(
+            terms["aaunsadi samjhaune"]["skill_name"],
+            "Medication Reminder Support",
+        )
+        self.assertEqual(terms["aaunsadi samjhaune"]["method"], "fuzzy")
+        self.assertGreaterEqual(terms["aaunsadi samjhaune"]["confidence"], 85)
+        self.assertTrue(terms["aaunsadi samjhaune"]["suggestions"])
+
+    def test_job_taxonomy_inference_returns_clear_below_threshold_candidate_for_confirmation(self):
+        button_fixing = SkillTag.objects.create(
+            subcategory=self.sub_electrical,
+            name="Button Fixing",
+        )
+
+        response = self.client.post(
+            reverse("taxonomy:infer_job_category"),
+            {"required_skills": ["batan fixing"], "preferred_skills": []},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["category"])
+        self.assertEqual(response.data["matched_terms"], [])
+        suggestion = response.data["suggested_terms"][0]
+        self.assertEqual(suggestion["skill_id"], button_fixing.id)
+        self.assertEqual(suggestion["skill_name"], "Button Fixing")
+        self.assertFalse(suggestion["is_confident_match"])
+        self.assertGreaterEqual(suggestion["confidence"], 75)
+
+    def test_job_taxonomy_inference_does_not_suggest_unrelated_phrase(self):
+        response = self.client.post(
+            reverse("taxonomy:infer_job_category"),
+            {"required_skills": ["totally unrelated gibberish"], "preferred_skills": []},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["matched_terms"], [])
+        self.assertEqual(response.data["suggested_terms"], [])
+
     def test_job_taxonomy_inference_is_side_effect_free_for_unknown_terms(self):
         before = UnmatchedSkillTerm.objects.count()
 

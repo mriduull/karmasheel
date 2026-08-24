@@ -57,9 +57,15 @@ function mockTaxonomy() {
               category: 1,
               category_name: 'Construction & Repair',
               confidence: 100,
+              method: 'exact_alias',
+              suggestions: [
+                { id: 2, name: 'House Wiring', subcategory: 'Electrical', confidence: 100 },
+              ],
+              is_confident_match: true,
             },
           ],
           confidence: 100,
+          suggested_terms: [],
         })
       }
 
@@ -70,6 +76,7 @@ function mockTaxonomy() {
         subcategory_name: null,
         matched_terms: [],
         confidence: 0,
+        suggested_terms: [],
       })
     }),
   )
@@ -176,6 +183,92 @@ describe('JobForm', () => {
       expect(requiredSkills.compareDocumentPosition(category) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       expect(preferredSkills.compareDocumentPosition(subcategory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       expect(screen.getByText(/recognized skills automatically select the matching category and subcategory/i)).toBeInTheDocument()
+    })
+
+    it('shows clickable canonical matches for both required and preferred phrases', async () => {
+      const user = userEvent.setup()
+      server.use(
+        http.post(`${API_ROOT}/taxonomy/infer-job-category/`, () => HttpResponse.json({
+          category: 9,
+          category_name: 'Security Services',
+          subcategory: 20,
+          subcategory_name: 'Access Control & Surveillance',
+          confidence: 60,
+          suggested_terms: [],
+          matched_terms: [
+            {
+              term: 'Aces Card managment', source: 'required_skill', skill_id: 20,
+              skill_name: 'Access Card Management', subcategory: 20,
+              subcategory_name: 'Access Control & Surveillance', category: 9,
+              category_name: 'Security Services', confidence: 87, method: 'fuzzy',
+              is_confident_match: true,
+              suggestions: [{ id: 20, name: 'Access Card Management', subcategory: 'Access Control & Surveillance', confidence: 87 }],
+            },
+            {
+              term: 'aaunsadi samjhaune', source: 'preferred_skill', skill_id: 21,
+              skill_name: 'Medication Reminder Support', subcategory: 30,
+              subcategory_name: 'Elderly Care', category: 10,
+              category_name: 'Care Services', confidence: 91, method: 'fuzzy',
+              is_confident_match: true,
+              suggestions: [
+                { id: 21, name: 'Medication Reminder Support', subcategory: 'Elderly Care', confidence: 91 },
+                { id: 22, name: 'Medicine Pickup Support', subcategory: 'Elderly Care', confidence: 72 },
+              ],
+            },
+          ],
+        })),
+      )
+      renderWithProviders(<JobForm mode="create" />)
+
+      for (const [label, phrase] of [['Required skills', 'Aces Card managment'], ['Preferred skills', 'aaunsadi samjhaune']] as const) {
+        const input = screen.getByLabelText(label)
+        await user.type(input, phrase)
+        await user.click(within(input.closest('div') as HTMLElement).getByRole('button', { name: 'Add' }))
+      }
+
+      const preferredMatch = await screen.findByText('Medication Reminder Support', { selector: 'summary' })
+      await user.click(preferredMatch)
+      const details = preferredMatch.closest('details') as HTMLElement
+      expect(within(details).getByText((_, element) => element?.tagName === 'P' && (element.textContent?.includes('aaunsadi samjhaune') ?? false))).toBeInTheDocument()
+      expect(within(details).getByText(/91% confidence/i)).toBeInTheDocument()
+      expect(within(details).getByText(/Medicine Pickup Support \(72%\)/i)).toBeInTheDocument()
+    })
+
+    it('shows and applies a tentative canonical suggestion for a lower-confidence spelling', async () => {
+      const user = userEvent.setup()
+      server.use(
+        http.post(`${API_ROOT}/taxonomy/infer-job-category/`, () => HttpResponse.json({
+          category: null,
+          category_name: null,
+          subcategory: null,
+          subcategory_name: null,
+          confidence: 0,
+          matched_terms: [],
+          suggested_terms: [{
+            term: 'batan fixing', source: 'required_skill', skill_id: 30,
+            skill_name: 'Button Fixing', subcategory: 40,
+            subcategory_name: 'Alterations & Repair', category: 12,
+            category_name: 'Tailoring & Garment Work', confidence: 80,
+            method: 'unmatched', is_confident_match: false,
+            suggestions: [
+              { id: 30, name: 'Button Fixing', subcategory: 'Alterations & Repair', confidence: 80 },
+              { id: 31, name: 'Steel Fixing', subcategory: 'Structural Work', confidence: 75 },
+            ],
+          }],
+        })),
+      )
+      renderWithProviders(<JobForm mode="create" />)
+      const input = screen.getByLabelText('Required skills')
+      await user.type(input, 'batan fixing')
+      await user.click(within(input.closest('div') as HTMLElement).getByRole('button', { name: 'Add' }))
+
+      const summary = await screen.findByText(/possible match: button fixing/i, { selector: 'summary' })
+      await user.click(summary)
+      expect(summary.closest('details')).toHaveTextContent('You entered “batan fixing”')
+      await user.click(screen.getByRole('button', { name: 'Use Button Fixing' }))
+
+      expect(screen.getByRole('button', { name: 'Remove Button Fixing' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Remove batan fixing' })).not.toBeInTheDocument()
     })
 
     it('rejects an application deadline in the past on create', async () => {

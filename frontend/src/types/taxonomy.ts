@@ -49,6 +49,14 @@ export interface JobTaxonomyMatchedTerm {
   category: number
   category_name: string
   confidence: number
+  method: 'exact_name' | 'exact_alias' | 'fuzzy' | 'unmatched'
+  suggestions: Array<{
+    id: number
+    name: string
+    subcategory: string
+    confidence: number
+  }>
+  is_confident_match: boolean
 }
 
 export interface JobTaxonomyInferenceResult {
@@ -57,5 +65,6 @@ export interface JobTaxonomyInferenceResult {
   subcategory: number | null
   subcategory_name: string | null
   matched_terms: JobTaxonomyMatchedTerm[]
+  suggested_terms: JobTaxonomyMatchedTerm[]
   confidence: number
 }

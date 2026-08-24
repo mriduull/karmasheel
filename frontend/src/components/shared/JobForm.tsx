@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from 'react-router-dom'
@@ -11,7 +11,7 @@ import { ownerJobQueryKey } from '@/hooks/useOwnerJob'
 import { jobFormSchema, isDeadlineInPast, type JobFormValues } from '@/validation/job'
 import { formatWageTypeLabel, formatWorkType, fromDatetimeLocalInputValue, toDatetimeLocalInputValue } from '@/lib/formatters'
 import type { EmployerJobPost, WageType, WorkType } from '@/types/job'
-import type { JobTaxonomyInferenceRequest } from '@/types/taxonomy'
+import type { JobTaxonomyInferenceRequest, JobTaxonomyMatchedTerm } from '@/types/taxonomy'
 import { TextField } from '@/components/primitives/TextField'
 import { Button } from '@/components/primitives/Button'
 import { ErrorBanner } from '@/components/primitives/ErrorBanner'
@@ -21,6 +21,7 @@ import { SkillChipInput, type SkillChipInputHandle } from './SkillChipInput'
 import { JobLocationFields } from './JobLocationFields'
 import { JobFormSection } from './JobFormSection'
 import { JobSkillDecisionScreen } from './JobSkillDecisionScreen'
+import { JobSkillInferenceResults } from './JobSkillInferenceResults'
 
 const WAGE_TYPES: WageType[] = ['HOURLY', 'DAILY', 'MONTHLY', 'FIXED']
 const WORK_TYPES: WorkType[] = ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'ONE_TIME']
@@ -146,6 +147,23 @@ export function JobForm({ mode, job }: JobFormProps) {
       .filter((term) => term.subcategory === inference.subcategory)
       .map((term) => term.skill_name)
       .filter((name, index, names) => names.indexOf(name) === index) ?? []
+  const requiredSkillMatches =
+    [...(inference?.matched_terms ?? []), ...(inference?.suggested_terms ?? [])]
+      .filter((term) => term.source === 'required_skill')
+  const preferredSkillMatches =
+    [...(inference?.matched_terms ?? []), ...(inference?.suggested_terms ?? [])]
+      .filter((term) => term.source === 'preferred_skill')
+
+  const confirmSuggestedSkill = (
+    match: JobTaxonomyMatchedTerm,
+    setSkills: Dispatch<SetStateAction<string[]>>,
+  ) => {
+    setSkills((skills) => skills.map((skill) =>
+      skill.trim().toLocaleLowerCase() === match.term.trim().toLocaleLowerCase()
+        ? match.skill_name
+        : skill,
+    ))
+  }
 
   const onSubmit = async (values: JobFormValues) => {
     setFormError(null)
@@ -274,7 +292,17 @@ export function JobForm({ mode, job }: JobFormProps) {
             </p>
           </div>
           <SkillChipInput ref={requiredSkillsRef} label="Required skills" value={requiredSkills} onChange={setRequiredSkills} />
+          <JobSkillInferenceResults
+            matches={requiredSkillMatches}
+            selectedSubcategoryId={subcategoryValue ? Number(subcategoryValue) : null}
+            onConfirmSuggestion={(match) => confirmSuggestedSkill(match, setRequiredSkills)}
+          />
           <SkillChipInput ref={preferredSkillsRef} label="Preferred skills" value={preferredSkills} onChange={setPreferredSkills} />
+          <JobSkillInferenceResults
+            matches={preferredSkillMatches}
+            selectedSubcategoryId={subcategoryValue ? Number(subcategoryValue) : null}
+            onConfirmSuggestion={(match) => confirmSuggestedSkill(match, setPreferredSkills)}
+          />
         </div>
         <CategorySelect
           value={categoryValue ? Number(categoryValue) : null}
@@ -393,4 +421,3 @@ export function JobForm({ mode, job }: JobFormProps) {
     </form>
   )
 }
-
