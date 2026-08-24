@@ -32,6 +32,7 @@ function renderPublicLayout(route = '/jobs') {
           <Route
             element={<PublicLayout />}
           >
+            <Route path="/" element={<p>landing-page-content</p>} />
             <Route path="/jobs" element={<p>browse-jobs-content</p>} />
           </Route>
         </Routes>
@@ -105,5 +106,16 @@ describe('PublicLayout navigation', () => {
 
     act(() => setAuthenticatedUser(WORKER_USER))
     expect(screen.getAllByRole('link', { name: /browse jobs/i }).length).toBeGreaterThan(0)
+  })
+
+  it('uses the marketing header treatment only at the landing page, not on other public routes', () => {
+    const { unmount } = renderPublicLayout('/')
+    const landingBrowseJobsLinks = screen.getAllByRole('link', { name: /browse jobs/i })
+    expect(landingBrowseJobsLinks.some((link) => link.className.includes('rounded-full'))).toBe(true)
+    unmount()
+
+    renderPublicLayout('/jobs')
+    const jobsBrowseJobsLinks = screen.getAllByRole('link', { name: /browse jobs/i })
+    expect(jobsBrowseJobsLinks.some((link) => link.className.includes('rounded-full'))).toBe(false)
   })
 })

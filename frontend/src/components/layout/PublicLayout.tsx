@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import {
   Briefcase,
   ClipboardList,
@@ -22,6 +22,12 @@ import { NavShell, type NavItem } from './NavShell'
 export function PublicLayout() {
   const { t } = useTranslation()
   const user = useAuthStore((state) => state.user)
+  const location = useLocation()
+  // The reference-style marketing header belongs to the landing page
+  // itself only — every other public route (job browse/detail, login,
+  // register) and every authenticated dashboard keep today's calmer
+  // header, so header continuity is preserved everywhere except `/`.
+  const navVariant = location.pathname === '/' ? 'public' : 'app'
 
   let brandHref = '/'
   let items: NavItem[]
@@ -53,7 +59,7 @@ export function PublicLayout() {
   }
 
   return (
-    <NavShell items={items} brandHref={brandHref}>
+    <NavShell items={items} brandHref={brandHref} variant={navVariant}>
       <Outlet />
     </NavShell>
   )

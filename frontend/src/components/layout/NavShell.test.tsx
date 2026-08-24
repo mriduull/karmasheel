@@ -43,6 +43,53 @@ function renderNavShell() {
   )
 }
 
+describe('NavShell — presentation variant', () => {
+  it('defaults to the "app" header treatment, preserving the same landmark and items', () => {
+    render(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <MemoryRouter initialEntries={['/']}>
+          <NavShell items={[{ to: '/jobs', label: 'Browse Jobs', icon: Home }]} brandHref="/">
+            <p>content</p>
+          </NavShell>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument()
+    // The same item renders once per breakpoint wrapper (desktop, tablet,
+    // mobile bottom tabs) — all present in the DOM at once, CSS-hidden per
+    // breakpoint, same existing pattern the rest of this suite relies on.
+    const browseJobsLinks = screen.getAllByRole('link', { name: 'Browse Jobs' })
+    expect(browseJobsLinks.length).toBeGreaterThan(0)
+    browseJobsLinks.forEach((link) => expect(link).toHaveAttribute('href', '/jobs'))
+    expect(browseJobsLinks.some((link) => link.className.includes('rounded-full'))).toBe(false)
+  })
+
+  it('applies the "public" marketing treatment without changing routes, items, or the landmark', () => {
+    render(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <MemoryRouter initialEntries={['/']}>
+          <NavShell
+            items={[{ to: '/jobs', label: 'Browse Jobs', icon: Home }]}
+            brandHref="/"
+            variant="public"
+          >
+            <p>content</p>
+          </NavShell>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument()
+    const browseJobsLinks = screen.getAllByRole('link', { name: 'Browse Jobs' })
+    expect(browseJobsLinks.length).toBeGreaterThan(0)
+    browseJobsLinks.forEach((link) => expect(link).toHaveAttribute('href', '/jobs'))
+    // At least the desktop/tablet top-bar instances get the pill
+    // treatment — the mobile bottom-tab item is unaffected by variant.
+    expect(browseJobsLinks.some((link) => link.className.includes('rounded-full'))).toBe(true)
+  })
+})
+
 describe('NavShell — current-user display and logout', () => {
   beforeEach(() => {
     tokenStorage.setRefreshToken('a-refresh-token')

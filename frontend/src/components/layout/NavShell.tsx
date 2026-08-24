@@ -16,6 +16,16 @@ interface NavShellProps {
   items: NavItem[]
   brandHref: string
   children: ReactNode
+  /**
+   * `'app'` (default) — today's header, used by the Worker/Employer
+   * dashboards and every public route except the landing page itself.
+   * `'public'` — a visually taller, more expressive marketing-header
+   * treatment for `/` only (Karmasheel Design Constitution §40 — the
+   * public site may be more visually expressive than the calmer product
+   * application). Presentation only: same `<nav aria-label="Primary">`
+   * landmark, same items, same breakpoint/overflow/logout behavior.
+   */
+  variant?: 'app' | 'public'
 }
 
 /** How many items stay directly visible on the tablet top bar before the
@@ -30,7 +40,7 @@ const MOBILE_TAB_ITEMS = 5
  * tab bar on mobile (<768px). Every item is icon + text, always — no
  * icon-only navigation anywhere, per the design spec's explicit requirement.
  */
-export function NavShell({ items, brandHref, children }: NavShellProps) {
+export function NavShell({ items, brandHref, children, variant = 'app' }: NavShellProps) {
   const { t } = useTranslation()
   const user = useAuthStore((state) => state.user)
   const [isMoreOpen, setMoreOpen] = useState(false)
@@ -60,11 +70,30 @@ export function NavShell({ items, brandHref, children }: NavShellProps) {
     window.location.assign('/')
   }
 
+  const isPublicVariant = variant === 'public'
+
   return (
     <div className="flex min-h-screen flex-col bg-bg">
-      <header className="border-b border-text-secondary/10 bg-surface">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <Link to={brandHref} className="shrink-0 text-lg font-semibold text-brand-primary">
+      <header
+        className={
+          isPublicVariant
+            ? 'border-b border-text-secondary/10 bg-bg'
+            : 'border-b border-text-secondary/10 bg-surface'
+        }
+      >
+        <div
+          className={`mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8 ${
+            isPublicVariant ? 'h-20' : 'h-16'
+          }`}
+        >
+          <Link
+            to={brandHref}
+            className={
+              isPublicVariant
+                ? 'shrink-0 font-display text-xl font-bold text-brand-primary'
+                : 'shrink-0 text-lg font-semibold text-brand-primary'
+            }
+          >
             {t('brand.name')}
           </Link>
 
@@ -78,14 +107,14 @@ export function NavShell({ items, brandHref, children }: NavShellProps) {
             {/* Desktop: every item, icon + text. */}
             <div className="hidden items-center gap-1 lg:flex">
               {items.map((item) => (
-                <NavLinkItem key={item.to} item={item} />
+                <NavLinkItem key={item.to} item={item} pill={isPublicVariant} />
               ))}
             </div>
 
             {/* Tablet: first few items directly visible + a labeled "More" menu. */}
             <div className="hidden items-center gap-1 md:flex lg:hidden">
               {tabletPrimaryItems.map((item) => (
-                <NavLinkItem key={item.to} item={item} />
+                <NavLinkItem key={item.to} item={item} pill={isPublicVariant} />
               ))}
               {tabletOverflowItems.length > 0 && (
                 <div className="relative">
@@ -146,7 +175,15 @@ export function NavShell({ items, brandHref, children }: NavShellProps) {
   )
 }
 
-function NavLinkItem({ item, onClick }: { item: NavItem; onClick?: () => void }) {
+function NavLinkItem({
+  item,
+  onClick,
+  pill = false,
+}: {
+  item: NavItem
+  onClick?: () => void
+  pill?: boolean
+}) {
   const Icon = item.icon
 
   return (
@@ -154,9 +191,9 @@ function NavLinkItem({ item, onClick }: { item: NavItem; onClick?: () => void })
       to={item.to}
       onClick={onClick}
       className={({ isActive }) =>
-        `inline-flex min-h-touch items-center gap-2 rounded-sm px-3 text-base font-semibold ${
-          isActive ? 'bg-surface-muted text-brand-primary' : 'text-text-primary hover:bg-surface-muted'
-        }`
+        `inline-flex min-h-touch items-center gap-2 px-3 text-base font-semibold ${
+          pill ? 'rounded-full px-4' : 'rounded-sm'
+        } ${isActive ? 'bg-surface-muted text-brand-primary' : 'text-text-primary hover:bg-surface-muted'}`
       }
     >
       <Icon size={20} aria-hidden="true" />
