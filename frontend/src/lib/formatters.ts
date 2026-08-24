@@ -67,3 +67,20 @@ export function toDatetimeLocalInputValue(isoString: string): string {
 export function fromDatetimeLocalInputValue(value: string): string {
   return new Date(value).toISOString()
 }
+
+/**
+ * Coarse, human-readable relative time (e.g. "Posted today", "Posted 3
+ * days ago") from a real `created_at` ISO 8601 timestamp — used on the
+ * landing page's job preview cards. Never estimates or invents a value;
+ * `null`/malformed input is the caller's problem to avoid, not this
+ * function's to guess around.
+ */
+export function formatPostedRelativeTime(isoString: string, now: Date = new Date()): string {
+  const created = new Date(isoString)
+  const diffMs = now.getTime() - created.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffDays <= 0) return 'Posted today'
+  if (diffDays === 1) return 'Posted 1 day ago'
+  return `Posted ${diffDays} days ago`
+}

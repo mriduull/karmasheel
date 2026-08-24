@@ -8,8 +8,8 @@ describe('MatchlineHero', () => {
   it('renders the illustrative worker card, job card, factors, and score', () => {
     render(<MatchlineHero />)
 
-    expect(screen.getByText('Ram Bahadur')).toBeInTheDocument()
-    expect(screen.getByText('Electrician Required')).toBeInTheDocument()
+    expect(screen.getByText('Suman Thapa')).toBeInTheDocument()
+    expect(screen.getByText('Delivery Rider Required')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /skills/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /distance/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /availability/i })).toBeInTheDocument()

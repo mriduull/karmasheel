@@ -10,6 +10,7 @@ import App from './App'
 function mockLandingData() {
   server.use(
     http.get(`${API_ROOT}/taxonomy/tree/`, () => HttpResponse.json([])),
+    http.get(`${API_ROOT}/taxonomy/categories/`, () => HttpResponse.json([])),
     http.get(`${API_ROOT}/jobs/browse/`, () => HttpResponse.json([])),
   )
 }
@@ -26,7 +27,7 @@ describe('App', () => {
       expect(screen.getByRole('link', { name: 'Workforce Matching' })).toBeInTheDocument(),
     )
     expect(
-      screen.getByRole('heading', { level: 1, name: /two sides\. one clear match/i }),
+      screen.getByRole('heading', { level: 1, name: /find work that fits\. find workers who fit/i }),
     ).toBeInTheDocument()
   })
 
