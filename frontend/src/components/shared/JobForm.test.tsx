@@ -165,6 +165,19 @@ describe('JobForm', () => {
       expect(screen.getByText(/auto-selected electrical based on house wiring/i)).toBeInTheDocument()
     })
 
+    it('places skill inputs before category and explains automatic taxonomy mapping', async () => {
+      renderWithProviders(<JobForm mode="create" />)
+
+      const requiredSkills = screen.getByLabelText('Required skills')
+      const preferredSkills = screen.getByLabelText('Preferred skills')
+      const category = await screen.findByLabelText('Category')
+      const subcategory = screen.getByLabelText('Subcategory')
+
+      expect(requiredSkills.compareDocumentPosition(category) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(preferredSkills.compareDocumentPosition(subcategory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(screen.getByText(/recognized skills automatically select the matching category and subcategory/i)).toBeInTheDocument()
+    })
+
     it('rejects an application deadline in the past on create', async () => {
       const user = userEvent.setup()
       renderWithProviders(<JobForm mode="create" />)

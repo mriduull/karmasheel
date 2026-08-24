@@ -33,7 +33,7 @@ interface JobFormProps {
 
 /**
  * One combined form for both `/employer/jobs/new` and
- * `/employer/jobs/:id/edit` — `POST /api/jobs/` has no concept of
+ * `/employer/jobs/:id/edit` â€” `POST /api/jobs/` has no concept of
  * partial creation, so unlike the Worker/Employer profile forms this is
  * a single submit covering every section, not independent per-section
  * PATCHes. Edit mode still uses `PATCH` (never `PUT`) as the safest
@@ -226,7 +226,7 @@ export function JobForm({ mode, job }: JobFormProps) {
           setFormError(toBannerMessage(error))
         }
       } else {
-        setFormError('Something went wrong — please try again.')
+        setFormError('Something went wrong â€” please try again.')
       }
     }
   }
@@ -239,7 +239,7 @@ export function JobForm({ mode, job }: JobFormProps) {
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-6">
       {mode === 'create' && (
         <p className="text-sm text-text-secondary">
-          This job will be visible to workers immediately once you publish it — there is no draft
+          This job will be visible to workers immediately once you publish it â€” there is no draft
           state.
         </p>
       )}
@@ -265,6 +265,16 @@ export function JobForm({ mode, job }: JobFormProps) {
               {errors.description.message}
             </span>
           )}
+        </div>
+        <div className="flex flex-col gap-4 rounded-md border border-text-secondary/10 bg-surface-muted p-4">
+          <div>
+            <h3 className="text-base font-semibold text-text-primary">Skills</h3>
+            <p className="mt-1 text-sm text-text-secondary">
+              Add required or preferred skills first. Recognized skills automatically select the matching category and subcategory.
+            </p>
+          </div>
+          <SkillChipInput ref={requiredSkillsRef} label="Required skills" value={requiredSkills} onChange={setRequiredSkills} />
+          <SkillChipInput ref={preferredSkillsRef} label="Preferred skills" value={preferredSkills} onChange={setPreferredSkills} />
         </div>
         <CategorySelect
           value={categoryValue ? Number(categoryValue) : null}
@@ -363,7 +373,7 @@ export function JobForm({ mode, job }: JobFormProps) {
           <TextField
             label="Duration (days)"
             inputMode="numeric"
-            hint="Optional — leave blank to remove"
+            hint="Optional â€” leave blank to remove"
             error={errors.duration_days?.message}
             {...register('duration_days')}
           />
@@ -377,27 +387,10 @@ export function JobForm({ mode, job }: JobFormProps) {
         </div>
       </JobFormSection>
 
-      <JobFormSection
-        title="Skills"
-        description="Add skills as free text — English or Romanized Nepali both work."
-      >
-        <SkillChipInput
-          ref={requiredSkillsRef}
-          label="Required skills"
-          value={requiredSkills}
-          onChange={setRequiredSkills}
-        />
-        <SkillChipInput
-          ref={preferredSkillsRef}
-          label="Preferred skills"
-          value={preferredSkills}
-          onChange={setPreferredSkills}
-        />
-      </JobFormSection>
-
       <Button type="submit" variant="primary" isLoading={isSubmitting} className="self-start">
         {mode === 'create' ? 'Publish job' : 'Save changes'}
       </Button>
     </form>
   )
 }
+
