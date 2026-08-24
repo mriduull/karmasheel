@@ -193,6 +193,32 @@ describe('WorkerProfile', () => {
     expect(within(form).getByText('Saved')).toBeInTheDocument()
   })
 
+  it('explains that added skill chips are waiting to be matched on save', async () => {
+    const user = userEvent.setup()
+
+    server.use(
+      http.get(`${API_ROOT}/profiles/worker/me/`, () =>
+        HttpResponse.json(buildWorkerProfileFixture({ skills: [] })),
+      ),
+    )
+
+    renderWithProviders(<WorkerProfile />)
+
+    const skillInput = await screen.findByLabelText('Your skills')
+    expect(skillInput).toHaveAccessibleDescription(
+      'Add each skill to the list, then click Save to check and match them.',
+    )
+
+    await user.type(skillInput, 'ghar wiring')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(screen.getByRole('list', { name: 'Your skills waiting to be saved' }))
+      .toHaveTextContent('ghar wiring')
+    expect(screen.getByRole('status')).toHaveTextContent(
+      '1 skill is ready to check. Click Save to match it to standardized skills.',
+    )
+  })
+
   it('saves a typed skill draft when the user clicks Save without clicking Add first', async () => {
     const user = userEvent.setup()
     let capturedBody: unknown = null

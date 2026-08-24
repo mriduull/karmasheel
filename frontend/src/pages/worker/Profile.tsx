@@ -492,9 +492,18 @@ function SkillsSection({ profile }: { profile: WorkerProfile }) {
       <SkillChipInput
         ref={skillInputRef}
         label="Your skills"
+        hint="Add each skill to the list, then click Save to check and match them."
         value={skillInput}
         onChange={markSkillsEdited}
       />
+
+      {skillInput.length > 0 && (
+        <p role="status" className="text-sm font-medium text-neutral-status-text">
+          {skillInput.length} {skillInput.length === 1 ? 'skill is' : 'skills are'} ready to
+          check. Click Save to match {skillInput.length === 1 ? 'it' : 'them'} to standardized
+          skills.
+        </p>
+      )}
 
       <div>
         <Button
