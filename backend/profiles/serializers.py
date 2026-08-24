@@ -47,11 +47,12 @@ def _validate_coordinate_pair(attrs, instance):
 class SkillTagSummarySerializer(serializers.ModelSerializer):
     """Read-only, minimal representation of a standardized skill."""
 
-    subcategory = serializers.StringRelatedField()
+    subcategory = serializers.CharField(source="subcategory.name", read_only=True)
+    category = serializers.CharField(source="subcategory.category.name", read_only=True)
 
     class Meta:
         model = SkillTag
-        fields = ("id", "name", "subcategory")
+        fields = ("id", "name", "category", "subcategory")
         read_only_fields = fields
 
 
@@ -217,17 +218,16 @@ class WorkerProfileSerializer(serializers.ModelSerializer):
 
     def _skill_match_summary(self, phrase, result, *, selected_skill_ids):
         suggestions = []
-        if result.method != "exact_name":
-            candidate = result.skill or result.candidate
-            subcategory_id = candidate.subcategory_id if candidate is not None else None
-            for skill, confidence in get_similar_skill_suggestions(
-                phrase,
-                limit=5,
-                subcategory_id=subcategory_id,
-            ):
-                suggestion = dict(self._skill_summary(skill))
-                suggestion["confidence"] = round(confidence, 2)
-                suggestions.append(suggestion)
+        candidate = result.skill or result.candidate
+        subcategory_id = candidate.subcategory_id if candidate is not None else None
+        for skill, confidence in get_similar_skill_suggestions(
+            phrase,
+            limit=5,
+            subcategory_id=subcategory_id,
+        ):
+            suggestion = dict(self._skill_summary(skill))
+            suggestion["confidence"] = round(confidence, 2)
+            suggestions.append(suggestion)
 
         return {
             "input_term": phrase,

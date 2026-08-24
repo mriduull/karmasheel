@@ -173,6 +173,61 @@ class JobPostCreationTests(JobPostAPITestsBase):
         preferred_ids = set(job.preferred_skills.values_list("id", flat=True))
         self.assertEqual(required_ids & preferred_ids, set())
 
+    def test_fuzzy_skill_match_returns_review_details(self):
+        access_card = SkillTag.objects.create(
+            subcategory=self.subcategory,
+            name="Access Card Management",
+        )
+        self.authenticate_as(self.verified_employer_user, "EmployerPassword123!")
+        payload = {
+            **self.valid_payload,
+            "required_skills_input": ["Aces card mangmnt"],
+        }
+
+        response = self.client.post(self.list_create_url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(list(JobPost.objects.get().required_skills.all()), [access_card])
+        match = response.data["required_skill_matches"][0]
+        self.assertEqual(match["input_term"], "Aces card mangmnt")
+        self.assertEqual(match["method"], "fuzzy")
+        self.assertEqual(match["matched_skill"]["name"], "Access Card Management")
+        self.assertGreaterEqual(match["confidence"], 85)
+
+    def test_employer_can_remove_fuzzy_match_and_send_original_for_review(self):
+        access_card = SkillTag.objects.create(
+            subcategory=self.subcategory,
+            name="Access Card Management",
+        )
+        self.authenticate_as(self.verified_employer_user, "EmployerPassword123!")
+        create_response = self.client.post(
+            self.list_create_url,
+            {**self.valid_payload, "required_skills_input": ["Aces card mangmnt"]},
+            format="json",
+        )
+        job = JobPost.objects.get()
+        self.assertIn(access_card, job.required_skills.all())
+
+        response = self.client.patch(
+            reverse("jobs:detail", args=[job.id]),
+            {
+                "required_skills_input": [],
+                "required_skills_review_input": ["Aces card mangmnt"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        job.refresh_from_db()
+        self.assertEqual(job.required_skills.count(), 0)
+        self.assertEqual(response.data["unmatched_required_terms"], ["Aces card mangmnt"])
+        self.assertTrue(
+            UnmatchedSkillTerm.objects.filter(
+                normalized_term="aces card mangmnt",
+                status=UnmatchedSkillTerm.Status.PENDING,
+            ).exists()
+        )
+
     def test_unmatched_skill_phrase_is_reported_and_not_stored_as_a_skill(self):
         self.authenticate_as(self.verified_employer_user, "EmployerPassword123!")
         payload = {**self.valid_payload, "required_skills_input": ["completely unrelated gibberish"]}
@@ -239,6 +294,68 @@ class JobPostCreationTests(JobPostAPITestsBase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("application_deadline", response.data)
         self.assertEqual(JobPost.objects.count(), 0)
+
+    def test_job_rejects_application_deadline_after_scheduled_start(self):
+        self.authenticate_as(
+            self.verified_employer_user, "EmployerPassword123!"
+        )
+        scheduled_start = timezone.now() + timedelta(days=3)
+        payload = {
+            **self.valid_payload,
+            "scheduled_datetime": scheduled_start.isoformat(),
+            "application_deadline": (
+                scheduled_start + timedelta(hours=1)
+            ).isoformat(),
+        }
+
+        response = self.client.post(
+            self.list_create_url, payload, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["application_deadline"][0],
+            "Application deadline must be earlier than the scheduled start.",
+        )
+        self.assertEqual(JobPost.objects.count(), 0)
+
+    def test_job_rejects_application_deadline_equal_to_scheduled_start(self):
+        self.authenticate_as(
+            self.verified_employer_user, "EmployerPassword123!"
+        )
+        scheduled_start = timezone.now() + timedelta(days=3)
+        payload = {
+            **self.valid_payload,
+            "scheduled_datetime": scheduled_start.isoformat(),
+            "application_deadline": scheduled_start.isoformat(),
+        }
+
+        response = self.client.post(
+            self.list_create_url, payload, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("application_deadline", response.data)
+        self.assertEqual(JobPost.objects.count(), 0)
+
+    def test_job_accepts_application_deadline_before_scheduled_start(self):
+        self.authenticate_as(
+            self.verified_employer_user, "EmployerPassword123!"
+        )
+        scheduled_start = timezone.now() + timedelta(days=3)
+        payload = {
+            **self.valid_payload,
+            "scheduled_datetime": scheduled_start.isoformat(),
+            "application_deadline": (
+                scheduled_start - timedelta(hours=1)
+            ).isoformat(),
+        }
+
+        response = self.client.post(
+            self.list_create_url, payload, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
 
 class JobPostListDetailTests(JobPostAPITestsBase):
@@ -376,6 +493,72 @@ class JobPostListDetailTests(JobPostAPITestsBase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("application_deadline", response.data)
+
+    def test_application_deadline_patch_is_checked_against_existing_start(self):
+        self.own_job.scheduled_datetime = timezone.now() + timedelta(days=3)
+        self.own_job.save(update_fields=["scheduled_datetime"])
+        self.authenticate_as(
+            self.verified_employer_user, "EmployerPassword123!"
+        )
+
+        response = self.client.patch(
+            self.detail_url(self.own_job),
+            {
+                "application_deadline": (
+                    self.own_job.scheduled_datetime + timedelta(minutes=1)
+                ).isoformat()
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["application_deadline"][0],
+            "Application deadline must be earlier than the scheduled start.",
+        )
+
+    def test_scheduled_start_patch_is_checked_against_existing_deadline(self):
+        self.own_job.application_deadline = timezone.now() + timedelta(days=2)
+        self.own_job.save(update_fields=["application_deadline"])
+        self.authenticate_as(
+            self.verified_employer_user, "EmployerPassword123!"
+        )
+
+        response = self.client.patch(
+            self.detail_url(self.own_job),
+            {
+                "scheduled_datetime": (
+                    self.own_job.application_deadline - timedelta(minutes=1)
+                ).isoformat()
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["application_deadline"][0],
+            "Application deadline must be earlier than the scheduled start.",
+        )
+
+    def test_clearing_scheduled_start_does_not_compare_existing_deadline(self):
+        self.own_job.application_deadline = timezone.now() + timedelta(days=2)
+        self.own_job.scheduled_datetime = timezone.now() + timedelta(days=3)
+        self.own_job.save(
+            update_fields=["application_deadline", "scheduled_datetime"]
+        )
+        self.authenticate_as(
+            self.verified_employer_user, "EmployerPassword123!"
+        )
+
+        response = self.client.patch(
+            self.detail_url(self.own_job),
+            {"scheduled_datetime": None},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.own_job.refresh_from_db()
+        self.assertIsNone(self.own_job.scheduled_datetime)
 
     def test_subcategory_change_requires_replacement_skills(self):
         self.own_job.required_skills.add(self.skill)

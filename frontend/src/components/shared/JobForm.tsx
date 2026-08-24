@@ -1,28 +1,32 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createJob, updateJob } from '@/api/endpoints/jobs'
+import { createJob, fetchMyJobs, updateJob } from '@/api/endpoints/jobs'
 import { inferJobTaxonomy } from '@/api/endpoints/taxonomy'
 import { ApiError, toBannerMessage, toFieldErrors } from '@/api/errors'
 import { MY_JOBS_QUERY_KEY } from '@/hooks/useMyJobs'
 import { ownerJobQueryKey } from '@/hooks/useOwnerJob'
-import { useEmployerProfile } from '@/hooks/useEmployerProfile'
-import { jobFormSchema, isDeadlineInPast, isValidJobLocation, type JobFormValues } from '@/validation/job'
+import {
+  isDeadlineInPast,
+  isDeadlineOnOrAfterScheduledStart,
+  jobFormSchema,
+  type JobFormValues,
+} from '@/validation/job'
 import { formatWageTypeLabel, formatWorkType, fromDatetimeLocalInputValue, toDatetimeLocalInputValue } from '@/lib/formatters'
 import type { EmployerJobPost, WageType, WorkType } from '@/types/job'
-import type { JobTaxonomyInferenceRequest } from '@/types/taxonomy'
-import type { LocationValue } from '@/types/location'
+import type { JobTaxonomyInferenceRequest, JobTaxonomyMatchedTerm } from '@/types/taxonomy'
 import { TextField } from '@/components/primitives/TextField'
 import { Button } from '@/components/primitives/Button'
 import { ErrorBanner } from '@/components/primitives/ErrorBanner'
 import { CategorySelect } from './CategorySelect'
 import { SubcategorySelect } from './SubcategorySelect'
 import { SkillChipInput, type SkillChipInputHandle } from './SkillChipInput'
-import { UnmatchedTermNotice } from './UnmatchedTermNotice'
-import { LocationPicker } from './LocationPicker'
+import { JobLocationFields } from './JobLocationFields'
 import { JobFormSection } from './JobFormSection'
+import { JobSkillDecisionScreen } from './JobSkillDecisionScreen'
+import { JobSkillInferenceResults } from './JobSkillInferenceResults'
 
 const WAGE_TYPES: WageType[] = ['HOURLY', 'DAILY', 'MONTHLY', 'FIXED']
 const WORK_TYPES: WorkType[] = ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'ONE_TIME']
@@ -31,6 +35,35 @@ interface JobFormProps {
   mode: 'create' | 'edit'
   /** Required (and used to prefill every field) in edit mode. */
   job?: EmployerJobPost
+}
+
+function jobFormValues(job?: EmployerJobPost, clearDates = false): JobFormValues {
+  return {
+    title: job?.title ?? '',
+    description: job?.description ?? '',
+    category: job ? String(job.category) : '',
+    subcategory: job ? String(job.subcategory) : '',
+    address: job?.address ?? '',
+    latitude: job?.latitude ?? '',
+    longitude: job?.longitude ?? '',
+    wage_type: job?.wage_type ?? 'DAILY',
+    wage_amount: job?.wage_amount ?? '',
+    work_type: job?.work_type ?? 'ONE_TIME',
+    required_experience_years: job ? String(job.required_experience_years) : '0',
+    number_of_workers_required: job ? String(job.number_of_workers_required) : '1',
+    scheduled_datetime:
+      !clearDates && job?.scheduled_datetime
+        ? toDatetimeLocalInputValue(job.scheduled_datetime)
+        : '',
+    duration_days:
+      job?.duration_days !== null && job?.duration_days !== undefined
+        ? String(job.duration_days)
+        : '',
+    application_deadline:
+      !clearDates && job?.application_deadline
+        ? toDatetimeLocalInputValue(job.application_deadline)
+        : '',
+  }
 }
 
 /**
@@ -56,62 +89,27 @@ export function JobForm({ mode, job }: JobFormProps) {
     () => job?.preferred_skills.map((skill) => skill.name) ?? [],
   )
   const [savedJob, setSavedJob] = useState<EmployerJobPost | null>(null)
-  const [unmatchedRequired, setUnmatchedRequired] = useState<string[]>([])
-  const [unmatchedPreferred, setUnmatchedPreferred] = useState<string[]>([])
   const [inferenceInput, setInferenceInput] = useState<JobTaxonomyInferenceRequest | null>(null)
-  // Address+latitude+longitude travel together as one LocationPicker-owned
-  // value (see validation/job.ts) rather than three separate form fields —
-  // `latitude`/`longitude` are always present together on an existing job
-  // (both required, non-nullable on JobPost), so edit mode never needs a
-  // partial value here.
-  const [location, setLocation] = useState<LocationValue | null>(() =>
-    job
-      ? { address: job.address, latitude: Number(job.latitude), longitude: Number(job.longitude), placeId: null }
-      : null,
-  )
-  const [locationError, setLocationError] = useState<string | null>(null)
+  const [selectedPreviousJobId, setSelectedPreviousJobId] = useState('')
+  const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null)
 
-  // Convenience prefill only — the employer's own saved profile location,
-  // offered as a starting point the picker's search/map/current-location
-  // controls can still adjust afterward (never submitted as-is without
-  // going through the same LocationPicker value).
-  const employerProfileQuery = useEmployerProfile()
-  const employerProfile = employerProfileQuery.data
-  const employerLocation: LocationValue | null =
-    employerProfile && employerProfile.latitude !== null && employerProfile.longitude !== null
-      ? {
-          address: employerProfile.address,
-          latitude: Number(employerProfile.latitude),
-          longitude: Number(employerProfile.longitude),
-          placeId: null,
-        }
-      : null
+  const previousJobsQuery = useQuery({
+    queryKey: MY_JOBS_QUERY_KEY,
+    queryFn: fetchMyJobs,
+    enabled: mode === 'create',
+  })
 
   const {
     register,
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors, isSubmitting },
     setError,
   } = useForm<JobFormValues>({
     resolver: zodResolver(jobFormSchema),
-    defaultValues: {
-      title: job?.title ?? '',
-      description: job?.description ?? '',
-      category: job ? String(job.category) : '',
-      subcategory: job ? String(job.subcategory) : '',
-      wage_type: job?.wage_type ?? 'DAILY',
-      wage_amount: job?.wage_amount ?? '',
-      work_type: job?.work_type ?? 'ONE_TIME',
-      required_experience_years: job ? String(job.required_experience_years) : '0',
-      number_of_workers_required: job ? String(job.number_of_workers_required) : '1',
-      scheduled_datetime: job?.scheduled_datetime ? toDatetimeLocalInputValue(job.scheduled_datetime) : '',
-      duration_days: job?.duration_days !== null && job?.duration_days !== undefined ? String(job.duration_days) : '',
-      application_deadline: job?.application_deadline
-        ? toDatetimeLocalInputValue(job.application_deadline)
-        : '',
-    },
+    defaultValues: jobFormValues(job),
   })
 
   const categoryValue = watch('category')
@@ -174,6 +172,50 @@ export function JobForm({ mode, job }: JobFormProps) {
       .filter((term) => term.subcategory === inference.subcategory)
       .map((term) => term.skill_name)
       .filter((name, index, names) => names.indexOf(name) === index) ?? []
+  const requiredSkillMatches =
+    [...(inference?.matched_terms ?? []), ...(inference?.suggested_terms ?? [])]
+      .filter((term) => term.source === 'required_skill')
+  const preferredSkillMatches =
+    [...(inference?.matched_terms ?? []), ...(inference?.suggested_terms ?? [])]
+      .filter((term) => term.source === 'preferred_skill')
+
+  const selectMappedSkill = (
+    match: JobTaxonomyMatchedTerm,
+    skillName: string,
+    setSkills: Dispatch<SetStateAction<string[]>>,
+  ) => {
+    setSkills((skills) => skills.map((skill) =>
+      skill.trim().toLocaleLowerCase() === match.term.trim().toLocaleLowerCase()
+        ? skillName
+        : skill,
+    ))
+  }
+
+  const duplicatePreviousJob = () => {
+    const previousJob = previousJobsQuery.data?.find(
+      (candidate) => String(candidate.id) === selectedPreviousJobId,
+    )
+    if (!previousJob) return
+
+    const nextRequiredSkills = previousJob.required_skills.map((skill) => skill.name)
+    const nextPreferredSkills = previousJob.preferred_skills.map((skill) => skill.name)
+
+    reset(jobFormValues(previousJob, true))
+    requiredSkillsRef.current?.clearDraft()
+    preferredSkillsRef.current?.clearDraft()
+    setRequiredSkills(nextRequiredSkills)
+    setPreferredSkills(nextPreferredSkills)
+    setInferenceInput({
+      title: previousJob.title,
+      description: previousJob.description,
+      required_skills: nextRequiredSkills,
+      preferred_skills: nextPreferredSkills,
+    })
+    setFormError(null)
+    setDuplicateNotice(
+      `Copied reusable details from “${previousJob.title}”. Enter a new scheduled start and application deadline before publishing.`,
+    )
+  }
 
   const onSubmit = async (values: JobFormValues) => {
     setFormError(null)
@@ -183,11 +225,15 @@ export function JobForm({ mode, job }: JobFormProps) {
       return
     }
 
-    if (!location || !isValidJobLocation(location)) {
-      // The submit wrapper below already surfaces this to the user; this
-      // is only the guard against actually sending the request — `onSubmit`
-      // fires whenever every RHF-registered field passes, which says
-      // nothing about `location` since it isn't one.
+    if (
+      isDeadlineOnOrAfterScheduledStart(
+        values.application_deadline,
+        values.scheduled_datetime,
+      )
+    ) {
+      setError('application_deadline', {
+        message: 'Application deadline must be earlier than the scheduled start.',
+      }, { shouldFocus: true })
       return
     }
 
@@ -227,12 +273,15 @@ export function JobForm({ mode, job }: JobFormProps) {
       await queryClient.invalidateQueries({ queryKey: MY_JOBS_QUERY_KEY })
       queryClient.setQueryData(ownerJobQueryKey(result.id), result)
 
-      if (result.unmatched_required_terms.length > 0 || result.unmatched_preferred_terms.length > 0) {
+      const hasReviewableMatches = [
+        ...result.required_skill_matches,
+        ...result.preferred_skill_matches,
+      ].some((match) => match.matched_skill !== null && match.method !== 'exact_name')
+
+      if (result.unmatched_required_terms.length > 0 || result.unmatched_preferred_terms.length > 0 || hasReviewableMatches) {
         // Stay on this screen long enough for the unmatched-term notice
         // to actually be seen, rather than redirecting it away instantly.
         setSavedJob(result)
-        setUnmatchedRequired(result.unmatched_required_terms)
-        setUnmatchedPreferred(result.unmatched_preferred_terms)
       } else {
         navigate(`/employer/jobs/${result.id}`, { replace: true })
       }
@@ -276,19 +325,7 @@ export function JobForm({ mode, job }: JobFormProps) {
   }
 
   if (savedJob) {
-    return (
-      <div className="flex flex-col gap-4">
-        <div role="status" className="rounded-md bg-success-bg p-4 text-success-text">
-          <p className="font-semibold">
-            {mode === 'create' ? 'Job published.' : 'Job updated.'}
-          </p>
-        </div>
-        <UnmatchedTermNotice terms={[...unmatchedRequired, ...unmatchedPreferred]} />
-        <Button variant="primary" onClick={() => navigate(`/employer/jobs/${savedJob.id}`)}>
-          View Job
-        </Button>
-      </div>
-    )
+    return <JobSkillDecisionScreen job={savedJob} wasCreated={mode === 'create'} />
   }
 
   return (
@@ -301,6 +338,63 @@ export function JobForm({ mode, job }: JobFormProps) {
       )}
 
       {formError && <ErrorBanner message={formError} />}
+
+      {mode === 'create' && (
+        <JobFormSection
+          title="Duplicate Job"
+          description="Choose one of your previous jobs to reuse its details. Scheduled start and application deadline are never copied."
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <div className="flex flex-1 flex-col gap-1">
+              <label htmlFor="previous-job" className="text-base font-semibold text-text-primary">
+                Previous job
+              </label>
+              <select
+                id="previous-job"
+                value={selectedPreviousJobId}
+                onChange={(event) => {
+                  setSelectedPreviousJobId(event.target.value)
+                  setDuplicateNotice(null)
+                }}
+                disabled={previousJobsQuery.isPending || previousJobsQuery.isError}
+                className="min-h-touch rounded-sm border border-text-secondary/30 bg-surface px-3 text-base text-text-primary focus:border-brand-primary disabled:opacity-60"
+              >
+                <option value="">
+                  {previousJobsQuery.isPending
+                    ? 'Loading previous jobs…'
+                    : 'Select a previous job'}
+                </option>
+                {(previousJobsQuery.data ?? []).map((previousJob) => (
+                  <option key={previousJob.id} value={previousJob.id}>
+                    {previousJob.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={duplicatePreviousJob}
+              disabled={!selectedPreviousJobId || previousJobsQuery.isPending}
+            >
+              Use Previous Job
+            </Button>
+          </div>
+          {previousJobsQuery.isSuccess && previousJobsQuery.data.length === 0 && (
+            <p className="text-sm text-text-secondary">You do not have any previous jobs to duplicate.</p>
+          )}
+          {previousJobsQuery.isError && (
+            <p role="alert" className="text-sm font-medium text-danger-text">
+              Previous jobs could not be loaded. Please try again.
+            </p>
+          )}
+          {duplicateNotice && (
+            <p role="status" className="text-sm font-medium text-success-text">
+              {duplicateNotice}
+            </p>
+          )}
+        </JobFormSection>
+      )}
 
       <JobFormSection title="Basics">
         <TextField label="Title" error={errors.title?.message} {...register('title')} />
@@ -321,6 +415,26 @@ export function JobForm({ mode, job }: JobFormProps) {
               {errors.description.message}
             </span>
           )}
+        </div>
+        <div className="flex flex-col gap-4 rounded-md border border-text-secondary/10 bg-surface-muted p-4">
+          <div>
+            <h3 className="text-base font-semibold text-text-primary">Skills</h3>
+            <p className="mt-1 text-sm text-text-secondary">
+              Add required or preferred skills first. Recognized skills automatically select the matching category and subcategory.
+            </p>
+          </div>
+          <SkillChipInput ref={requiredSkillsRef} label="Required skills" value={requiredSkills} onChange={setRequiredSkills} />
+          <JobSkillInferenceResults
+            matches={requiredSkillMatches}
+            selectedSubcategoryId={subcategoryValue ? Number(subcategoryValue) : null}
+            onSelectSkill={(match, skillName) => selectMappedSkill(match, skillName, setRequiredSkills)}
+          />
+          <SkillChipInput ref={preferredSkillsRef} label="Preferred skills" value={preferredSkills} onChange={setPreferredSkills} />
+          <JobSkillInferenceResults
+            matches={preferredSkillMatches}
+            selectedSubcategoryId={subcategoryValue ? Number(subcategoryValue) : null}
+            onSelectSkill={(match, skillName) => selectMappedSkill(match, skillName, setPreferredSkills)}
+          />
         </div>
         <CategorySelect
           value={categoryValue ? Number(categoryValue) : null}
@@ -453,24 +567,6 @@ export function JobForm({ mode, job }: JobFormProps) {
             {...register('application_deadline')}
           />
         </div>
-      </JobFormSection>
-
-      <JobFormSection
-        title="Skills"
-        description="Add skills as free text — English or Romanized Nepali both work."
-      >
-        <SkillChipInput
-          ref={requiredSkillsRef}
-          label="Required skills"
-          value={requiredSkills}
-          onChange={setRequiredSkills}
-        />
-        <SkillChipInput
-          ref={preferredSkillsRef}
-          label="Preferred skills"
-          value={preferredSkills}
-          onChange={setPreferredSkills}
-        />
       </JobFormSection>
 
       <Button type="submit" variant="primary" isLoading={isSubmitting} className="self-start">

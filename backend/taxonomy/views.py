@@ -13,7 +13,11 @@ from .serializers import (
     SkillTagSerializer,
     SubcategorySerializer,
 )
-from .services import normalize_skill_phrase, preprocess_skill_phrase
+from .services import (
+    get_similar_skill_suggestions,
+    normalize_skill_phrase,
+    preprocess_skill_phrase,
+)
 
 
 def _parse_int_query_param(request, name):
@@ -122,33 +126,80 @@ class JobTaxonomyInferenceView(APIView):
 
         scores = {}
         matched_terms = []
+        suggested_terms = []
 
-        def add_score(skill, weight, term, source, confidence):
+        def serialize_term(skill, term, source, result, *, is_confident_match):
+            subcategory = skill.subcategory
+            suggestions = []
+            if result.method != "exact_name":
+                for suggested_skill, suggestion_confidence in get_similar_skill_suggestions(
+                    term,
+                    limit=5,
+                ):
+                    suggestions.append(
+                        {
+                            "id": suggested_skill.id,
+                            "name": suggested_skill.name,
+                            "subcategory": str(suggested_skill.subcategory),
+                            "confidence": round(suggestion_confidence, 2),
+                        }
+                    )
+            return {
+                "term": term,
+                "source": source,
+                "skill_id": skill.id,
+                "skill_name": skill.name,
+                "subcategory": subcategory.id,
+                "subcategory_name": subcategory.name,
+                "category": subcategory.category_id,
+                "category_name": subcategory.category.name,
+                "confidence": round(result.confidence, 2),
+                "method": result.method,
+                "suggestions": suggestions,
+                "is_confident_match": is_confident_match,
+            }
+
+        def add_score(skill, weight, term, source, result):
             subcategory = skill.subcategory
             scores[subcategory.id] = scores.get(subcategory.id, 0) + weight
-            matched_terms.append(
-                {
-                    "term": term,
-                    "source": source,
-                    "skill_id": skill.id,
-                    "skill_name": skill.name,
-                    "subcategory": subcategory.id,
-                    "subcategory_name": subcategory.name,
-                    "category": subcategory.category_id,
-                    "category_name": subcategory.category.name,
-                    "confidence": confidence,
-                }
+            matched_terms.append(serialize_term(skill, term, source, result, is_confident_match=True))
+
+        def add_tentative_suggestion(term, source, result):
+            if result.candidate is None:
+                return
+            ranked = get_similar_skill_suggestions(term, limit=2)
+            if not ranked:
+                return
+            top_score = ranked[0][1]
+            runner_up_score = ranked[1][1] if len(ranked) > 1 else 0.0
+            # A tentative candidate is only useful when it is reasonably
+            # close and clearly ahead of the next option. It never affects
+            # automatic category selection; the employer must confirm it.
+            if top_score < 75 or top_score - runner_up_score < 5:
+                return
+            suggested_terms.append(
+                serialize_term(
+                    result.candidate,
+                    term,
+                    source,
+                    result,
+                    is_confident_match=False,
+                )
             )
 
         for phrase in required_skills:
             result = normalize_skill_phrase(phrase, record_unmatched=False)
             if result.skill is not None:
-                add_score(result.skill, 3, phrase, "required_skill", result.confidence)
+                add_score(result.skill, 3, phrase, "required_skill", result)
+            else:
+                add_tentative_suggestion(phrase, "required_skill", result)
 
         for phrase in preferred_skills:
             result = normalize_skill_phrase(phrase, record_unmatched=False)
             if result.skill is not None:
-                add_score(result.skill, 2, phrase, "preferred_skill", result.confidence)
+                add_score(result.skill, 2, phrase, "preferred_skill", result)
+            else:
+                add_tentative_suggestion(phrase, "preferred_skill", result)
 
         normalized_text = preprocess_skill_phrase(f"{title} {description}")
         if normalized_text:
@@ -156,7 +207,8 @@ class JobTaxonomyInferenceView(APIView):
             for skill in skills:
                 normalized_name = preprocess_skill_phrase(skill.name)
                 if normalized_name and normalized_name in normalized_text:
-                    add_score(skill, 1, skill.name, "job_text", 100.0)
+                    result = normalize_skill_phrase(skill.name, record_unmatched=False)
+                    add_score(skill, 1, skill.name, "job_text", result)
 
             aliases = SkillAlias.objects.filter(skill__is_active=True).select_related(
                 "skill__subcategory__category"
@@ -164,7 +216,8 @@ class JobTaxonomyInferenceView(APIView):
             for alias in aliases:
                 normalized_alias = preprocess_skill_phrase(alias.phrase)
                 if normalized_alias and normalized_alias in normalized_text:
-                    add_score(alias.skill, 1, alias.phrase, "job_text", 100.0)
+                    result = normalize_skill_phrase(alias.phrase, record_unmatched=False)
+                    add_score(alias.skill, 1, alias.phrase, "job_text", result)
 
         if not scores:
             return Response(
@@ -174,6 +227,7 @@ class JobTaxonomyInferenceView(APIView):
                     "subcategory": None,
                     "subcategory_name": None,
                     "matched_terms": [],
+                    "suggested_terms": suggested_terms,
                     "confidence": 0,
                 }
             )
@@ -189,6 +243,7 @@ class JobTaxonomyInferenceView(APIView):
                 "subcategory": best_subcategory.id,
                 "subcategory_name": best_subcategory.name,
                 "matched_terms": matched_terms,
+                "suggested_terms": suggested_terms,
                 "confidence": round((scores[best_subcategory_id] / total_score) * 100, 2),
             }
         )

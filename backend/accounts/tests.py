@@ -1,4 +1,7 @@
+from datetime import datetime
+from decimal import Decimal
 from io import StringIO
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
@@ -598,7 +601,9 @@ class SeedDemoCommandTests(TestCase):
         call_command("seed_demo", stdout=StringIO())
 
         user_count = User.objects.filter(username__startswith="demo_").count()
-        job_count = JobPost.objects.filter(employer__user__username="demo_employer_verified").count()
+        job_count = JobPost.objects.filter(
+            employer__user__username__startswith="demo_employer"
+        ).count()
         application_count = Application.objects.filter(
             worker__user__username__startswith="demo_worker"
         ).count()
@@ -611,7 +616,9 @@ class SeedDemoCommandTests(TestCase):
             User.objects.filter(username__startswith="demo_").count(), user_count
         )
         self.assertEqual(
-            JobPost.objects.filter(employer__user__username="demo_employer_verified").count(),
+            JobPost.objects.filter(
+                employer__user__username__startswith="demo_employer"
+            ).count(),
             job_count,
         )
         self.assertEqual(
@@ -670,6 +677,48 @@ class SeedDemoCommandTests(TestCase):
             active_demo_jobs.values_list("employer__user__username", flat=True)
         )
         self.assertGreaterEqual(len(employer_usernames), 2)
+
+    def test_retail_employer_has_deterministic_electrician_job(self):
+        call_command("seed_demo", stdout=StringIO())
+
+        job = JobPost.objects.get(
+            employer__user__username="demo_employer_retail",
+            title="Electrician Needed for House Wiring",
+        )
+
+        self.assertEqual(
+            job.description,
+            "Need an electrician for house wiring and switch installation.",
+        )
+        self.assertEqual(job.category.name, "Construction & Repair")
+        self.assertEqual(job.subcategory.name, "Electrical")
+        self.assertEqual(
+            list(job.required_skills.values_list("name", flat=True)),
+            ["House Wiring"],
+        )
+        self.assertEqual(
+            list(job.preferred_skills.values_list("name", flat=True)),
+            ["Switchboard Installation"],
+        )
+        self.assertEqual(job.address, "Patan, Lalitpur")
+        self.assertEqual(job.latitude, Decimal("27.683219"))
+        self.assertEqual(job.longitude, Decimal("85.327463"))
+        self.assertEqual(job.required_experience_years, 1)
+        self.assertEqual(job.wage_type, JobPost.WageType.DAILY)
+        self.assertEqual(job.wage_amount, Decimal("1800.00"))
+        self.assertEqual(job.work_type, JobPost.WorkType.ONE_TIME)
+        self.assertEqual(job.number_of_workers_required, 1)
+        self.assertEqual(job.duration_days, 1)
+        nepal_time_zone = ZoneInfo("Asia/Kathmandu")
+        self.assertEqual(
+            job.scheduled_datetime,
+            datetime(2026, 8, 27, 15, 0, tzinfo=nepal_time_zone),
+        )
+        self.assertEqual(
+            job.application_deadline,
+            datetime(2026, 8, 26, 15, 0, tzinfo=nepal_time_zone),
+        )
+        self.assertEqual(job.status, JobPost.Status.ACTIVE)
 
     def test_job_with_several_applicants_in_different_states(self):
         call_command("seed_demo", stdout=StringIO())

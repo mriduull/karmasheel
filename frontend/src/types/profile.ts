@@ -4,7 +4,7 @@ export interface SkillMatchSuggestion extends SkillTagSummary {
   confidence: number
 }
 
-export interface WorkerSkillMatch {
+export interface SkillMatch {
   input_term: string
   method: 'exact_name' | 'exact_alias' | 'fuzzy' | 'unmatched'
   confidence: number
@@ -12,6 +12,8 @@ export interface WorkerSkillMatch {
   matched_skill_was_selected: boolean
   suggestions: SkillMatchSuggestion[]
 }
+
+export type WorkerSkillMatch = SkillMatch
 
 /**
  * profiles/serializers.py:WorkerProfileSerializer — response shape from

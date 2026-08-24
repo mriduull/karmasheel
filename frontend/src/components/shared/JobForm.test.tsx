@@ -33,6 +33,7 @@ const EMPLOYER_USER = {
 
 function mockTaxonomy() {
   server.use(
+    http.get(`${API_ROOT}/jobs/`, () => HttpResponse.json([])),
     http.get(`${API_ROOT}/taxonomy/categories/`, () => HttpResponse.json(CATEGORY_FIXTURES)),
     http.get(`${API_ROOT}/taxonomy/subcategories/`, ({ request }) => {
       const url = new URL(request.url)
@@ -68,9 +69,15 @@ function mockTaxonomy() {
               category: 1,
               category_name: 'Construction & Repair',
               confidence: 100,
+              method: 'exact_alias',
+              suggestions: [
+                { id: 2, name: 'House Wiring', subcategory: 'Electrical', confidence: 100 },
+              ],
+              is_confident_match: true,
             },
           ],
           confidence: 100,
+          suggested_terms: [],
         })
       }
 
@@ -81,6 +88,7 @@ function mockTaxonomy() {
         subcategory_name: null,
         matched_terms: [],
         confidence: 0,
+        suggested_terms: [],
       })
     }),
   )
@@ -173,6 +181,108 @@ describe('JobForm', () => {
       expect(screen.getByText(/auto-selected electrical based on house wiring/i)).toBeInTheDocument()
     })
 
+    it('places skill inputs before category and explains automatic taxonomy mapping', async () => {
+      renderWithProviders(<JobForm mode="create" />)
+
+      const requiredSkills = screen.getByLabelText('Required skills')
+      const preferredSkills = screen.getByLabelText('Preferred skills')
+      const category = await screen.findByLabelText('Category')
+      const subcategory = screen.getByLabelText('Subcategory')
+
+      expect(requiredSkills.compareDocumentPosition(category) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(preferredSkills.compareDocumentPosition(subcategory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(screen.getByText(/recognized skills automatically select the matching category and subcategory/i)).toBeInTheDocument()
+    })
+
+    it('shows clickable canonical matches for both required and preferred phrases', async () => {
+      const user = userEvent.setup()
+      server.use(
+        http.post(`${API_ROOT}/taxonomy/infer-job-category/`, () => HttpResponse.json({
+          category: 9,
+          category_name: 'Security Services',
+          subcategory: 20,
+          subcategory_name: 'Access Control & Surveillance',
+          confidence: 60,
+          suggested_terms: [],
+          matched_terms: [
+            {
+              term: 'Aces Card managment', source: 'required_skill', skill_id: 20,
+              skill_name: 'Access Card Management', subcategory: 20,
+              subcategory_name: 'Access Control & Surveillance', category: 9,
+              category_name: 'Security Services', confidence: 87, method: 'fuzzy',
+              is_confident_match: true,
+              suggestions: [{ id: 20, name: 'Access Card Management', subcategory: 'Access Control & Surveillance', confidence: 87 }],
+            },
+            {
+              term: 'aaunsadi samjhaune', source: 'preferred_skill', skill_id: 21,
+              skill_name: 'Medication Reminder Support', subcategory: 30,
+              subcategory_name: 'Elderly Care', category: 10,
+              category_name: 'Care Services', confidence: 91, method: 'fuzzy',
+              is_confident_match: true,
+              suggestions: [
+                { id: 21, name: 'Medication Reminder Support', subcategory: 'Elderly Care', confidence: 91 },
+                { id: 22, name: 'Medicine Pickup Support', subcategory: 'Elderly Care', confidence: 72 },
+              ],
+            },
+          ],
+        })),
+      )
+      renderWithProviders(<JobForm mode="create" />)
+
+      for (const [label, phrase] of [['Required skills', 'Aces Card managment'], ['Preferred skills', 'aaunsadi samjhaune']] as const) {
+        const input = screen.getByLabelText(label)
+        await user.type(input, phrase)
+        await user.click(within(input.closest('div') as HTMLElement).getByRole('button', { name: 'Add' }))
+      }
+
+      const preferredMatch = await screen.findByText('Medication Reminder Support', { selector: 'summary' })
+      await user.click(preferredMatch)
+      const details = preferredMatch.closest('details') as HTMLElement
+      expect(within(details).getByText((_, element) => element?.tagName === 'P' && (element.textContent?.includes('aaunsadi samjhaune') ?? false))).toBeInTheDocument()
+      expect(within(details).getByText(/91% confidence/i)).toBeInTheDocument()
+      expect(within(details).getByText(/Medicine Pickup Support \(72%\)/i)).toBeInTheDocument()
+      await user.click(within(details).getByRole('button', { name: 'Use suggested skill Medicine Pickup Support' }))
+      expect(screen.getByRole('button', { name: 'Remove Medicine Pickup Support' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Remove aaunsadi samjhaune' })).not.toBeInTheDocument()
+    })
+
+    it('shows and applies a tentative canonical suggestion for a lower-confidence spelling', async () => {
+      const user = userEvent.setup()
+      server.use(
+        http.post(`${API_ROOT}/taxonomy/infer-job-category/`, () => HttpResponse.json({
+          category: null,
+          category_name: null,
+          subcategory: null,
+          subcategory_name: null,
+          confidence: 0,
+          matched_terms: [],
+          suggested_terms: [{
+            term: 'batan fixing', source: 'required_skill', skill_id: 30,
+            skill_name: 'Button Fixing', subcategory: 40,
+            subcategory_name: 'Alterations & Repair', category: 12,
+            category_name: 'Tailoring & Garment Work', confidence: 80,
+            method: 'unmatched', is_confident_match: false,
+            suggestions: [
+              { id: 30, name: 'Button Fixing', subcategory: 'Alterations & Repair', confidence: 80 },
+              { id: 31, name: 'Steel Fixing', subcategory: 'Structural Work', confidence: 75 },
+            ],
+          }],
+        })),
+      )
+      renderWithProviders(<JobForm mode="create" />)
+      const input = screen.getByLabelText('Required skills')
+      await user.type(input, 'batan fixing')
+      await user.click(within(input.closest('div') as HTMLElement).getByRole('button', { name: 'Add' }))
+
+      const summary = await screen.findByText(/possible match: button fixing/i, { selector: 'summary' })
+      await user.click(summary)
+      expect(summary.closest('details')).toHaveTextContent('You entered “batan fixing”')
+      await user.click(screen.getByRole('button', { name: 'Use Button Fixing' }))
+
+      expect(screen.getByRole('button', { name: 'Remove Button Fixing' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Remove batan fixing' })).not.toBeInTheDocument()
+    })
+
     it('rejects an application deadline in the past on create', async () => {
       const user = userEvent.setup()
       renderWithProviders(<JobForm mode="create" />)
@@ -186,6 +296,92 @@ describe('JobForm', () => {
       expect(
         await screen.findByText('Application deadline cannot be in the past.'),
       ).toBeInTheDocument()
+    })
+
+    it('requires the application deadline to be earlier than the scheduled start', async () => {
+      const user = userEvent.setup()
+      let postCalled = false
+      server.use(
+        http.post(`${API_ROOT}/jobs/`, () => {
+          postCalled = true
+          return HttpResponse.json(buildEmployerJobFixture())
+        }),
+      )
+
+      renderWithProviders(<JobForm mode="create" />)
+      await fillRequiredBasics(user)
+      await user.type(screen.getByLabelText('Scheduled start'), '2099-08-27T15:00')
+      await user.type(screen.getByLabelText('Application deadline'), '2099-08-29T15:00')
+
+      await user.click(screen.getByRole('button', { name: 'Publish job' }))
+
+      expect(
+        await screen.findByText('Application deadline must be earlier than the scheduled start.'),
+      ).toBeInTheDocument()
+      expect(postCalled).toBe(false)
+    })
+
+    it('duplicates reusable details from a previous job but leaves both dates blank', async () => {
+      const user = userEvent.setup()
+      const previousJob = buildEmployerJobFixture({
+        id: 42,
+        title: 'Electrician Needed for House Wiring',
+        description: 'Need an electrician for house wiring and switch installation.',
+        required_skills: [{ id: 2, name: 'House Wiring', subcategory: 'Electrical' }],
+        preferred_skills: [{ id: 8, name: 'Switch Installation', subcategory: 'Electrical' }],
+        address: 'Patan, Lalitpur',
+        latitude: '27.683219',
+        longitude: '85.327463',
+        wage_type: 'DAILY',
+        wage_amount: '1800.00',
+        work_type: 'ONE_TIME',
+        required_experience_years: 1,
+        number_of_workers_required: 1,
+        duration_days: 1,
+        scheduled_datetime: '2099-08-27T09:15:00Z',
+        application_deadline: '2099-08-26T09:15:00Z',
+      })
+      server.use(http.get(`${API_ROOT}/jobs/`, () => HttpResponse.json([previousJob])))
+
+      renderWithProviders(<JobForm mode="create" />)
+
+      await user.type(screen.getByLabelText('Required skills'), 'stale required draft')
+      await user.type(screen.getByLabelText('Preferred skills'), 'stale preferred draft')
+      const previousJobSelect = await screen.findByLabelText('Previous job')
+      await within(previousJobSelect).findByRole('option', { name: previousJob.title })
+      await user.selectOptions(previousJobSelect, String(previousJob.id))
+      await user.click(screen.getByRole('button', { name: 'Use Previous Job' }))
+
+      expect(screen.getByLabelText('Title')).toHaveValue(previousJob.title)
+      expect(screen.getByLabelText('Description')).toHaveValue(previousJob.description)
+      expect(screen.getByLabelText('Address')).toHaveValue('Patan, Lalitpur')
+      expect(screen.getByLabelText('Latitude')).toHaveValue('27.683219')
+      expect(screen.getByLabelText('Longitude')).toHaveValue('85.327463')
+      expect(screen.getByLabelText('Wage type')).toHaveValue('DAILY')
+      expect(screen.getByLabelText('Wage amount')).toHaveValue('1800.00')
+      expect(screen.getByLabelText('Work type')).toHaveValue('ONE_TIME')
+      expect(screen.getByLabelText('Required experience (years)')).toHaveValue('1')
+      expect(screen.getByLabelText('Number of workers needed')).toHaveValue('1')
+      expect(screen.getByLabelText('Duration (days)')).toHaveValue('1')
+      expect(screen.getByRole('button', { name: 'Remove House Wiring' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Remove Switch Installation' })).toBeInTheDocument()
+      expect(screen.getByLabelText('Required skills')).toHaveValue('')
+      expect(screen.getByLabelText('Preferred skills')).toHaveValue('')
+      expect(screen.getByLabelText('Scheduled start')).toHaveValue('')
+      expect(screen.getByLabelText('Application deadline')).toHaveValue('')
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Enter a new scheduled start and application deadline before publishing.',
+      )
+    })
+
+    it('renders em dashes without mojibake', async () => {
+      const { container } = renderWithProviders(<JobForm mode="create" />)
+
+      expect(
+        screen.getByText(/publish it — there is no draft state/i),
+      ).toBeInTheDocument()
+      expect(screen.getByText('Optional — leave blank to remove')).toBeInTheDocument()
+      expect(container).not.toHaveTextContent('\u00e2')
     })
 
     it('adds and removes skill chips, submitting them as required_skills_input/preferred_skills_input', async () => {
@@ -279,6 +475,57 @@ describe('JobForm', () => {
       expect(screen.getByText(/we couldn't confidently match/i)).toBeInTheDocument()
       expect(screen.getByText('cnc machine operation')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'View Job' })).toBeInTheDocument()
+    })
+
+    it('lets an employer review a fuzzy skill match and send the original phrase to admin review', async () => {
+      const user = userEvent.setup()
+      const accessCard = { id: 20, name: 'Access Card Management', subcategory: 'Electrical' }
+      let patchBody: Record<string, unknown> | null = null
+      server.use(
+        http.post(`${API_ROOT}/jobs/`, () =>
+          HttpResponse.json(buildEmployerJobFixture({
+            id: 77,
+            required_skills: [accessCard],
+            preferred_skills: [],
+            required_skill_matches: [{
+              input_term: 'Aces card mangmnt',
+              method: 'fuzzy',
+              confidence: 87.18,
+              matched_skill: accessCard,
+              matched_skill_was_selected: true,
+              suggestions: [{ ...accessCard, confidence: 87.18 }],
+            }],
+          })),
+        ),
+        http.patch(`${API_ROOT}/jobs/77/`, async ({ request }) => {
+          patchBody = (await request.json()) as Record<string, unknown>
+          return HttpResponse.json(buildEmployerJobFixture({
+            id: 77,
+            required_skills: [],
+            preferred_skills: [],
+            unmatched_required_terms: ['Aces card mangmnt'],
+          }))
+        }),
+      )
+
+      renderWithProviders(<JobForm mode="create" />)
+      await fillRequiredBasics(user)
+      const input = screen.getByLabelText('Required skills')
+      await user.type(input, 'Aces card mangmnt')
+      await user.click(within(input.closest('div') as HTMLElement).getByRole('button', { name: 'Add' }))
+      await user.click(screen.getByRole('button', { name: 'Publish job' }))
+
+      expect(await screen.findByRole('region', { name: 'Review match for Aces card mangmnt' })).toBeInTheDocument()
+      expect(screen.getByText(/matched to/i)).toHaveTextContent('Access Card Management')
+      await user.click(screen.getByRole('button', { name: 'Remove this match and send original for review' }))
+      await user.click(screen.getByRole('button', { name: 'Save skill decisions' }))
+
+      await waitFor(() => expect(patchBody).not.toBeNull())
+      expect(patchBody).toMatchObject({
+        required_skills_input: [],
+        required_skills_review_input: ['Aces card mangmnt'],
+      })
+      expect(await screen.findByText('Skill decisions saved.')).toBeInTheDocument()
     })
 
     it('shows a verification-specific message on a 403 without crashing', async () => {
@@ -445,6 +692,32 @@ describe('JobForm', () => {
       await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
       expect(screen.queryByText('Application deadline cannot be in the past.')).not.toBeInTheDocument()
+    })
+
+    it('still validates deadline order on edit', async () => {
+      const user = userEvent.setup()
+      let patchCalled = false
+      const job = buildEmployerJobFixture({
+        id: 9,
+        scheduled_datetime: '2099-08-27T09:15:00Z',
+        application_deadline: '2099-08-29T09:15:00Z',
+      })
+
+      server.use(
+        http.patch(`${API_ROOT}/jobs/9/`, () => {
+          patchCalled = true
+          return HttpResponse.json(job)
+        }),
+      )
+
+      renderWithProviders(<JobForm mode="edit" job={job} />)
+      await screen.findByDisplayValue(job.title)
+      await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+      expect(
+        await screen.findByText('Application deadline must be earlier than the scheduled start.'),
+      ).toBeInTheDocument()
+      expect(patchCalled).toBe(false)
     })
   })
 

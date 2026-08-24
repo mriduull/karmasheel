@@ -107,3 +107,19 @@ export function isDeadlineInPast(value: string): boolean {
   if (!value) return false
   return new Date(value).getTime() < Date.now()
 }
+
+/** Both values come from `datetime-local` controls and therefore share the
+ * same local-time basis. An equal deadline is also invalid: employers must
+ * leave workers some time to apply before work starts. */
+export function isDeadlineOnOrAfterScheduledStart(
+  applicationDeadline: string,
+  scheduledStart: string,
+): boolean {
+  if (!applicationDeadline || !scheduledStart) return false
+
+  const deadlineTime = new Date(applicationDeadline).getTime()
+  const scheduledTime = new Date(scheduledStart).getTime()
+
+  if (!Number.isFinite(deadlineTime) || !Number.isFinite(scheduledTime)) return false
+  return deadlineTime >= scheduledTime
+}

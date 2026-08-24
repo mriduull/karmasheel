@@ -157,7 +157,7 @@ describe('WorkerProfile', () => {
       name: 'Selected standardized skills',
     })
     expect(within(selectedList).getByText('House Wiring')).toBeInTheDocument()
-    expect(within(selectedList).getByText('(Electrical)')).toBeInTheDocument()
+    expect(within(selectedList).getByText('Electrical')).toBeInTheDocument()
   })
 
   it('displays unmatched skill terms returned by a save, without discarding existing skills', async () => {
@@ -234,6 +234,171 @@ describe('WorkerProfile', () => {
       expect(capturedBody).toContain('Content-Type: image/png')
     })
     expect(within(form).getByText('Saved')).toBeInTheDocument()
+  })
+
+  it('explains that added skill chips are waiting to be matched on save', async () => {
+    const user = userEvent.setup()
+
+    server.use(
+      http.get(`${API_ROOT}/profiles/worker/me/`, () =>
+        HttpResponse.json(buildWorkerProfileFixture({ skills: [] })),
+      ),
+    )
+
+    renderWithProviders(<WorkerProfile />)
+
+    const skillInput = await screen.findByLabelText('Your skills')
+    expect(skillInput).toHaveAccessibleDescription(
+      'Add each skill to see how it matches, then click Save to update your profile.',
+    )
+
+    await user.type(skillInput, 'ghar wiring')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(screen.getByRole('list', { name: 'Your skills waiting to be saved' }))
+      .toHaveTextContent('ghar wiring')
+    expect(screen.getByRole('status')).toHaveTextContent(
+      '1 skill is ready to save. Review the match shown above, then click Save.',
+    )
+  })
+
+  it('shows immediate expandable taxonomy matches and lets the worker choose an alternative', async () => {
+    const user = userEvent.setup()
+    let inferenceBody: unknown = null
+
+    server.use(
+      http.get(`${API_ROOT}/profiles/worker/me/`, () =>
+        HttpResponse.json(buildWorkerProfileFixture({ skills: [] })),
+      ),
+      http.post(`${API_ROOT}/taxonomy/infer-job-category/`, async ({ request }) => {
+        inferenceBody = await request.json()
+        return HttpResponse.json({
+          category: 1,
+          category_name: 'Construction & Repair',
+          subcategory: 4,
+          subcategory_name: 'Plumbing',
+          confidence: 100,
+          matched_terms: [
+            {
+              term: 'bathroom fixture installation',
+              source: 'required_skill',
+              skill_id: 20,
+              skill_name: 'Bathroom Fitting Installation',
+              category: 1,
+              category_name: 'Construction & Repair',
+              subcategory: 4,
+              subcategory_name: 'Plumbing',
+              confidence: 100,
+              method: 'exact_alias',
+              is_confident_match: true,
+              suggestions: [
+                {
+                  id: 20,
+                  name: 'Bathroom Fitting Installation',
+                  subcategory: 'Construction & Repair - Plumbing',
+                  confidence: 100,
+                },
+                {
+                  id: 21,
+                  name: 'Tile Installation',
+                  subcategory: 'Construction & Repair - Masonry',
+                  confidence: 70,
+                },
+              ],
+            },
+          ],
+          suggested_terms: [],
+        })
+      }),
+    )
+
+    renderWithProviders(<WorkerProfile />)
+
+    const skillInput = await screen.findByLabelText('Your skills')
+    await user.type(skillInput, 'bathroom fixture installation')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    await waitFor(() => {
+      expect(inferenceBody).toEqual({
+        title: '',
+        description: '',
+        required_skills: ['bathroom fixture installation'],
+        preferred_skills: [],
+      })
+    })
+
+    const matchSummary = await screen.findByText('Bathroom Fitting Installation', {
+      selector: 'summary',
+    })
+    await user.click(matchSummary)
+    expect(screen.getByText('Construction & Repair — Plumbing')).toBeInTheDocument()
+    expect(screen.getByText(/100% confidence using a saved alias/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Use suggested skill Tile Installation' }))
+    expect(screen.getByRole('list', { name: 'Your skills waiting to be saved' }))
+      .toHaveTextContent('Tile Installation')
+  })
+
+  it('expands a matched skill to show taxonomy, score, and alternative matches', async () => {
+    const user = userEvent.setup()
+
+    server.use(
+      http.get(`${API_ROOT}/profiles/worker/me/`, () =>
+        HttpResponse.json(
+          buildWorkerProfileFixture({
+            skills: [
+              {
+                id: 2,
+                name: 'House Wiring',
+                category: 'Construction & Repair',
+                subcategory: 'Electrical',
+              },
+            ],
+            skill_matches: [
+              {
+                input_term: 'ghar wiring',
+                method: 'exact_alias',
+                confidence: 100,
+                matched_skill_was_selected: false,
+                matched_skill: {
+                  id: 2,
+                  name: 'House Wiring',
+                  category: 'Construction & Repair',
+                  subcategory: 'Electrical',
+                },
+                suggestions: [
+                  {
+                    id: 2,
+                    name: 'House Wiring',
+                    category: 'Construction & Repair',
+                    subcategory: 'Electrical',
+                    confidence: 100,
+                  },
+                  {
+                    id: 4,
+                    name: 'Electrical Repair',
+                    category: 'Construction & Repair',
+                    subcategory: 'Electrical',
+                    confidence: 74.4,
+                  },
+                ],
+              },
+            ],
+          }),
+        ),
+      ),
+    )
+
+    renderWithProviders(<WorkerProfile />)
+
+    const matchedSkill = await screen.findByRole('button', { name: /house wiring.*100% match/i })
+    expect(matchedSkill).toHaveTextContent('Construction & Repair → Electrical')
+    await user.click(matchedSkill)
+
+    const details = screen.getByRole('region', { name: 'Match details for House Wiring' })
+    expect(details).toHaveTextContent('“ghar wiring” matched to House Wiring with a 100% score.')
+    expect(within(details).getByRole('button', { name: 'Electrical Repair (74%)' }))
+      .toBeInTheDocument()
   })
 
   it('saves a typed skill draft when the user clicks Save without clicking Add first', async () => {
