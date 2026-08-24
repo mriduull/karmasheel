@@ -70,7 +70,7 @@ describe('router', () => {
     renderAt('/')
     expect(screen.getByRole('link', { name: 'Workforce Matching' })).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { level: 1, name: /find honest local work/i }),
+      screen.getByRole('heading', { level: 1, name: /two sides\. one clear match/i }),
     ).toBeInTheDocument()
   })
 

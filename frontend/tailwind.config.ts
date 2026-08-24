@@ -32,6 +32,9 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        // Public-site headings only (Karmasheel Design Constitution §17/§40)
+        // — application UI stays on `sans` (Inter) everywhere.
+        display: ['Space Grotesk', 'Inter', 'system-ui', 'sans-serif'],
       },
       fontSize: {
         // Slightly larger than Tailwind's defaults so the interface remains
