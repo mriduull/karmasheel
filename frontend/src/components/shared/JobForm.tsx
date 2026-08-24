@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+} from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from 'react-router-dom'
@@ -8,14 +15,17 @@ import { inferJobTaxonomy } from '@/api/endpoints/taxonomy'
 import { ApiError, toBannerMessage, toFieldErrors } from '@/api/errors'
 import { MY_JOBS_QUERY_KEY } from '@/hooks/useMyJobs'
 import { ownerJobQueryKey } from '@/hooks/useOwnerJob'
+import { useEmployerProfile } from '@/hooks/useEmployerProfile'
 import {
   isDeadlineInPast,
   isDeadlineOnOrAfterScheduledStart,
+  isValidJobLocation,
   jobFormSchema,
   type JobFormValues,
 } from '@/validation/job'
 import { formatWageTypeLabel, formatWorkType, fromDatetimeLocalInputValue, toDatetimeLocalInputValue } from '@/lib/formatters'
 import type { EmployerJobPost, WageType, WorkType } from '@/types/job'
+import type { LocationValue } from '@/types/location'
 import type { JobTaxonomyInferenceRequest, JobTaxonomyMatchedTerm } from '@/types/taxonomy'
 import { TextField } from '@/components/primitives/TextField'
 import { Button } from '@/components/primitives/Button'
@@ -23,7 +33,7 @@ import { ErrorBanner } from '@/components/primitives/ErrorBanner'
 import { CategorySelect } from './CategorySelect'
 import { SubcategorySelect } from './SubcategorySelect'
 import { SkillChipInput, type SkillChipInputHandle } from './SkillChipInput'
-import { JobLocationFields } from './JobLocationFields'
+import { LocationPicker } from './LocationPicker'
 import { JobFormSection } from './JobFormSection'
 import { JobSkillDecisionScreen } from './JobSkillDecisionScreen'
 import { JobSkillInferenceResults } from './JobSkillInferenceResults'
@@ -43,9 +53,6 @@ function jobFormValues(job?: EmployerJobPost, clearDates = false): JobFormValues
     description: job?.description ?? '',
     category: job ? String(job.category) : '',
     subcategory: job ? String(job.subcategory) : '',
-    address: job?.address ?? '',
-    latitude: job?.latitude ?? '',
-    longitude: job?.longitude ?? '',
     wage_type: job?.wage_type ?? 'DAILY',
     wage_amount: job?.wage_amount ?? '',
     work_type: job?.work_type ?? 'ONE_TIME',
@@ -92,6 +99,29 @@ export function JobForm({ mode, job }: JobFormProps) {
   const [inferenceInput, setInferenceInput] = useState<JobTaxonomyInferenceRequest | null>(null)
   const [selectedPreviousJobId, setSelectedPreviousJobId] = useState('')
   const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null)
+  const [location, setLocation] = useState<LocationValue | null>(() =>
+    job
+      ? {
+          address: job.address,
+          latitude: Number(job.latitude),
+          longitude: Number(job.longitude),
+          placeId: null,
+        }
+      : null,
+  )
+  const [locationError, setLocationError] = useState<string | null>(null)
+
+  const employerProfileQuery = useEmployerProfile()
+  const employerProfile = employerProfileQuery.data
+  const employerLocation: LocationValue | null =
+    employerProfile && employerProfile.latitude !== null && employerProfile.longitude !== null
+      ? {
+          address: employerProfile.address,
+          latitude: Number(employerProfile.latitude),
+          longitude: Number(employerProfile.longitude),
+          placeId: null,
+        }
+      : null
 
   const previousJobsQuery = useQuery({
     queryKey: MY_JOBS_QUERY_KEY,
@@ -201,6 +231,13 @@ export function JobForm({ mode, job }: JobFormProps) {
     const nextPreferredSkills = previousJob.preferred_skills.map((skill) => skill.name)
 
     reset(jobFormValues(previousJob, true))
+    setLocation({
+      address: previousJob.address,
+      latitude: Number(previousJob.latitude),
+      longitude: Number(previousJob.longitude),
+      placeId: null,
+    })
+    setLocationError(null)
     requiredSkillsRef.current?.clearDraft()
     preferredSkillsRef.current?.clearDraft()
     setRequiredSkills(nextRequiredSkills)
@@ -219,6 +256,11 @@ export function JobForm({ mode, job }: JobFormProps) {
 
   const onSubmit = async (values: JobFormValues) => {
     setFormError(null)
+
+    if (!isValidJobLocation(location) || !location) {
+      setLocationError('Select a location for this job.')
+      return
+    }
 
     if (mode === 'create' && isDeadlineInPast(values.application_deadline)) {
       setError('application_deadline', { message: 'Application deadline cannot be in the past.' })

@@ -22,6 +22,7 @@ import type {
 } from '@/types/profile'
 import type { SkillTagSummary } from '@/types/skill'
 import type { JobTaxonomyInferenceRequest } from '@/types/taxonomy'
+import type { LocationValue } from '@/types/location'
 import { PageContainer } from '@/components/primitives/PageContainer'
 import { Button } from '@/components/primitives/Button'
 import { TextField } from '@/components/primitives/TextField'
@@ -33,7 +34,7 @@ import { UnmatchedTermNotice } from '@/components/shared/UnmatchedTermNotice'
 import { ManualSkillPicker } from '@/components/shared/ManualSkillPicker'
 import { SkillMatchReview } from '@/components/shared/SkillMatchReview'
 import { JobSkillInferenceResults } from '@/components/shared/JobSkillInferenceResults'
-import { CoordinateCapture } from '@/components/shared/CoordinateCapture'
+import { LocationPicker } from '@/components/shared/LocationPicker'
 import { ProfilePhotoUpload } from '@/components/shared/ProfilePhotoUpload'
 
 /**
