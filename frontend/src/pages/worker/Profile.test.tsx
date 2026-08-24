@@ -81,7 +81,7 @@ describe('WorkerProfile', () => {
     expect(within(basicsForm).getByText('Saved')).toBeInTheDocument()
   })
 
-  it('submits address/latitude/longitude together for the Location section on map click', async () => {
+  it('submits rounded address/latitude/longitude together for a precise map click', async () => {
     const user = userEvent.setup()
     let capturedBody: unknown = null
 
@@ -92,14 +92,14 @@ describe('WorkerProfile', () => {
       http.patch(`${API_ROOT}/profiles/worker/me/`, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json(
-          buildWorkerProfileFixture({ address: 'Baneshwor, Kathmandu, Nepal', latitude: '27.700500', longitude: '85.301000' }),
+          buildWorkerProfileFixture({ address: 'Baneshwor, Kathmandu, Nepal', latitude: '27.700512', longitude: '85.301046' }),
         )
       }),
     )
 
     renderWithProviders(<WorkerProfile />)
 
-    await user.click(await screen.findByRole('button', { name: 'Simulate map click' }))
+    await user.click(await screen.findByRole('button', { name: 'Simulate precise map click' }))
     await screen.findByText('Baneshwor, Kathmandu, Nepal')
 
     const locationForm = screen.getByText('Your usual work location').closest('form') as HTMLFormElement
@@ -108,8 +108,8 @@ describe('WorkerProfile', () => {
     await waitFor(() => {
       expect(capturedBody).toEqual({
         address: 'Baneshwor, Kathmandu, Nepal',
-        latitude: 27.7005,
-        longitude: 85.301,
+        latitude: 27.700512,
+        longitude: 85.301046,
       })
     })
     expect(within(locationForm).getByText('Saved')).toBeInTheDocument()
@@ -257,7 +257,8 @@ describe('WorkerProfile', () => {
 
     expect(screen.getByRole('list', { name: 'Your skills waiting to be saved' }))
       .toHaveTextContent('ghar wiring')
-    expect(screen.getByRole('status')).toHaveTextContent(
+    const skillsSection = screen.getByRole('heading', { name: 'Skills', exact: true }).closest('section') as HTMLElement
+    expect(within(skillsSection).getByRole('status')).toHaveTextContent(
       '1 skill is ready to save. Review the match shown above, then click Save.',
     )
   })

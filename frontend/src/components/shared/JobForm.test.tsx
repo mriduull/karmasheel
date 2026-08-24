@@ -354,9 +354,10 @@ describe('JobForm', () => {
 
       expect(screen.getByLabelText('Title')).toHaveValue(previousJob.title)
       expect(screen.getByLabelText('Description')).toHaveValue(previousJob.description)
-      expect(screen.getByLabelText('Address')).toHaveValue('Patan, Lalitpur')
-      expect(screen.getByLabelText('Latitude')).toHaveValue('27.683219')
-      expect(screen.getByLabelText('Longitude')).toHaveValue('85.327463')
+      const locationSection = screen.getByRole('heading', { name: 'Location', exact: true }).closest('section') as HTMLElement
+      expect(within(locationSection).getByText('Patan, Lalitpur')).toBeInTheDocument()
+      expect(within(locationSection).getByText('27.683219', { exact: false })).toBeInTheDocument()
+      expect(within(locationSection).getByText('85.327463', { exact: false })).toBeInTheDocument()
       expect(screen.getByLabelText('Wage type')).toHaveValue('DAILY')
       expect(screen.getByLabelText('Wage amount')).toHaveValue('1800.00')
       expect(screen.getByLabelText('Work type')).toHaveValue('ONE_TIME')
@@ -369,7 +370,8 @@ describe('JobForm', () => {
       expect(screen.getByLabelText('Preferred skills')).toHaveValue('')
       expect(screen.getByLabelText('Scheduled start')).toHaveValue('')
       expect(screen.getByLabelText('Application deadline')).toHaveValue('')
-      expect(screen.getByRole('status')).toHaveTextContent(
+      const duplicateSection = screen.getByRole('heading', { name: 'Duplicate Job', exact: true }).closest('section') as HTMLElement
+      expect(within(duplicateSection).getByRole('status')).toHaveTextContent(
         'Enter a new scheduled start and application deadline before publishing.',
       )
     })

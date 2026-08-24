@@ -20,7 +20,18 @@ import type { LocationSearchResult, LocationValue } from '@/types/location'
 const SEARCH_DEBOUNCE_MS = 400
 const MIN_QUERY_LENGTH = 3
 const DEFAULT_ZOOM = 12
-const SELECTED_ZOOM = 16
+// Keep enough surrounding streets visible to orient the user and avoid
+// requesting an unnecessarily detailed tile set for a saved point.
+const SELECTED_ZOOM = 14
+const OPENSTREETMAP_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+const OPENSTREETMAP_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+const GEOAPIFY_ATTRIBUTION = `${OPENSTREETMAP_ATTRIBUTION} | &copy; <a href="https://www.geoapify.com/">Geoapify</a>`
+
+/** DRF stores profile/job coordinates with six decimal places. Leaflet map
+ * clicks and Geoapify results commonly contain more precision than that, so
+ * normalize before the value reaches form state rather than only rounding the
+ * number displayed in the summary. */
+const normalizeCoordinate = (coordinate: number) => Number(coordinate.toFixed(6))
 
 /**
  * Inline SVG pin (brand-primary #9a3412, matching --color-brand-primary)
@@ -83,6 +94,9 @@ export function LocationPicker({
   const [searchError, setSearchError] = useState<string | null>(null)
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false)
   const [reverseGeocodeError, setReverseGeocodeError] = useState<string | null>(null)
+  const [tileProvider, setTileProvider] = useState<'geoapify' | 'openstreetmap'>(() =>
+    geoapifyConfigured ? 'geoapify' : 'openstreetmap',
+  )
   const [tileError, setTileError] = useState(false)
   const [announcement, setAnnouncement] = useState('')
 
@@ -111,7 +125,9 @@ export function LocationPicker({
   )
 
   const commitPoint = useCallback(
-    (latitude: number, longitude: number) => {
+    (rawLatitude: number, rawLongitude: number) => {
+      const latitude = normalizeCoordinate(rawLatitude)
+      const longitude = normalizeCoordinate(rawLongitude)
       reverseAbortRef.current?.abort()
       const controller = new AbortController()
       reverseAbortRef.current = controller
@@ -166,7 +182,14 @@ export function LocationPicker({
     const container = map.getContainer()
     const observer = new ResizeObserver(() => map.invalidateSize())
     observer.observe(container)
-    return () => observer.disconnect()
+    const initialResize = window.setTimeout(() => map.invalidateSize(), 0)
+    const handleWindowResize = () => map.invalidateSize()
+    window.addEventListener('resize', handleWindowResize)
+    return () => {
+      observer.disconnect()
+      window.clearTimeout(initialResize)
+      window.removeEventListener('resize', handleWindowResize)
+    }
   }, [map])
 
   // --- debounced, cancellable search ----------------------------------
@@ -218,10 +241,12 @@ export function LocationPicker({
 
   const handleSelectResult = useCallback(
     (result: LocationSearchResult) => {
+      const latitude = normalizeCoordinate(result.latitude)
+      const longitude = normalizeCoordinate(result.longitude)
       onChange({
         address: result.formatted,
-        latitude: result.latitude,
-        longitude: result.longitude,
+        latitude,
+        longitude,
         placeId: result.placeId,
       })
       setQuery('')
@@ -229,7 +254,7 @@ export function LocationPicker({
       setSearchStatus('idle')
       setReverseGeocodeError(null)
       setAnnouncement(`Location selected: ${result.formatted}`)
-      flyToPoint(result.latitude, result.longitude)
+      flyToPoint(latitude, longitude)
       summaryHeadingRef.current?.focus()
     },
     [onChange, flyToPoint],
@@ -382,9 +407,22 @@ export function LocationPicker({
           ref={setMap}
         >
           <TileLayer
-            url={geoapifyTileUrl()}
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | &copy; <a href="https://www.geoapify.com/">Geoapify</a>'
-            eventHandlers={{ tileerror: () => setTileError(true) }}
+            key={tileProvider}
+            url={tileProvider === 'geoapify' ? geoapifyTileUrl() : OPENSTREETMAP_TILE_URL}
+            attribution={tileProvider === 'geoapify' ? GEOAPIFY_ATTRIBUTION : OPENSTREETMAP_ATTRIBUTION}
+            eventHandlers={{
+              load: () => setTileError(false),
+              tileerror: () => {
+                if (tileProvider === 'geoapify') {
+                  // A quota/auth/network failure must not leave a half-grey
+                  // map. Replace the whole layer with the public OSM tiles.
+                  setTileProvider('openstreetmap')
+                  setTileError(false)
+                } else {
+                  setTileError(true)
+                }
+              },
+            }}
           />
           {markerPosition && (
             <Marker

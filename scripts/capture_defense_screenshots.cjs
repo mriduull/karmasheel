@@ -233,6 +233,10 @@ async function settle(page, expectedText) {
   if (captureZoom !== 1) {
     await page.evaluate((zoom) => {
       document.documentElement.style.zoom = String(zoom)
+      // Leaflet measures its container at mount time. CSS zoom does not
+      // reliably trigger its resize detection, so explicitly prompt the
+      // picker to invalidate its size before screenshots are taken.
+      window.dispatchEvent(new Event('resize'))
     }, captureZoom)
   }
   await page.waitForTimeout(250)
@@ -385,6 +389,16 @@ async function captureWorker(browser) {
     const skillsHeading = worker.page.getByRole('heading', { name: 'Skills', exact: true })
     await skillsHeading.scrollIntoViewIfNeeded()
     await worker.page.evaluate(() => window.scrollBy(0, -160))
+    await worker.page.waitForFunction(
+      () => {
+        const map = document.querySelector('.leaflet-container')
+        if (!map) return false
+        const tiles = Array.from(map.querySelectorAll('.leaflet-tile'))
+        return tiles.length > 0 && tiles.every((tile) => tile.classList.contains('leaflet-tile-loaded'))
+      },
+      undefined,
+      { timeout: 15_000 },
+    )
     await screenshot(worker.page, outputFiles.workerProfileSkills)
 
     await goto(worker.page, '/worker/recommendations', 'Recommended Jobs')

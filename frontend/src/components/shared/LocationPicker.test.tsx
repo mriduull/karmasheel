@@ -65,6 +65,7 @@ describe('LocationPicker', () => {
     expect(screen.getByText('Koteshwor, Kathmandu')).toBeInTheDocument()
     expect(screen.getByText('27.677800', { exact: false })).toBeInTheDocument()
     expect(screen.getByText('85.348800', { exact: false })).toBeInTheDocument()
+    expect(screen.getByTestId('location-map')).toHaveAttribute('data-zoom', '14')
 
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(mockedReverseGeocode).not.toHaveBeenCalled()
@@ -177,6 +178,40 @@ describe('LocationPicker', () => {
     expect(mockedReverseGeocode).toHaveBeenCalledWith(27.7005, 85.301, expect.objectContaining({ signal: expect.anything() }))
   })
 
+  it('rounds a precise map click to the six decimal places accepted by the API', async () => {
+    mockedReverseGeocode.mockResolvedValue('Selected Street, Kathmandu')
+    const user = userEvent.setup()
+    render(<Harness />)
+
+    await user.click(screen.getByRole('button', { name: 'Simulate precise map click' }))
+
+    expect(await screen.findByText('Selected Street, Kathmandu')).toBeInTheDocument()
+    expect(screen.getByText('27.700512', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('85.301046', { exact: false })).toBeInTheDocument()
+    expect(mockedReverseGeocode).toHaveBeenCalledWith(
+      27.700512,
+      85.301046,
+      expect.objectContaining({ signal: expect.anything() }),
+    )
+  })
+
+  it('falls back to OpenStreetMap tiles instead of leaving a partially empty map', async () => {
+    vi.stubEnv('VITE_GEOAPIFY_API_KEY', 'test-key')
+    const user = userEvent.setup()
+    render(<Harness initialValue={SAVED_VALUE} />)
+
+    expect(screen.getByTestId('simulate-tile-error')).toHaveAttribute(
+      'data-url',
+      expect.stringContaining('maps.geoapify.com'),
+    )
+    await user.click(screen.getByTestId('simulate-tile-error'))
+    expect(screen.getByTestId('simulate-tile-error')).toHaveAttribute(
+      'data-url',
+      expect.stringContaining('tile.openstreetmap.org'),
+    )
+    expect(screen.queryByText(/map preview is temporarily unavailable/i)).not.toBeInTheDocument()
+  })
+
   it('keeps coordinates and falls back to a plain label when reverse geocoding fails', async () => {
     mockedReverseGeocode.mockRejectedValue(new Error('boom'))
     const user = userEvent.setup()
@@ -249,6 +284,10 @@ describe('LocationPicker', () => {
     expect(screen.getByText(/search is unavailable right now/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Use my current location' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Simulate map click' })).toBeInTheDocument()
+    expect(screen.getByTestId('simulate-tile-error')).toHaveAttribute(
+      'data-url',
+      expect.stringContaining('tile.openstreetmap.org'),
+    )
   })
 
   it('has no automatically-detectable accessibility violations', async () => {
