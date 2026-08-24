@@ -257,7 +257,7 @@ describe('WorkerProfile', () => {
 
     expect(screen.getByRole('list', { name: 'Your skills waiting to be saved' }))
       .toHaveTextContent('ghar wiring')
-    const skillsSection = screen.getByRole('heading', { name: 'Skills', exact: true }).closest('section') as HTMLElement
+    const skillsSection = screen.getByRole('heading', { name: /^Skills$/ }).closest('section') as HTMLElement
     expect(within(skillsSection).getByRole('status')).toHaveTextContent(
       '1 skill is ready to save. Review the match shown above, then click Save.',
     )
