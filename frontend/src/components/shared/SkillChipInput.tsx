@@ -12,6 +12,7 @@ interface SkillChipInputProps {
 
 export interface SkillChipInputHandle {
   commitDraft: () => string[] | null
+  clearDraft: () => void
 }
 
 /**
@@ -60,6 +61,10 @@ export const SkillChipInput = forwardRef<SkillChipInputHandle, SkillChipInputPro
 
     useImperativeHandle(ref, () => ({
       commitDraft: commitDraftIfPresent,
+      clearDraft: () => {
+        setDraft('')
+        setError(null)
+      },
     }))
 
     const addDraft = () => {
@@ -115,7 +120,7 @@ export const SkillChipInput = forwardRef<SkillChipInputHandle, SkillChipInputPro
         )}
 
         {value.length > 0 && (
-          <ul className="flex flex-wrap gap-2">
+          <ul className="flex flex-wrap gap-2" aria-label={`${label} waiting to be saved`}>
             {value.map((skill, index) => (
               <li key={skill} className="flex items-center gap-1 rounded-sm bg-surface-muted px-2 py-1">
                 <span className="text-sm text-text-primary">{skill}</span>

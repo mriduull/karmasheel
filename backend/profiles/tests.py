@@ -321,14 +321,36 @@ class WorkerProfileAPITests(APITestCase):
             {
                 "id": self.skill.id,
                 "name": "House Wiring",
-                "subcategory": "Construction & Repair - Electrical",
+                "category": "Construction & Repair",
+                "subcategory": "Electrical",
             },
         )
         self.assertFalse(match["matched_skill_was_selected"])
-        self.assertEqual(match["suggestions"], [])
+        self.assertTrue(match["suggestions"])
 
         self.worker_profile.refresh_from_db()
         self.assertIn(self.skill, self.worker_profile.skills.all())
+
+    def test_worker_receives_review_details_for_access_card_typo(self):
+        access_card = SkillTag.objects.create(
+            subcategory=self.skill.subcategory,
+            name="Access Card Management",
+        )
+        self.authenticate_as(self.worker, "WorkerPassword123!")
+
+        response = self.client.patch(
+            self.worker_url,
+            {"skill_input": ["Aces card mangmnt"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        match = response.data["skill_matches"][0]
+        self.assertEqual(match["method"], "fuzzy")
+        self.assertEqual(match["matched_skill"]["name"], "Access Card Management")
+        self.assertGreaterEqual(match["confidence"], 85)
+        self.worker_profile.refresh_from_db()
+        self.assertIn(access_card, self.worker_profile.skills.all())
 
     def test_worker_skill_input_lists_are_limited_to_twenty_items(self):
         self.worker_profile.address = "Original address"
@@ -459,7 +481,7 @@ class WorkerProfileAPITests(APITestCase):
             self.assertTrue(
                 all(
                     suggestion["subcategory"]
-                    == "Construction & Repair - Electrical"
+                    == "Electrical"
                     for suggestion in item["suggestions"]
                 )
             )
@@ -490,7 +512,7 @@ class WorkerProfileAPITests(APITestCase):
         self.assertNotEqual(suggestions, [])
         self.assertTrue(
             all(
-                suggestion["subcategory"] == "Construction & Repair - Electrical"
+                suggestion["subcategory"] == "Electrical"
                 for suggestion in suggestions
             )
         )

@@ -4,18 +4,31 @@ Use the current React application at `http://localhost:5173`, not the older
 Django debug interface at port 8000. All captures must use the synthetic
 `demo_*` dataset created by `seed_demo`.
 
-The report-ready PNG files live in [`appendix-c/screenshots/`](appendix-c/screenshots/).
-Regenerate them after any visible UI/data change; do not mix captures from
-different commits.
+The refreshed report-ready PNG files live in
+[`appendix-c/screenshots-2026-08-24/`](appendix-c/screenshots-2026-08-24/).
+Presentation-ready 4:3 versions with larger text live in
+[`appendix-c/screenshots-2026-08-24-4x3-presentation/`](appendix-c/screenshots-2026-08-24-4x3-presentation/).
+The previous [`appendix-c/screenshots/`](appendix-c/screenshots/) folder is
+retained as history and should not be mixed with the refreshed sets.
 
-The current screenshot directory contains these 14 files:
+Supplementary frontend evidence for the three Worker skill-normalization cases
+is stored separately in
+[`appendix-c/skill-normalization-frontend-2026-08-24/`](appendix-c/skill-normalization-frontend-2026-08-24/):
+
+- `c14a-ghar-ko-wiring-house-wiring.png`
+- `c14b-electric-safety-electrical-safety.png`
+- `c14c-mystery-quantum-repair-unmatched.png`
+
+The refreshed report directory contains these 16 files:
 
 - `c01-public-landing.png`
 - `c02-public-job-discovery.png`
 - `c03a-worker-profile-photo-basics.png`
 - `c03b-worker-profile-location-skills.png`
 - `c04-worker-job-recommendations.png`
-- `c05-opportunity-advisory-empty-state.png`
+- `c05a-opportunity-near-miss.png`
+- `c05b-opportunity-skill-gap.png`
+- `c06-worker-applications-ratings.png`
 - `c07-generated-worker-cv.png`
 - `c08-employer-job-management.png`
 - `c09-employer-application-lifecycle.png`
@@ -25,9 +38,10 @@ The current screenshot directory contains these 14 files:
 - `c12b-admin-taxonomy-moderation.png`
 - `c13-mobile-job-discovery.png`
 
-Figures C03 and C12 use two readable screenshots each. Figure C06 remains a
-capture target but is not currently present in the directory. C13 is the
-mobile capture; the remaining files are desktop captures.
+Figures C03, C05, and C12 use two readable screenshots each. C13 is the mobile
+capture; the remaining files are desktop captures. The presentation version
+frames the true mobile viewport inside a 1440×1080 canvas so every PNG retains
+the requested 4:3 slide ratio.
 
 ## Prepare a clean capture state
 

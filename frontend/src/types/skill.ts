@@ -8,5 +8,7 @@
 export interface SkillTagSummary {
   id: number
   name: string
+  /** Present in current API responses; optional for older cached responses. */
+  category?: string
   subcategory: string
 }

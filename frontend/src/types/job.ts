@@ -1,5 +1,6 @@
 import type { EmployerVerificationStatus } from '@/hooks/useEmployerVerificationStatus'
 import type { SkillTagSummary } from './skill'
+import type { SkillMatch } from './profile'
 
 export type JobStatus = 'ACTIVE' | 'CLOSED'
 export type WorkType = 'FULL_TIME' | 'PART_TIME' | 'CONTRACT' | 'ONE_TIME'
@@ -66,6 +67,8 @@ export interface EmployerJobPost {
   preferred_skills: SkillTagSummary[]
   unmatched_required_terms: string[]
   unmatched_preferred_terms: string[]
+  required_skill_matches: SkillMatch[]
+  preferred_skill_matches: SkillMatch[]
   description: string
   address: string
   latitude: string
@@ -109,6 +112,8 @@ export interface JobCreatePayload {
   application_deadline?: string | null
   required_skills_input?: string[]
   preferred_skills_input?: string[]
+  required_skills_review_input?: string[]
+  preferred_skills_review_input?: string[]
 }
 
 /**
@@ -158,5 +163,7 @@ export interface JobUpdatePayload {
   application_deadline?: string | null
   required_skills_input?: string[]
   preferred_skills_input?: string[]
+  required_skills_review_input?: string[]
+  preferred_skills_review_input?: string[]
   status?: 'CLOSED'
 }

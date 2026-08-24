@@ -205,6 +205,42 @@ class NormalizeSkillPhraseTests(TestCase):
             ).exists()
         )
 
+    def test_partial_token_overlap_does_not_create_unrelated_fuzzy_match(self):
+        tailoring = Subcategory.objects.create(
+            category=self.category,
+            name="Garment Fabrication",
+        )
+        wrong_skill = SkillTag.objects.create(
+            subcategory=tailoring,
+            name="Sewing Machine Handling",
+        )
+
+        result = normalize_skill_phrase("gadi chalaune", record_unmatched=False)
+
+        self.assertIsNone(result.skill)
+        self.assertEqual(result.method, "unmatched")
+        self.assertEqual(result.candidate, wrong_skill)
+        self.assertLess(result.confidence, 85)
+
+    def test_high_score_without_a_clear_margin_requires_confirmation(self):
+        SkillTag.objects.create(
+            subcategory=self.subcategory,
+            name="Switch Board Installation",
+        )
+        SkillTag.objects.create(
+            subcategory=self.subcategory,
+            name="Switchboard Installation",
+        )
+
+        result = normalize_skill_phrase(
+            "switch bord instalation",
+            record_unmatched=False,
+        )
+
+        self.assertIsNone(result.skill)
+        self.assertEqual(result.method, "unmatched")
+        self.assertGreaterEqual(result.confidence, 85)
+
     def test_custom_threshold_overrides_default(self):
         # A near-miss that clears a lenient threshold but not a strict one.
         lenient = normalize_skill_phrase("House Wireing", threshold=50)
@@ -650,6 +686,70 @@ class TaxonomyPublicAPITests(APITestCase):
         self.assertEqual(response.data["subcategory"], self.sub_electrical.id)
         self.assertEqual(response.data["subcategory_name"], "Electrical")
         self.assertEqual(response.data["matched_terms"][0]["skill_name"], "House Wiring")
+
+    def test_job_taxonomy_inference_returns_every_skill_mapping_with_suggestions(self):
+        medication = SkillTag.objects.create(
+            subcategory=self.sub_electrical,
+            name="Medication Reminder Support",
+        )
+
+        SkillAlias.objects.create(
+            skill=medication,
+            phrase="ausadhi samjhaune",
+            language=SkillAlias.Language.NE_ROMANIZED,
+        )
+
+        response = self.client.post(
+            reverse("taxonomy:infer_job_category"),
+            {
+                "required_skills": ["ghar wiring"],
+                "preferred_skills": ["aaunsadi samjhaune"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        terms = {term["term"]: term for term in response.data["matched_terms"]}
+        self.assertEqual(terms["ghar wiring"]["skill_name"], "House Wiring")
+        self.assertEqual(
+            terms["aaunsadi samjhaune"]["skill_name"],
+            "Medication Reminder Support",
+        )
+        self.assertEqual(terms["aaunsadi samjhaune"]["method"], "fuzzy")
+        self.assertGreaterEqual(terms["aaunsadi samjhaune"]["confidence"], 85)
+        self.assertTrue(terms["aaunsadi samjhaune"]["suggestions"])
+
+    def test_job_taxonomy_inference_returns_clear_below_threshold_candidate_for_confirmation(self):
+        button_fixing = SkillTag.objects.create(
+            subcategory=self.sub_electrical,
+            name="Button Fixing",
+        )
+
+        response = self.client.post(
+            reverse("taxonomy:infer_job_category"),
+            {"required_skills": ["batan fixing"], "preferred_skills": []},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["category"])
+        self.assertEqual(response.data["matched_terms"], [])
+        suggestion = response.data["suggested_terms"][0]
+        self.assertEqual(suggestion["skill_id"], button_fixing.id)
+        self.assertEqual(suggestion["skill_name"], "Button Fixing")
+        self.assertFalse(suggestion["is_confident_match"])
+        self.assertGreaterEqual(suggestion["confidence"], 75)
+
+    def test_job_taxonomy_inference_does_not_suggest_unrelated_phrase(self):
+        response = self.client.post(
+            reverse("taxonomy:infer_job_category"),
+            {"required_skills": ["totally unrelated gibberish"], "preferred_skills": []},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["matched_terms"], [])
+        self.assertEqual(response.data["suggested_terms"], [])
 
     def test_job_taxonomy_inference_is_side_effect_free_for_unknown_terms(self):
         before = UnmatchedSkillTerm.objects.count()
@@ -1157,6 +1257,45 @@ class SeedTaxonomyV1CommandTests(TestCase):
         self.assertIsNotNone(result.skill)
         self.assertEqual(result.skill.name, "Elderly Personal Care")
         self.assertEqual(result.method, "exact_alias")
+
+    def test_electric_safety_alias_resolves_to_electrical_safety(self):
+        result = normalize_skill_phrase("electric safety")
+
+        self.assertIsNotNone(result.skill)
+        self.assertEqual(result.skill.name, "Electrical Safety")
+        self.assertEqual(result.method, "exact_alias")
+
+    def test_common_romanized_electrical_and_driving_aliases_resolve_correctly(self):
+        expected = {
+            "bijuli jodan": "House Wiring",
+            "bijuli jadan": "House Wiring",
+            "gadi chalaune": "Car Driving",
+            "gaadi chalaune": "Car Driving",
+        }
+
+        for phrase, skill_name in expected.items():
+            with self.subTest(phrase=phrase):
+                result = normalize_skill_phrase(phrase)
+                self.assertEqual(result.skill.name, skill_name)
+                self.assertEqual(result.method, "exact_alias")
+
+    def test_common_spelling_variations_resolve_to_the_same_skill(self):
+        expected = {
+            "bijuli jodna": "House Wiring",
+            "bijuli jodne": "House Wiring",
+            "bijuli jodane": "House Wiring",
+            "bijli jodan": "House Wiring",
+            "gadi chalauney": "Car Driving",
+            "gadi chalune": "Car Driving",
+            "gadi chalauna": "Car Driving",
+            "gadi chalane": "Car Driving",
+        }
+
+        for phrase, skill_name in expected.items():
+            with self.subTest(phrase=phrase):
+                result = normalize_skill_phrase(phrase, record_unmatched=False)
+                self.assertIsNotNone(result.skill)
+                self.assertEqual(result.skill.name, skill_name)
 
     def test_english_alias_normalization_is_case_insensitive(self):
         lower = normalize_skill_phrase("home wiring")

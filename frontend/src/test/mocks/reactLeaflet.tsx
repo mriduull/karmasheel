@@ -11,6 +11,7 @@ import { useEffect, useRef, type ReactNode } from 'react'
  * manual acceptance test).
  */
 export const MOCK_CLICK_LATLNG = { lat: 27.7005, lng: 85.301 }
+const MOCK_PRECISE_CLICK_LATLNG = { lat: 27.700512345, lng: 85.301045678 }
 export const MOCK_DRAG_LATLNG = { lat: 27.71, lng: 85.31 }
 
 type ClickHandler = (event: { latlng: { lat: number; lng: number } }) => void
@@ -18,6 +19,7 @@ type ClickHandler = (event: { latlng: { lat: number; lng: number } }) => void
 interface MapContainerProps {
   children?: ReactNode
   ref?: (map: MockMap | null) => void
+  zoom?: number
   [key: string]: unknown
 }
 
@@ -32,7 +34,7 @@ interface MockMap {
   getContainer: () => HTMLElement | null
 }
 
-export function MapContainer({ children, ref: mapRef }: MapContainerProps) {
+export function MapContainer({ children, ref: mapRef, zoom }: MapContainerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const clickHandlers = useRef(new Set<ClickHandler>())
 
@@ -57,7 +59,7 @@ export function MapContainer({ children, ref: mapRef }: MapContainerProps) {
   }, [])
 
   return (
-    <div ref={containerRef} data-testid="location-map">
+    <div ref={containerRef} data-testid="location-map" data-zoom={zoom}>
       {children}
       <button
         type="button"
@@ -65,13 +67,29 @@ export function MapContainer({ children, ref: mapRef }: MapContainerProps) {
       >
         Simulate map click
       </button>
+      <button
+        type="button"
+        onClick={() => clickHandlers.current.forEach((handler) => handler({ latlng: MOCK_PRECISE_CLICK_LATLNG }))}
+      >
+        Simulate precise map click
+      </button>
     </div>
   )
 }
 
-export function TileLayer(props: { eventHandlers?: { tileerror?: () => void } }) {
+export function TileLayer(props: {
+  url?: string
+  attribution?: string
+  eventHandlers?: { load?: () => void; tileerror?: () => void }
+}) {
   return (
-    <button type="button" data-testid="simulate-tile-error" onClick={() => props.eventHandlers?.tileerror?.()}>
+    <button
+      type="button"
+      data-testid="simulate-tile-error"
+      data-url={props.url}
+      data-attribution={props.attribution}
+      onClick={() => props.eventHandlers?.tileerror?.()}
+    >
       Simulate tile error
     </button>
   )
