@@ -11,6 +11,14 @@ Presentation-ready 4:3 versions with larger text live in
 The previous [`appendix-c/screenshots/`](appendix-c/screenshots/) folder is
 retained as history and should not be mixed with the refreshed sets.
 
+Supplementary frontend evidence for the three Worker skill-normalization cases
+is stored separately in
+[`appendix-c/skill-normalization-frontend-2026-08-24/`](appendix-c/skill-normalization-frontend-2026-08-24/):
+
+- `c14a-ghar-ko-wiring-house-wiring.png`
+- `c14b-electric-safety-electrical-safety.png`
+- `c14c-mystery-quantum-repair-unmatched.png`
+
 The refreshed report directory contains these 16 files:
 
 - `c01-public-landing.png`

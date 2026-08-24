@@ -1258,6 +1258,13 @@ class SeedTaxonomyV1CommandTests(TestCase):
         self.assertEqual(result.skill.name, "Elderly Personal Care")
         self.assertEqual(result.method, "exact_alias")
 
+    def test_electric_safety_alias_resolves_to_electrical_safety(self):
+        result = normalize_skill_phrase("electric safety")
+
+        self.assertIsNotNone(result.skill)
+        self.assertEqual(result.skill.name, "Electrical Safety")
+        self.assertEqual(result.method, "exact_alias")
+
     def test_common_romanized_electrical_and_driving_aliases_resolve_correctly(self):
         expected = {
             "bijuli jodan": "House Wiring",

@@ -60,6 +60,20 @@
               ]
             },
             {
+              "name": "Electrical Safety",
+              "existing": false,
+              "aliases": [
+                {
+                  "phrase": "electric safety",
+                  "language": "EN"
+                },
+                {
+                  "phrase": "bijuli suraksha",
+                  "language": "NE_ROMANIZED"
+                }
+              ]
+            },
+            {
               "name": "Ceiling Fan Installation",
               "existing": true,
               "aliases": [
