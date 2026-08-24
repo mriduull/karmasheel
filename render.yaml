@@ -1,0 +1,82 @@
+# Render Blueprint for Karmasheel.
+#
+# Free-tier first deployment. Two known, deliberate limitations of this
+# pass (not bugs, not omissions):
+#
+# 1. Migrations are NOT run by Render. There is no buildCommand,
+#    startCommand, or preDeployCommand step that runs
+#    `manage.py migrate` / `manage.py seed_taxonomy` — the free web
+#    service plan does not support preDeployCommand, and Render Shell/SSH
+#    is intentionally not depended on either. After karmasheel-db is
+#    provisioned, run both commands manually from a local machine against
+#    its External Database URL (Render dashboard > karmasheel-db > Info).
+#
+# 2. Profile-photo persistence is NOT solved here. karmasheel-api runs on
+#    the free web-service plan with no persistent disk attached, so
+#    WorkerProfile.profile_photo uploads (FileSystemStorage under
+#    MEDIA_ROOT) do not survive a redeploy or restart. Object storage is
+#    out of scope for this pass.
+
+databases:
+  - name: karmasheel-db
+    plan: free
+    region: singapore
+    databaseName: karmasheel
+    user: karmasheel_user
+
+services:
+  - type: web
+    name: karmasheel-api
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: "pip install -r requirements.txt && python backend/manage.py collectstatic --noinput"
+    startCommand: "gunicorn --chdir backend config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120 --access-logfile - --error-logfile -"
+    healthCheckPath: /api/health/
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_ALLOWED_HOSTS
+        fromService:
+          type: web
+          name: karmasheel-api
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
+      - key: CSRF_TRUSTED_ORIGINS
+        fromService:
+          type: web
+          name: karmasheel-api
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: CORS_ALLOWED_ORIGINS
+        fromService:
+          type: web
+          name: karmasheel-frontend
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: DATABASE_URL
+        fromDatabase:
+          name: karmasheel-db
+          property: connectionString
+      - key: DB_SSL_REQUIRED
+        value: "True"
+      - key: CV_PDF_ENGINE
+        value: basic
+      - key: DJANGO_LOG_LEVEL
+        value: INFO
+
+  - type: web
+    name: karmasheel-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: "npm ci && npm run build"
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: karmasheel-api
+          envVarKey: RENDER_EXTERNAL_URL
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
