@@ -232,6 +232,9 @@ describe('JobForm', () => {
       expect(within(details).getByText((_, element) => element?.tagName === 'P' && (element.textContent?.includes('aaunsadi samjhaune') ?? false))).toBeInTheDocument()
       expect(within(details).getByText(/91% confidence/i)).toBeInTheDocument()
       expect(within(details).getByText(/Medicine Pickup Support \(72%\)/i)).toBeInTheDocument()
+      await user.click(within(details).getByRole('button', { name: 'Use suggested skill Medicine Pickup Support' }))
+      expect(screen.getByRole('button', { name: 'Remove Medicine Pickup Support' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Remove aaunsadi samjhaune' })).not.toBeInTheDocument()
     })
 
     it('shows and applies a tentative canonical suggestion for a lower-confidence spelling', async () => {

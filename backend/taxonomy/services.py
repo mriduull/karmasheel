@@ -16,11 +16,12 @@ from typing import Optional
 from django.conf import settings
 from django.db.models import Count, F
 from django.utils import timezone
-from rapidfuzz import fuzz, process
+from rapidfuzz import fuzz
 
 from .models import SkillAlias, SkillTag, UnmatchedSkillTerm
 
 DEFAULT_SKILL_MATCH_THRESHOLD = 85.0
+DEFAULT_SKILL_MATCH_MIN_MARGIN = 5.0
 
 
 def preprocess_skill_phrase(phrase: str) -> str:
@@ -90,28 +91,15 @@ def _resolve_active_skill_by_alias(normalized_phrase):
 
 
 def _best_fuzzy_candidate(normalized_phrase):
-    """Return (SkillTag or None, score) for the closest active skill name or alias."""
+    """Return the best skill, its score, and its lead over the runner-up."""
 
-    lookup = {}
+    ranked = get_similar_skill_suggestions(normalized_phrase, limit=2)
+    if not ranked:
+        return None, 0.0, 0.0
 
-    for name, pk in _active_skills_by_canonical_preference().values_list("name", "pk"):
-        lookup.setdefault(name.lower(), pk)
-
-    for phrase, skill_id in SkillAlias.objects.filter(
-        skill__is_active=True
-    ).values_list("phrase", "skill_id"):
-        lookup.setdefault(phrase.lower(), skill_id)
-
-    if not lookup:
-        return None, 0.0
-
-    match = process.extractOne(normalized_phrase, lookup.keys(), scorer=fuzz.WRatio)
-
-    if match is None:
-        return None, 0.0
-
-    matched_text, score, _ = match
-    return SkillTag.objects.filter(pk=lookup[matched_text]).first(), float(score)
+    candidate, score = ranked[0]
+    runner_up_score = ranked[1][1] if len(ranked) > 1 else 0.0
+    return candidate, score, score - runner_up_score
 
 
 def _record_unmatched_term(
@@ -151,7 +139,12 @@ def _record_unmatched_term(
     return term
 
 
-def get_similar_skill_suggestions(phrase, *, limit=5, subcategory_id=None):
+def get_similar_skill_suggestions(
+    phrase,
+    *,
+    limit=5,
+    subcategory_id=None,
+):
     """Return the closest active standardized skills, deduplicated by skill.
 
     Canonical names and aliases both contribute to a skill's score, but each
@@ -174,7 +167,7 @@ def get_similar_skill_suggestions(phrase, *, limit=5, subcategory_id=None):
         candidate_phrases = [skill.name]
         candidate_phrases.extend(alias.phrase for alias in skill.aliases.all())
         score = max(
-            fuzz.WRatio(normalized, preprocess_skill_phrase(candidate_phrase))
+            fuzz.ratio(normalized, preprocess_skill_phrase(candidate_phrase))
             for candidate_phrase in candidate_phrases
         )
         ranked.append((skill, float(score)))
@@ -265,9 +258,13 @@ def normalize_skill_phrase(
             candidate=alias_skill,
         )
 
-    candidate, score = _best_fuzzy_candidate(normalized)
+    candidate, score, score_margin = _best_fuzzy_candidate(normalized)
 
-    if candidate is not None and score >= match_threshold:
+    if (
+        candidate is not None
+        and score >= match_threshold
+        and score_margin >= DEFAULT_SKILL_MATCH_MIN_MARGIN
+    ):
         return SkillMatchResult(
             candidate,
             "fuzzy",

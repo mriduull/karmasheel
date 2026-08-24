@@ -154,13 +154,14 @@ export function JobForm({ mode, job }: JobFormProps) {
     [...(inference?.matched_terms ?? []), ...(inference?.suggested_terms ?? [])]
       .filter((term) => term.source === 'preferred_skill')
 
-  const confirmSuggestedSkill = (
+  const selectMappedSkill = (
     match: JobTaxonomyMatchedTerm,
+    skillName: string,
     setSkills: Dispatch<SetStateAction<string[]>>,
   ) => {
     setSkills((skills) => skills.map((skill) =>
       skill.trim().toLocaleLowerCase() === match.term.trim().toLocaleLowerCase()
-        ? match.skill_name
+        ? skillName
         : skill,
     ))
   }
@@ -295,13 +296,13 @@ export function JobForm({ mode, job }: JobFormProps) {
           <JobSkillInferenceResults
             matches={requiredSkillMatches}
             selectedSubcategoryId={subcategoryValue ? Number(subcategoryValue) : null}
-            onConfirmSuggestion={(match) => confirmSuggestedSkill(match, setRequiredSkills)}
+            onSelectSkill={(match, skillName) => selectMappedSkill(match, skillName, setRequiredSkills)}
           />
           <SkillChipInput ref={preferredSkillsRef} label="Preferred skills" value={preferredSkills} onChange={setPreferredSkills} />
           <JobSkillInferenceResults
             matches={preferredSkillMatches}
             selectedSubcategoryId={subcategoryValue ? Number(subcategoryValue) : null}
-            onConfirmSuggestion={(match) => confirmSuggestedSkill(match, setPreferredSkills)}
+            onSelectSkill={(match, skillName) => selectMappedSkill(match, skillName, setPreferredSkills)}
           />
         </div>
         <CategorySelect

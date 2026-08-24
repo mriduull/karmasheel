@@ -3,10 +3,10 @@ import type { JobTaxonomyMatchedTerm } from '@/types/taxonomy'
 interface JobSkillInferenceResultsProps {
   matches: JobTaxonomyMatchedTerm[]
   selectedSubcategoryId: number | null
-  onConfirmSuggestion?: (match: JobTaxonomyMatchedTerm) => void
+  onSelectSkill?: (match: JobTaxonomyMatchedTerm, skillName: string) => void
 }
 
-export function JobSkillInferenceResults({ matches, selectedSubcategoryId, onConfirmSuggestion }: JobSkillInferenceResultsProps) {
+export function JobSkillInferenceResults({ matches, selectedSubcategoryId, onSelectSkill }: JobSkillInferenceResultsProps) {
   if (matches.length === 0) return null
 
   return (
@@ -30,11 +30,11 @@ export function JobSkillInferenceResults({ matches, selectedSubcategoryId, onCon
                 <strong>{match.skill_name}</strong> with {Math.round(match.confidence)}% confidence
                 {match.method === 'exact_alias' ? ' using a saved alias' : match.method === 'fuzzy' ? ' using typo-tolerant matching' : ''}.
               </p>
-              {!match.is_confident_match && onConfirmSuggestion && (
+              {!match.is_confident_match && onSelectSkill && (
                 <button
                   type="button"
                   className="min-h-touch self-start rounded-sm bg-brand-primary px-4 font-semibold text-white hover:bg-brand-primary-hover"
-                  onClick={() => onConfirmSuggestion(match)}
+                  onClick={() => onSelectSkill(match, match.skill_name)}
                 >
                   Use {match.skill_name}
                 </button>
@@ -52,8 +52,15 @@ export function JobSkillInferenceResults({ matches, selectedSubcategoryId, onCon
                   <p className="font-semibold">Other suggestions</p>
                   <ul className="mt-1 flex flex-wrap gap-2">
                     {alternatives.map((suggestion) => (
-                      <li key={suggestion.id} className="rounded-full bg-surface px-3 py-1 text-text-primary">
-                        {suggestion.name} ({Math.round(suggestion.confidence)}%)
+                      <li key={suggestion.id}>
+                        <button
+                          type="button"
+                          className="min-h-touch rounded-full bg-surface px-3 py-1 font-medium text-text-primary hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+                          onClick={() => onSelectSkill?.(match, suggestion.name)}
+                          aria-label={`Use suggested skill ${suggestion.name}`}
+                        >
+                          {suggestion.name} ({Math.round(suggestion.confidence)}%)
+                        </button>
                       </li>
                     ))}
                   </ul>

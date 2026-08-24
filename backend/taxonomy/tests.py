@@ -205,6 +205,42 @@ class NormalizeSkillPhraseTests(TestCase):
             ).exists()
         )
 
+    def test_partial_token_overlap_does_not_create_unrelated_fuzzy_match(self):
+        tailoring = Subcategory.objects.create(
+            category=self.category,
+            name="Garment Fabrication",
+        )
+        wrong_skill = SkillTag.objects.create(
+            subcategory=tailoring,
+            name="Sewing Machine Handling",
+        )
+
+        result = normalize_skill_phrase("gadi chalaune", record_unmatched=False)
+
+        self.assertIsNone(result.skill)
+        self.assertEqual(result.method, "unmatched")
+        self.assertEqual(result.candidate, wrong_skill)
+        self.assertLess(result.confidence, 85)
+
+    def test_high_score_without_a_clear_margin_requires_confirmation(self):
+        SkillTag.objects.create(
+            subcategory=self.subcategory,
+            name="Switch Board Installation",
+        )
+        SkillTag.objects.create(
+            subcategory=self.subcategory,
+            name="Switchboard Installation",
+        )
+
+        result = normalize_skill_phrase(
+            "switch bord instalation",
+            record_unmatched=False,
+        )
+
+        self.assertIsNone(result.skill)
+        self.assertEqual(result.method, "unmatched")
+        self.assertGreaterEqual(result.confidence, 85)
+
     def test_custom_threshold_overrides_default(self):
         # A near-miss that clears a lenient threshold but not a strict one.
         lenient = normalize_skill_phrase("House Wireing", threshold=50)
@@ -656,6 +692,7 @@ class TaxonomyPublicAPITests(APITestCase):
             subcategory=self.sub_electrical,
             name="Medication Reminder Support",
         )
+
         SkillAlias.objects.create(
             skill=medication,
             phrase="ausadhi samjhaune",
@@ -1220,6 +1257,38 @@ class SeedTaxonomyV1CommandTests(TestCase):
         self.assertIsNotNone(result.skill)
         self.assertEqual(result.skill.name, "Elderly Personal Care")
         self.assertEqual(result.method, "exact_alias")
+
+    def test_common_romanized_electrical_and_driving_aliases_resolve_correctly(self):
+        expected = {
+            "bijuli jodan": "House Wiring",
+            "bijuli jadan": "House Wiring",
+            "gadi chalaune": "Car Driving",
+            "gaadi chalaune": "Car Driving",
+        }
+
+        for phrase, skill_name in expected.items():
+            with self.subTest(phrase=phrase):
+                result = normalize_skill_phrase(phrase)
+                self.assertEqual(result.skill.name, skill_name)
+                self.assertEqual(result.method, "exact_alias")
+
+    def test_common_spelling_variations_resolve_to_the_same_skill(self):
+        expected = {
+            "bijuli jodna": "House Wiring",
+            "bijuli jodne": "House Wiring",
+            "bijuli jodane": "House Wiring",
+            "bijli jodan": "House Wiring",
+            "gadi chalauney": "Car Driving",
+            "gadi chalune": "Car Driving",
+            "gadi chalauna": "Car Driving",
+            "gadi chalane": "Car Driving",
+        }
+
+        for phrase, skill_name in expected.items():
+            with self.subTest(phrase=phrase):
+                result = normalize_skill_phrase(phrase, record_unmatched=False)
+                self.assertIsNotNone(result.skill)
+                self.assertEqual(result.skill.name, skill_name)
 
     def test_english_alias_normalization_is_case_insensitive(self):
         lower = normalize_skill_phrase("home wiring")
