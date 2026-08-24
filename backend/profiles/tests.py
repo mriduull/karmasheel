@@ -321,11 +321,12 @@ class WorkerProfileAPITests(APITestCase):
             {
                 "id": self.skill.id,
                 "name": "House Wiring",
-                "subcategory": "Construction & Repair - Electrical",
+                "category": "Construction & Repair",
+                "subcategory": "Electrical",
             },
         )
         self.assertFalse(match["matched_skill_was_selected"])
-        self.assertEqual(match["suggestions"], [])
+        self.assertTrue(match["suggestions"])
 
         self.worker_profile.refresh_from_db()
         self.assertIn(self.skill, self.worker_profile.skills.all())
@@ -480,7 +481,7 @@ class WorkerProfileAPITests(APITestCase):
             self.assertTrue(
                 all(
                     suggestion["subcategory"]
-                    == "Construction & Repair - Electrical"
+                    == "Electrical"
                     for suggestion in item["suggestions"]
                 )
             )
@@ -511,7 +512,7 @@ class WorkerProfileAPITests(APITestCase):
         self.assertNotEqual(suggestions, [])
         self.assertTrue(
             all(
-                suggestion["subcategory"] == "Construction & Repair - Electrical"
+                suggestion["subcategory"] == "Electrical"
                 for suggestion in suggestions
             )
         )

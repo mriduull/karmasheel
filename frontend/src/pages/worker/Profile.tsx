@@ -1,9 +1,10 @@
-import { useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { updateWorkerProfile } from '@/api/endpoints/profiles'
+import { inferJobTaxonomy } from '@/api/endpoints/taxonomy'
 import { ApiError, toBannerMessage, toFieldErrors } from '@/api/errors'
 import { useWorkerProfile, WORKER_PROFILE_QUERY_KEY } from '@/hooks/useWorkerProfile'
 import { WORKER_JOB_RECOMMENDATIONS_QUERY_KEY } from '@/hooks/useWorkerJobRecommendations'
@@ -20,6 +21,7 @@ import type {
   WorkerSkillMatch,
 } from '@/types/profile'
 import type { SkillTagSummary } from '@/types/skill'
+import type { JobTaxonomyInferenceRequest } from '@/types/taxonomy'
 import { PageContainer } from '@/components/primitives/PageContainer'
 import { Button } from '@/components/primitives/Button'
 import { TextField } from '@/components/primitives/TextField'
@@ -30,6 +32,7 @@ import { SkillChipInput, type SkillChipInputHandle } from '@/components/shared/S
 import { UnmatchedTermNotice } from '@/components/shared/UnmatchedTermNotice'
 import { ManualSkillPicker } from '@/components/shared/ManualSkillPicker'
 import { SkillMatchReview } from '@/components/shared/SkillMatchReview'
+import { JobSkillInferenceResults } from '@/components/shared/JobSkillInferenceResults'
 import { CoordinateCapture } from '@/components/shared/CoordinateCapture'
 import { ProfilePhotoUpload } from '@/components/shared/ProfilePhotoUpload'
 
@@ -279,6 +282,8 @@ function SkillsSection({ profile }: { profile: WorkerProfile }) {
   // phrases. Names are not globally unique, so category-picker choices must
   // never be round-tripped through name-only matching.
   const [skillInput, setSkillInput] = useState<string[]>([])
+  const [skillInferenceInput, setSkillInferenceInput] =
+    useState<JobTaxonomyInferenceRequest | null>(null)
   const [selectedSkills, setSelectedSkills] = useState<SkillTagSummary[]>(profile.skills)
   const [unmatchedTerms, setUnmatchedTerms] = useState<string[]>([])
   const [skillMatches, setSkillMatches] = useState<WorkerSkillMatch[]>(profile.skill_matches)
@@ -288,12 +293,43 @@ function SkillsSection({ profile }: { profile: WorkerProfile }) {
   const [queuedReviews, setQueuedReviews] = useState<QueuedSkillReview[]>([])
   const [submittedReviewTerms, setSubmittedReviewTerms] = useState<string[]>([])
   const [showManualPicker, setShowManualPicker] = useState(false)
+  const [expandedSkillId, setExpandedSkillId] = useState<number | null>(null)
   const [editNotice, setEditNotice] = useState<string | null>(null)
   const reviewableMatches = skillMatches.filter(
     (match) =>
       match.matched_skill !== null &&
       match.method !== 'exact_name',
   )
+
+  useEffect(() => {
+    if (skillInput.length === 0) {
+      setSkillInferenceInput(null)
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      setSkillInferenceInput({
+        title: '',
+        description: '',
+        required_skills: skillInput,
+        preferred_skills: [],
+      })
+    }, 350)
+
+    return () => window.clearTimeout(timeout)
+  }, [skillInput])
+
+  const skillInferenceQuery = useQuery({
+    queryKey: ['taxonomy', 'infer-worker-skills', skillInferenceInput],
+    queryFn: () => inferJobTaxonomy(skillInferenceInput as JobTaxonomyInferenceRequest),
+    enabled: skillInferenceInput !== null,
+  })
+  const inferredSkillMatches = skillInferenceInput
+    ? [
+        ...(skillInferenceQuery.data?.matched_terms ?? []),
+        ...(skillInferenceQuery.data?.suggested_terms ?? []),
+      ].filter((match) => match.source === 'required_skill')
+    : []
 
   const restoreSkillDecisionFocus = () => skillDecisionFocusRef.current?.focus()
 
@@ -492,16 +528,39 @@ function SkillsSection({ profile }: { profile: WorkerProfile }) {
       <SkillChipInput
         ref={skillInputRef}
         label="Your skills"
-        hint="Add each skill to the list, then click Save to check and match them."
+        hint="Add each skill to see how it matches, then click Save to update your profile."
         value={skillInput}
         onChange={markSkillsEdited}
       />
 
+      {skillInferenceQuery.isFetching && skillInferenceInput && (
+        <p role="status" className="text-sm text-text-secondary">Checking skill matches…</p>
+      )}
+
+      {skillInferenceQuery.isError && skillInferenceInput && (
+        <p role="alert" className="text-sm font-medium text-danger-text">
+          Skill matches could not be checked right now. You can still save and try again.
+        </p>
+      )}
+
+      <JobSkillInferenceResults
+        matches={inferredSkillMatches}
+        selectedSubcategoryId={null}
+        onSelectSkill={(match, skillName) => {
+          setSkillInput((current) => current.map((phrase) =>
+            skillNameKey(phrase) === skillNameKey(match.term) ? skillName : phrase,
+          ))
+          setIsSaved(false)
+          setUnmatchedTerms([])
+          setSubmittedReviewTerms([])
+          setEditNotice(`${skillName} selected. Save this section to apply the change.`)
+        }}
+      />
+
       {skillInput.length > 0 && (
         <p role="status" className="text-sm font-medium text-neutral-status-text">
-          {skillInput.length} {skillInput.length === 1 ? 'skill is' : 'skills are'} ready to
-          check. Click Save to match {skillInput.length === 1 ? 'it' : 'them'} to standardized
-          skills.
+          {skillInput.length} {skillInput.length === 1 ? 'skill is' : 'skills are'} ready to save.
+          Review the match {skillInput.length === 1 ? 'shown' : 'options'} above, then click Save.
         </p>
       )}
 
@@ -617,45 +676,103 @@ function SkillsSection({ profile }: { profile: WorkerProfile }) {
       {selectedSkills.length > 0 && (
         <div>
           <p className="mb-1 text-sm font-semibold text-text-primary">Selected standardized skills</p>
-          <ul className="flex flex-wrap gap-2" aria-label="Selected standardized skills">
-            {selectedSkills.map((skill) => (
-              <li
-                key={skill.id}
-                className="flex min-h-touch items-center gap-2 rounded-full bg-neutral-status-bg pl-3 text-sm font-medium text-neutral-status-text"
-              >
-                <span>
-                  {skill.name}
-                  <span className="ml-1 font-normal text-text-secondary">
-                    ({skill.subcategory})
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  className="flex min-h-touch min-w-touch items-center justify-center rounded-full hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
-                  aria-label={`Remove ${skill.name} (${skill.subcategory})`}
-                  onClick={() => {
-                    setSelectedSkills((current) =>
-                      current.filter((candidate) => candidate.id !== skill.id),
-                    )
-                    setProtectedSkillIds((current) => {
-                      const updated = new Set(current)
-                      updated.delete(skill.id)
-                      return updated
-                    })
-                    setSkillMatches((current) =>
-                      current.filter((match) => match.matched_skill?.id !== skill.id),
-                    )
-                    setIsSaved(false)
-                    setUnmatchedTerms([])
-                    setSubmittedReviewTerms([])
-                    setEditNotice(`${skill.name} removed. Save this section to apply the change.`)
-                    restoreSkillDecisionFocus()
-                  }}
-                >
-                  <X aria-hidden="true" size={18} />
-                </button>
-              </li>
-            ))}
+          <ul className="flex flex-col gap-2" aria-label="Selected standardized skills">
+            {selectedSkills.map((skill) => {
+              const match = skillMatches.find((candidate) => candidate.matched_skill?.id === skill.id)
+              const alternatives = match?.suggestions.filter((candidate) => candidate.id !== skill.id) ?? []
+              const isExpanded = expandedSkillId === skill.id
+
+              return (
+                <li key={skill.id} className="rounded-md bg-neutral-status-bg text-neutral-status-text">
+                  <div className="flex items-stretch">
+                    <button
+                      type="button"
+                      className="flex min-h-touch flex-1 items-center justify-between gap-3 rounded-l-md px-3 py-2 text-left hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+                      aria-expanded={isExpanded}
+                      aria-controls={`skill-match-details-${skill.id}`}
+                      onClick={() => setExpandedSkillId(isExpanded ? null : skill.id)}
+                    >
+                      <span>
+                        <span className="block text-sm font-semibold">{skill.name}</span>
+                        <span className="block text-xs font-normal text-text-secondary">
+                          {skill.category ? `${skill.category} → ` : ''}{skill.subcategory}
+                        </span>
+                      </span>
+                      <span className="text-xs font-semibold">
+                        {match ? `${Math.round(match.confidence)}% match` : 'View details'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="flex min-h-touch min-w-touch items-center justify-center rounded-r-md border-l border-text-secondary/20 hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+                      aria-label={`Remove ${skill.name} (${skill.subcategory})`}
+                      onClick={() => {
+                        setSelectedSkills((current) =>
+                          current.filter((candidate) => candidate.id !== skill.id),
+                        )
+                        setProtectedSkillIds((current) => {
+                          const updated = new Set(current)
+                          updated.delete(skill.id)
+                          return updated
+                        })
+                        setSkillMatches((current) =>
+                          current.filter((candidate) => candidate.matched_skill?.id !== skill.id),
+                        )
+                        setExpandedSkillId((current) => current === skill.id ? null : current)
+                        setIsSaved(false)
+                        setUnmatchedTerms([])
+                        setSubmittedReviewTerms([])
+                        setEditNotice(`${skill.name} removed. Save this section to apply the change.`)
+                        restoreSkillDecisionFocus()
+                      }}
+                    >
+                      <X aria-hidden="true" size={18} />
+                    </button>
+                  </div>
+
+                  {isExpanded && (
+                    <div
+                      id={`skill-match-details-${skill.id}`}
+                      role="region"
+                      aria-label={`Match details for ${skill.name}`}
+                      className="border-t border-text-secondary/20 px-3 py-3"
+                    >
+                      {match ? (
+                        <>
+                          <p className="text-sm">
+                            &ldquo;{match.input_term}&rdquo; matched to <strong>{skill.name}</strong> with a{' '}
+                            <strong>{Math.round(match.confidence)}% score</strong>.
+                          </p>
+                          {alternatives.length > 0 ? (
+                            <div className="mt-3">
+                              <p className="text-sm font-semibold">Other match options</p>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {alternatives.map((alternative) => (
+                                  <Button
+                                    key={alternative.id}
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => replaceAutomaticMatch(match, alternative)}
+                                  >
+                                    {alternative.name} ({Math.round(alternative.confidence)}%)
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="mt-2 text-sm text-text-secondary">No other close matches were found.</p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-sm text-text-secondary">
+                          This saved skill has no match score from the current session. Add the phrase again and save to recalculate it.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         </div>
       )}
