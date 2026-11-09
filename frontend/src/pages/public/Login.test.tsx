@@ -60,6 +60,7 @@ describe('Login', () => {
         HttpResponse.json({
           id: 1,
           username: 'demo_worker_electrician',
+          full_name: 'Demo Worker',
           email: 'electrician@example.com',
           phone_number: '9811100011',
           role: 'WORKER',
@@ -70,7 +71,7 @@ describe('Login', () => {
 
     renderLogin()
 
-    await user.type(screen.getByLabelText('Username'), 'demo_worker_electrician')
+    await user.type(screen.getByLabelText('Phone number'), '9811100011')
     await user.type(screen.getByLabelText('Password'), 'DemoPass123!')
     await user.click(screen.getByRole('button', { name: 'Log In' }))
 
@@ -91,6 +92,7 @@ describe('Login', () => {
         HttpResponse.json({
           id: 2,
           username: 'demo_employer_verified',
+          full_name: 'Demo Employer',
           email: 'employer@example.com',
           phone_number: '9811100022',
           role: 'EMPLOYER',
@@ -101,7 +103,7 @@ describe('Login', () => {
 
     renderLogin()
 
-    await user.type(screen.getByLabelText('Username'), 'demo_employer_verified')
+    await user.type(screen.getByLabelText('Phone number'), '9811100022')
     await user.type(screen.getByLabelText('Password'), 'DemoPass123!')
     await user.click(screen.getByRole('button', { name: 'Log In' }))
 
@@ -119,12 +121,12 @@ describe('Login', () => {
 
     renderLogin()
 
-    await user.type(screen.getByLabelText('Username'), 'demo_worker_electrician')
+    await user.type(screen.getByLabelText('Phone number'), '9811100011')
     await user.type(screen.getByLabelText('Password'), 'wrong-password')
     await user.click(screen.getByRole('button', { name: 'Log In' }))
 
     expect(
-      await screen.findByText("That username or password isn't right. Please try again."),
+      await screen.findByText("That phone number or password isn't right. Please try again."),
     ).toBeInTheDocument()
     expect(useAuthStore.getState().accessToken).toBeNull()
     expect(tokenStorage.getRefreshToken()).toBeNull()
@@ -164,7 +166,7 @@ describe('Login', () => {
 
     renderLogin()
 
-    await user.type(screen.getByLabelText('Username'), 'demo_worker_electrician')
+    await user.type(screen.getByLabelText('Phone number'), '9811100011')
     await user.type(screen.getByLabelText('Password'), 'DemoPass123!')
     await user.click(screen.getByRole('button', { name: 'Log In' }))
 
@@ -180,7 +182,7 @@ describe('Login', () => {
 
     renderLogin()
 
-    await user.type(screen.getByLabelText('Username'), 'demo_worker_electrician')
+    await user.type(screen.getByLabelText('Phone number'), '9811100011')
     await user.type(screen.getByLabelText('Password'), 'DemoPass123!')
     await user.click(screen.getByRole('button', { name: 'Log In' }))
 
@@ -199,6 +201,7 @@ describe('Login', () => {
         HttpResponse.json({
           id: 1,
           username: 'demo_worker_electrician',
+          full_name: 'Demo Worker',
           email: 'electrician@example.com',
           phone_number: '9811100011',
           role: 'WORKER',
@@ -209,7 +212,7 @@ describe('Login', () => {
 
     renderLogin()
 
-    await user.type(screen.getByLabelText('Username'), 'demo_worker_electrician')
+    await user.type(screen.getByLabelText('Phone number'), '9811100011')
     await user.type(screen.getByLabelText('Password'), 'DemoPass123!')
 
     const submitButton = screen.getByRole('button', { name: 'Log In' })

@@ -37,7 +37,7 @@ export function WorkerDashboard() {
   return (
     <PageContainer>
       <h1 className="text-2xl font-semibold text-text-primary">
-        Welcome, <span className="break-all">{user?.username}</span>
+        Welcome, <span className="break-all">{user?.full_name || user?.username}</span>
       </h1>
 
       <div className="mt-6">

@@ -7,6 +7,7 @@ export type Role = 'WORKER' | 'EMPLOYER'
 export interface CurrentUser {
   id: number
   username: string
+  full_name?: string
   email: string
   phone_number: string
   role: Role
@@ -27,7 +28,7 @@ export interface LoginPayload {
 /** accounts/serializers.py:RegisterSerializer request fields — `email` is
  * optional (the model field has `blank=True`, so DRF marks it not-required). */
 export interface RegisterPayload {
-  username: string
+  full_name: string
   email?: string
   phone_number: string
   password: string
@@ -42,6 +43,7 @@ export interface RegisterPayload {
 export interface RegisteredAccount {
   id: number
   username: string
+  full_name: string
   email: string
   phone_number: string
   role: Role

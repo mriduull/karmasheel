@@ -19,7 +19,7 @@ import { ErrorBanner } from '@/components/primitives/ErrorBanner'
  * generic session-ended fallback in src/api/errors.ts, which is written
  * for an already-authenticated session unexpectedly expiring, not a
  * failed login attempt. */
-const INVALID_CREDENTIALS_MESSAGE = "That username or password isn't right. Please try again."
+const INVALID_CREDENTIALS_MESSAGE = "That phone number or password isn't right. Please try again."
 
 export function Login() {
   const navigate = useNavigate()
@@ -83,8 +83,8 @@ export function Login() {
         className="flex flex-col gap-4"
       >
         <TextField
-          label="Username"
-          autoComplete="off"
+          label="Phone number"
+          autoComplete="tel-national"
           error={errors.username?.message}
           {...registerField('username')}
         />

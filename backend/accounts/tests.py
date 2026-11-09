@@ -28,7 +28,7 @@ class RegistrationAPITests(APITestCase):
 
     def test_worker_registration_creates_worker_profile(self):
         payload = {
-            "username": "newworker",
+            "full_name": "New Worker",
             "email": "newworker@example.com",
             "phone_number": "9811111111",
             "password": "SecurePassword123!",
@@ -46,8 +46,10 @@ class RegistrationAPITests(APITestCase):
             status.HTTP_201_CREATED,
         )
 
-        worker = User.objects.get(username="newworker")
+        worker = User.objects.get(phone_number="9811111111")
 
+        self.assertEqual(worker.get_full_name(), "New Worker")
+        self.assertEqual(worker.username, "user-9811111111")
         self.assertEqual(worker.role, User.Role.WORKER)
         self.assertFalse(worker.is_contact_verified)
         self.assertFalse(worker.is_staff)
@@ -67,7 +69,7 @@ class RegistrationAPITests(APITestCase):
 
     def test_employer_registration_creates_employer_profile(self):
         payload = {
-            "username": "newemployer",
+            "full_name": "New Employer",
             "email": "newemployer@example.com",
             "phone_number": "9822222222",
             "password": "SecurePassword123!",
@@ -85,8 +87,9 @@ class RegistrationAPITests(APITestCase):
             status.HTTP_201_CREATED,
         )
 
-        employer = User.objects.get(username="newemployer")
+        employer = User.objects.get(phone_number="9822222222")
 
+        self.assertEqual(employer.get_full_name(), "New Employer")
         self.assertEqual(employer.role, User.Role.EMPLOYER)
         self.assertFalse(employer.is_contact_verified)
 
@@ -100,7 +103,7 @@ class RegistrationAPITests(APITestCase):
 
     def test_registration_rejects_admin_role(self):
         payload = {
-            "username": "fakeadmin",
+            "full_name": "Fake Admin",
             "phone_number": "9833333333",
             "password": "SecurePassword123!",
             "role": "ADMIN",
@@ -118,7 +121,7 @@ class RegistrationAPITests(APITestCase):
         )
 
         self.assertFalse(
-            User.objects.filter(username="fakeadmin").exists()
+            User.objects.filter(phone_number="9833333333").exists()
         )
 
     def test_registration_rejects_duplicate_phone_number(self):
@@ -130,7 +133,7 @@ class RegistrationAPITests(APITestCase):
         )
 
         payload = {
-            "username": "anotheruser",
+            "full_name": "Another User",
             "phone_number": "9844444444",
             "password": "SecurePassword123!",
             "role": User.Role.WORKER,
@@ -158,7 +161,7 @@ class RegistrationAPITests(APITestCase):
                 response = self.client.post(
                     self.register_url,
                     {
-                        "username": f"invalidphone{index}",
+                        "full_name": "Invalid Phone",
                         "phone_number": phone_number,
                         "password": "SecurePassword123!",
                         "role": User.Role.WORKER,
@@ -169,18 +172,19 @@ class RegistrationAPITests(APITestCase):
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
                 self.assertIn("phone_number", response.data)
 
-    def test_registration_rejects_numeric_only_or_too_long_username(self):
+    def test_registration_rejects_invalid_full_name(self):
         cases = (
-            ("1234567890", "Username must include at least one letter."),
-            ("workername123456789012345678901", "Username must be 30 characters or fewer."),
+            ("1234567890", "Name should only contain letters and spaces."),
+            ("Ram 123", "Name should only contain letters and spaces."),
+            ("Ram_Bahadur", "Name should only contain letters and spaces."),
         )
 
-        for index, (username, expected_message) in enumerate(cases, start=1):
-            with self.subTest(username=username):
+        for index, (full_name, expected_message) in enumerate(cases, start=1):
+            with self.subTest(full_name=full_name):
                 response = self.client.post(
                     self.register_url,
                     {
-                        "username": username,
+                        "full_name": full_name,
                         "phone_number": f"981111111{index}",
                         "password": "SecurePassword123!",
                         "role": User.Role.WORKER,
@@ -189,8 +193,8 @@ class RegistrationAPITests(APITestCase):
                 )
 
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-                self.assertIn("username", response.data)
-                self.assertIn(expected_message, response.data["username"])
+                self.assertIn("full_name", response.data)
+                self.assertIn(expected_message, response.data["full_name"])
 
 
 class AuthenticationAPITests(APITestCase):
@@ -252,6 +256,20 @@ class AuthenticationAPITests(APITestCase):
     def test_valid_login_returns_access_and_refresh_tokens(self):
         response = self.login(
             self.worker.username,
+            self.worker_password,
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertIn("access", response.data)
+        self.assertIn("refresh", response.data)
+
+    def test_phone_number_login_returns_access_and_refresh_tokens(self):
+        response = self.login(
+            self.worker.phone_number,
             self.worker_password,
         )
 

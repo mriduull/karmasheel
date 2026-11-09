@@ -1,11 +1,11 @@
 from django.urls import path
 from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
     TokenRefreshView,
 )
 
 from .views import (
     EmployerOnlyView,
+    LoginView,
     LogoutView,
     MeView,
     RegisterView,
@@ -24,7 +24,7 @@ urlpatterns = [
     ),
     path(
         "login/",
-        TokenObtainPairView.as_view(),
+        LoginView.as_view(),
         name="login",
     ),
     path(

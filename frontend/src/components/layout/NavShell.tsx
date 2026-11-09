@@ -46,6 +46,7 @@ export function NavShell({ items, brandHref, children, variant = 'app' }: NavShe
   const { pathname } = useLocation()
   const user = useAuthStore((state) => state.user)
   const [isMoreOpen, setMoreOpen] = useState(false)
+  const displayName = user?.full_name || user?.username
 
   const tabletPrimaryItems = visibleItemsIncludingCurrent(items, TABLET_VISIBLE_ITEMS, pathname)
   const tabletPrimaryPaths = new Set(tabletPrimaryItems.map((item) => item.to))
@@ -172,12 +173,9 @@ export function NavShell({ items, brandHref, children, variant = 'app' }: NavShe
           </nav>
 
           {user && (
-            <div className="hidden shrink-0 items-center gap-1 md:flex xl:gap-2">
-              <span
-                className="max-w-28 truncate text-xs text-text-secondary xl:max-w-44 2xl:max-w-52"
-                title={user.username}
-              >
-                {user.username} · {user.role === 'WORKER' ? 'Worker' : 'Employer'}
+            <div className="hidden shrink-0 items-center gap-3 md:flex">
+              <span className="max-w-64 truncate text-sm text-text-secondary" title={displayName}>
+                {displayName} · {user.role === 'WORKER' ? 'Worker' : 'Employer'}
               </span>
               <button
                 type="button"

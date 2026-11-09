@@ -5,9 +5,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .permissions import IsEmployer, IsWorker
-from .serializers import CurrentUserSerializer, RegisterSerializer
+from .serializers import (
+    CurrentUserSerializer,
+    PhoneOrUsernameTokenObtainPairSerializer,
+    RegisterSerializer,
+)
 
 
 User = get_user_model()
@@ -19,6 +24,12 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
+
+
+class LoginView(TokenObtainPairView):
+    """JWT login with phone-number-or-username identifier support."""
+
+    serializer_class = PhoneOrUsernameTokenObtainPairSerializer
 
 
 class LogoutView(APIView):

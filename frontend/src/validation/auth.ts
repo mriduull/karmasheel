@@ -2,23 +2,19 @@ import { z } from 'zod'
 import { nonEmptyString } from './common'
 
 export const loginSchema = z.object({
-  username: nonEmptyString('Username'),
+  username: nonEmptyString('Phone number'),
   password: nonEmptyString('Password'),
 })
 
 export type LoginFormValues = z.infer<typeof loginSchema>
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-/** Django's default `UnicodeUsernameValidator`, inherited unmodified by
- * this project's custom User model (accounts/models.py). */
-const USERNAME_PATTERN = /^[\w.@+-]+$/
-const USERNAME_HAS_LETTER_PATTERN = /[A-Za-z]/
-const MAX_USERNAME_LENGTH = 30
+const FULL_NAME_PATTERN = /^[A-Za-z\s]+$/
 
 /**
  * Mirrors `accounts/serializers.py:RegisterSerializer` exactly:
- * - `username`: required, 30 characters max, at least one letter, plus
- *   Django's default UnicodeUsernameValidator-compatible character set.
+ * - `full_name`: required, letters and spaces only; stored server-side on
+ *   the account's name field while Django keeps an internal generated username.
  * - `email`: OPTIONAL — `AbstractUser.email` has `blank=True`, so DRF marks
  *   it `required=False`. Format is still checked client-side if provided.
  * - `phone_number`: required, max_length 10, NO format/digits validator
@@ -34,10 +30,10 @@ const MAX_USERNAME_LENGTH = 30
  *   itself (no free-text role input exists to validate).
  */
 export const registerSchema = z.object({
-  username: nonEmptyString('Username')
-    .max(MAX_USERNAME_LENGTH, 'Username must be 30 characters or fewer.')
-    .regex(USERNAME_PATTERN, 'Letters, digits, and @/./+/-/_ only.')
-    .regex(USERNAME_HAS_LETTER_PATTERN, 'Username must include at least one letter.'),
+  full_name: nonEmptyString('Full name').regex(
+    FULL_NAME_PATTERN,
+    'Name should only contain letters and spaces.',
+  ),
   email: z
     .string()
     .trim()

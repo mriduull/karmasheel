@@ -55,9 +55,9 @@ describe('Register', () => {
   it('marks registration fields with distinct autocomplete purposes', () => {
     const { container } = renderRegister()
 
-    expect(screen.getByLabelText('Username')).toHaveAttribute(
+    expect(screen.getByLabelText('Full name')).toHaveAttribute(
       'autocomplete',
-      'section-register nickname',
+      'section-register name',
     )
     expect(screen.getByLabelText('Email')).toHaveAttribute(
       'autocomplete',
@@ -76,7 +76,7 @@ describe('Register', () => {
       input.getAttribute('autocomplete'),
     )
     expect(autofillOrder.slice(0, 4)).toEqual([
-      'section-register nickname',
+      'section-register name',
       'section-register new-password',
       'section-register email',
       'section-register tel-national',
@@ -89,28 +89,28 @@ describe('Register', () => {
 
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
-    expect(await screen.findByText('Username is required.')).toBeInTheDocument()
+    expect(await screen.findByText('Full name is required.')).toBeInTheDocument()
     expect(screen.getByText('Phone number is required.')).toBeInTheDocument()
     expect(screen.getByText('Password is required.')).toBeInTheDocument()
   })
 
-  it('rejects numeric-only and too-long usernames before submitting', async () => {
+  it('rejects full names with anything besides letters and spaces before submitting', async () => {
     const user = userEvent.setup()
     renderRegister()
 
-    const usernameInput = screen.getByLabelText('Username')
-    await user.type(usernameInput, '1234567890')
+    const fullNameInput = screen.getByLabelText('Full name')
+    await user.type(fullNameInput, '1234567890')
     await user.type(screen.getByLabelText('Phone number'), '9811111111')
     await user.type(screen.getByLabelText('Password'), 'SecurePassword123!')
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
-    expect(await screen.findByText('Username must include at least one letter.')).toBeInTheDocument()
+    expect(await screen.findByText('Name should only contain letters and spaces.')).toBeInTheDocument()
 
-    await user.clear(usernameInput)
-    await user.type(usernameInput, 'workername123456789012345678901')
+    await user.clear(fullNameInput)
+    await user.type(fullNameInput, 'Ram 123')
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
-    expect(await screen.findByText('Username must be 30 characters or fewer.')).toBeInTheDocument()
+    expect(await screen.findByText('Name should only contain letters and spaces.')).toBeInTheDocument()
   })
 
   it('shows a minimum-length error for a too-short (but non-empty) password', async () => {
@@ -133,7 +133,8 @@ describe('Register', () => {
         return HttpResponse.json(
           {
             id: 10,
-            username: 'newworker',
+            username: 'user-9811111111',
+            full_name: 'New Worker',
             email: '',
             phone_number: '9811111111',
             role: 'WORKER',
@@ -145,7 +146,7 @@ describe('Register', () => {
 
     renderRegister()
 
-    await user.type(screen.getByLabelText('Username'), 'newworker')
+    await user.type(screen.getByLabelText('Full name'), 'New Worker')
     await user.type(screen.getByLabelText('Phone number'), '9811111111')
     await user.type(screen.getByLabelText('Password'), 'SecurePassword123!')
     await user.click(screen.getByRole('button', { name: 'Create account' }))
@@ -156,7 +157,7 @@ describe('Register', () => {
     expect(useAuthStore.getState().accessToken).toBeNull()
     expect(tokenStorage.getRefreshToken()).toBeNull()
     expect(capturedBody).toEqual({
-      username: 'newworker',
+      full_name: 'New Worker',
       phone_number: '9811111111',
       password: 'SecurePassword123!',
       role: 'WORKER',
@@ -180,7 +181,7 @@ describe('Register', () => {
 
     renderRegister()
 
-    await user.type(screen.getByLabelText('Username'), 'anotheruser')
+    await user.type(screen.getByLabelText('Full name'), 'Another User')
     await user.type(screen.getByLabelText('Phone number'), '9844444444')
     await user.type(screen.getByLabelText('Password'), 'SecurePassword123!')
     await user.click(screen.getByRole('button', { name: 'Create account' }))

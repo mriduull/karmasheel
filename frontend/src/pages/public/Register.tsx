@@ -27,7 +27,7 @@ export function Register() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [formError, setFormError] = useState<string | null>(null)
-  const [registeredUsername, setRegisteredUsername] = useState<string | null>(null)
+  const [registeredName, setRegisteredName] = useState<string | null>(null)
 
   const roleParam = searchParams.get('role')
   const preselectedRole: Role = isRole(roleParam) ? roleParam : 'WORKER'
@@ -42,7 +42,7 @@ export function Register() {
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      username: '',
+      full_name: '',
       email: '',
       phone_number: '',
       password: '',
@@ -55,27 +55,27 @@ export function Register() {
   // Successful registration never logs the user in — this effect only
   // redirects away from a confirmed registration, never toward one.
   useEffect(() => {
-    if (!registeredUsername) return
+    if (!registeredName) return
 
     const timer = setTimeout(() => {
       navigate('/login', { replace: true })
     }, AUTO_REDIRECT_DELAY_MS)
 
     return () => clearTimeout(timer)
-  }, [registeredUsername, navigate])
+  }, [registeredName, navigate])
 
   const onSubmit = async (values: RegisterFormValues) => {
     setFormError(null)
 
     try {
       const account = await registerAccount({
-        username: values.username,
+        full_name: values.full_name,
         email: values.email || undefined,
         phone_number: values.phone_number,
         password: values.password,
         role: values.role,
       })
-      setRegisteredUsername(account.username)
+      setRegisteredName(account.full_name)
     } catch (error) {
       if (error instanceof ApiError) {
         const fieldErrors = toFieldErrors(error)
@@ -93,11 +93,11 @@ export function Register() {
     }
   }
 
-  if (registeredUsername) {
+  if (registeredName) {
     return (
       <AuthCard title="Account created">
         <p className="text-base text-text-secondary">
-          Welcome, <strong className="text-text-primary">{registeredUsername}</strong> — your
+          Welcome, <strong className="text-text-primary">{registeredName}</strong> — your
           account is ready. Log in to set up your profile next.
         </p>
         <Button
@@ -128,10 +128,10 @@ export function Register() {
 
         <div className="order-1">
           <TextField
-            label="Username"
-            autoComplete="section-register nickname"
-            error={errors.username?.message}
-            {...registerField('username')}
+            label="Full name"
+            autoComplete="section-register name"
+            error={errors.full_name?.message}
+            {...registerField('full_name')}
           />
         </div>
         <div className="order-4">
